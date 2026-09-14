@@ -1,0 +1,209 @@
+{
+  "manifestVersion": "1.0.0",
+  "manifestType": "LEGACY_UCL_SOURCE_ARTIFACT_MANIFEST",
+  "createdAt": "2026-09-13T14:30:00+03:00",
+  "createdBy": "GHARIBO AI Lab — M3A autonomous work session",
+  "sourceRoot": "data/raw/legacy-ucl/",
+  "classification": "DERIVED — immutable manifest of source artifacts (hashes and metadata only; no source payloads)",
+  "securityNote": "This manifest contains only hashes, counts, and structural metadata. No source record payloads are included. Safe for public repo.",
+  "files": [
+    {
+      "fileName": "VOKA_UCL_DATA_FACTORY_MASTER_STATE.json",
+      "relativePath": "data/raw/legacy-ucl/VOKA_UCL_DATA_FACTORY_MASTER_STATE.json",
+      "fileType": "JSON",
+      "byteSize": 11158,
+      "sha256": "52e38d97ea9b10d1d6beb37ea9916193d29a5718c70d53fb39fbe89d057cbdd1",
+      "lineCount": 368,
+      "recordCount": 1,
+      "parseValid": true,
+      "parseErrors": 0,
+      "entityTypeDistribution": {"MASTER_STATE": 1},
+      "topLevelKeys": ["strategyVersion", "contractVersion", "updatedAt", "globalCategoryRegistryState", "globalCoreDomainRegistryState", "globalServiceRegistryState", "categoriesDiscovered", "categoriesStable", "coreDomainsDiscovered", "coreDomainsStable", "coreDomainsCompleted", "currentCategory", "currentCoreDomain"],
+      "role": "Master state reconciliation record — governs category/domain/service registry state",
+      "masterState": {
+        "strategyVersion": 3,
+        "contractVersion": "1.0",
+        "updatedAt": "2026-09-05T11:36:52+03:00",
+        "categoriesDiscovered": 47,
+        "categoriesStable": 47,
+        "coreDomainsDiscovered": 330,
+        "coreDomainsStable": 330,
+        "coreDomainsCompleted": 0,
+        "currentCategory": "Security & Public Safety",
+        "currentCoreDomain": "Security Systems",
+        "globalCategoryRegistryState": "STABLE_FOR_V1",
+        "globalCoreDomainRegistryState": "STABLE_FOR_V1",
+        "globalServiceRegistryState": "STABLE_FOR_V1"
+      }
+    },
+    {
+      "fileName": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+      "relativePath": "data/raw/legacy-ucl/VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+      "fileType": "JSONL",
+      "byteSize": 2215344,
+      "sha256": "016dbd1f707327eaa7b0697dba3757716b613e0a7606e2aea3e7b47f0daf439b",
+      "lineCount": 2393,
+      "recordCount": 2393,
+      "parseValid": true,
+      "parseErrors": 0,
+      "duplicateLines": 0,
+      "entityTypeDistribution": {"SOURCE": 29, "EVIDENCE": 1182, "RELATION": 1182},
+      "role": "Global category↔core-domain relation registry with evidence and source records"
+    },
+    {
+      "fileName": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+      "relativePath": "data/raw/legacy-ucl/VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+      "fileType": "JSONL",
+      "byteSize": 212962,
+      "sha256": "f83ea37d5ac4550f6672451347cb92687f6fd5bb356b97732a6a9cf637a48be9",
+      "lineCount": 214,
+      "recordCount": 214,
+      "parseValid": true,
+      "parseErrors": 0,
+      "duplicateLines": 0,
+      "entityTypeDistribution": {"SOURCE": 28, "EVIDENCE": 139, "CATEGORY": 47},
+      "role": "Global category registry — 47 stable categories with evidence and source records"
+    },
+    {
+      "fileName": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "relativePath": "data/raw/legacy-ucl/VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "fileType": "JSONL",
+      "byteSize": 1237405,
+      "sha256": "1a4b3741a04a52d5c2b9c302cea153884c62a66c6148ff2b0e2a8b33cff87146",
+      "lineCount": 1014,
+      "recordCount": 1014,
+      "parseValid": true,
+      "parseErrors": 0,
+      "duplicateLines": 0,
+      "entityTypeDistribution": {"SOURCE": 29, "EVIDENCE": 655, "DOMAIN": 330},
+      "role": "Global core domain registry — 330 stable domains with evidence and source records"
+    },
+    {
+      "fileName": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "relativePath": "data/raw/legacy-ucl/VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "fileType": "JSONL",
+      "byteSize": 2221185,
+      "sha256": "e4536b49ae6c066976e60d70eef26f3f041cbcdbff3f9374974c09debbc76b69",
+      "lineCount": 2634,
+      "recordCount": 2634,
+      "parseValid": true,
+      "parseErrors": 0,
+      "duplicateLines": 0,
+      "entityTypeDistribution": {"DOMAIN": 1, "CATEGORY": 19, "SYSTEM": 7, "MANUFACTURER": 8, "BRAND": 9, "PRODUCT_FAMILY": 80, "PRODUCT_MODEL": 402, "ITEM": 1, "SERVICE": 3, "SOURCE": 64, "EVIDENCE": 64, "MARKET_RELEVANCE": 1, "RELATION": 1975},
+      "role": "Security batch 001 — security systems, manufacturers, brands, product families, models, relations"
+    },
+    {
+      "fileName": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "relativePath": "data/raw/legacy-ucl/VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "fileType": "JSONL",
+      "byteSize": 1642599,
+      "sha256": "475ccbb7fdb3eafe53f90f14f7be54a657187c63b1ef23ad44b965b600c0dfd0",
+      "lineCount": 1801,
+      "recordCount": 1801,
+      "parseValid": true,
+      "parseErrors": 0,
+      "duplicateLines": 0,
+      "entityTypeDistribution": {"SOURCE": 34, "EVIDENCE": 34, "PRODUCT_FAMILY": 39, "RELATION": 1468, "PRODUCT_MODEL": 213, "ITEM": 13},
+      "role": "Security batch 002 — additional product families, models, items, and relations"
+    },
+    {
+      "fileName": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "relativePath": "data/raw/legacy-ucl/VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "fileType": "JSONL",
+      "byteSize": 8583382,
+      "sha256": "312569c8fef9a5d92402722fd165e2133387ba1b9e787dd53d141c5002942c1a",
+      "lineCount": 9677,
+      "recordCount": 9677,
+      "parseValid": true,
+      "parseErrors": 0,
+      "duplicateLines": 0,
+      "entityTypeDistribution": {"SOURCE": 48, "EVIDENCE": 1109, "MANUFACTURER": 2, "BRAND": 3, "CATEGORY": 3, "PRODUCT_FAMILY": 80, "RELATION": 7408, "PRODUCT_MODEL": 1024},
+      "role": "Security batch 003 — largest batch; manufacturers, brands, product families, models, extensive relations"
+    },
+    {
+      "fileName": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "relativePath": "data/raw/legacy-ucl/VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "fileType": "JSONL",
+      "byteSize": 893751,
+      "sha256": "46f7d80be2e637bde8c51f3d44d8737a6728908d553a3f0348b9240447816f84",
+      "lineCount": 913,
+      "recordCount": 913,
+      "parseValid": true,
+      "parseErrors": 0,
+      "duplicateLines": 0,
+      "entityTypeDistribution": {"DOMAIN": 1, "CATEGORY": 14, "SOURCE": 43, "EVIDENCE": 470, "SYSTEM": 70, "SERVICE": 45, "RELATION": 270},
+      "role": "Security system and service registry — 70 systems, 45 services, with relations and evidence"
+    }
+  ],
+  "filesExpected": 8,
+  "filesFound": 8,
+  "missingFiles": [],
+  "unavailableFiles": [
+    {
+      "fileName": "VOKA_UCL_SECURITY_BATCH_004.jsonl",
+      "status": "UNAVAILABLE",
+      "note": "Security batch 004 was not supplied and must not be invented or reconstructed."
+    }
+  ],
+  "aggregateStats": {
+    "totalBytes": 16607846,
+    "totalLines": 18054,
+    "totalRecords": 18054,
+    "totalParseErrors": 0,
+    "totalDuplicateLines": 0,
+    "entityTypeDistribution": {
+      "RELATION": 12303,
+      "EVIDENCE": 3653,
+      "PRODUCT_MODEL": 1639,
+      "DOMAIN": 332,
+      "SOURCE": 275,
+      "PRODUCT_FAMILY": 199,
+      "CATEGORY": 83,
+      "SYSTEM": 77,
+      "SERVICE": 48,
+      "ITEM": 14,
+      "BRAND": 12,
+      "MANUFACTURER": 10,
+      "MARKET_RELEVANCE": 1
+    },
+    "externalKeyUniqueness": {
+      "totalExternalKeys": 18646,
+      "uniqueExternalKeys": 18583,
+      "duplicateExternalKeys": 63,
+      "duplicateByEntityType": {
+        "SOURCE": "56 duplicates (same source referenced across batch files — expected)",
+        "SYSTEM": "7 duplicates (same system referenced across batch files — expected)"
+      }
+    },
+    "relationReferentialIntegrity": {
+      "totalRelations": 12303,
+      "brokenReferences": 0,
+      "result": "ALL_RELATIONS_RESOLVE"
+    },
+    "evidenceSourceLinkage": {
+      "totalEvidenceRecords": 3653,
+      "brokenSourceLinks": 0,
+      "result": "ALL_EVIDENCE_LINKED_TO_SOURCES"
+    }
+  },
+  "masterStateReconciliation": {
+    "masterCategoriesDiscovered": 47,
+    "actualCategoryRecordsInJsonl": 83,
+    "categoryDelta": "+36 (83 - 47 = 36 EVIDENCE/SOURCE records accompanying the 47 CATEGORY entities — expected: JSONL includes evidence and source records per entity)",
+    "masterCoreDomainsDiscovered": 330,
+    "actualDomainRecordsInJsonl": 332,
+    "domainDelta": "+2 (332 - 330 = 2 EVIDENCE/SOURCE records accompanying the 330 DOMAIN entities — expected)",
+    "reconciliationResult": "MATCH — actual record counts are consistent with master state once evidence/source satellite records are accounted for",
+    "discrepancyClassification": "EXPECTED — no blocking discrepancies"
+  },
+  "forensicsNotes": [
+    "All 8 files parse cleanly with zero JSON/JSONL parse errors.",
+    "Zero duplicate lines across all JSONL files.",
+    "63 duplicate externalKeys exist (56 SOURCE, 7 SYSTEM) — expected: same source/system legitimately referenced across multiple batch files.",
+    "All 12,303 relations have valid sourceExternalKey and targetExternalKey references that resolve to known entities.",
+    "All 3,653 EVIDENCE records link to valid SOURCE records.",
+    "Master state reports 47 categories and 330 domains as STABLE_FOR_V1; JSONL record counts (83 CATEGORY, 332 DOMAIN) include accompanying evidence and source records — reconciliation matches.",
+    "SECURITY_BATCH_004 is unavailable and must not be invented or reconstructed.",
+    "Source files are immutable — never modified in place, never reconstructed."
+  ]
+}

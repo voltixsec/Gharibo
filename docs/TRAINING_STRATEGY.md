@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.1.0 |
+| **Version** | 1.3.0 |
 | **Last Updated** | 2026-09-14 |
 
 > Part of the Milestone 1 architecture baseline. See `docs/DOCUMENTATION_GOVERNANCE.md` §5 for
@@ -17,6 +17,36 @@
 > Worker #1), ADR-0012 (canonical Training Package), ADR-0013 (content-addressed dataset
 > versions), and ADR-0014 (zero-cost artifact policy). The incremental design lives in
 > `docs/ARCHITECTURE_MILESTONE_2.md`.
+
+> **v1.3.0 — Milestone 3A: READY_FOR_ENV_QUALIFICATION (2026-09-13).** No training has been executed.
+> The autonomous work session completed Sections A–H: source artifact forensics, gold dataset
+> construction (800 examples in Harmony format), dependency freeze promotion (6→12), verify-m3a gate
+> runner (12 gates, 51 checks PASS), benchmark definitions, and the GHARIBO-exp-001 readiness package.
+>
+> 1. **The engine dependency freeze set is complete (12 entries) but versions are unresolved.**
+>    `PINNED_ENGINE_DEPENDENCIES` (`apps/web/lib/training/package.ts`) now pins the full set:
+>    `torch`, `triton`, `unsloth_zoo`, `unsloth`, `transformers`, `triton_kernels`, `peft`, `trl`,
+>    `datasets`, `accelerate`, `bitsandbytes`, `openai-harmony`. `resolvedVersion` is `null` for every
+>    entry — real versions require a Kaggle T4 run. The git specs for `unsloth` / `unsloth-zoo` /
+>    `transformers` still track upstream default branches; the qualification harness will resolve
+>    them to exact commit SHAs.
+> 2. **The first dataset exists: `GHARIBO-Research-Gold-v0.1`.** 800 verified examples (640 train /
+>    80 validation / 80 test), all pairwise disjoint, deterministic seeded split (seed=3407),
+>    TEST permanently held out. Dataset, split, and source-manifest hashes computed. Dataset card
+>    at `data/processed/gharibo-research-gold-v0.1/dataset-card.json`.
+>
+> **Unblock path.** Run the qualification harness on a free Kaggle T4
+> (`scripts/qualify/qualify-kaggle-env.ipynb`); it resolves the exact versions and commit SHAs and
+> emits a freeze artifact conforming to
+> [`docs/ENV_QUALIFICATION_CONTRACT.md`](ENV_QUALIFICATION_CONTRACT.md), which pastes into
+> `PINNED_ENGINE_DEPENDENCIES`. That contract requires the frozen form to be an **exact pin** —
+> `name==version` for pip and `git+<url>@<40-hex commit>` for git — so a branch-tracking spec is not
+> an acceptable freeze. Until the artifact exists and is `QUALIFIED`, the recipe is not reproducible
+> and `GHARIBO-exp-001` must not be launched.
+>
+> **Unchanged.** The T4 constraints below (fp16 only, no bf16, no FlashAttention-2, ~14 GB
+> VRAM floor), the zero-cost constraint, the free-tier resilience requirements, and the Harmony
+> format requirement all remain binding.
 
 ## Philosophy
 

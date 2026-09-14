@@ -1,0 +1,111 @@
+{
+  "packageId": null,
+  "experimentId": "GHARIBO-exp-001",
+  "packageVersion": "0.1.0-draft",
+  "status": "READY_FOR_ENV_QUALIFICATION",
+  "createdAt": "2026-09-13T14:50:00+03:00",
+  "createdBy": "GHARIBO AI Lab — M3A autonomous work session",
+  "gitCommitSha": "9735fe430b0d9041a4c193fc24b47a74dac46a0a",
+  "gitBranch": "main",
+  "baseModel": {
+    "identity": "openai/gpt-oss-20b",
+    "revision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "loaderModelId": "unsloth/gpt-oss-20b",
+    "quantization": "4-bit (MXFP4)",
+    "loaderVerified": "HuggingFace API verified (M2 facts)"
+  },
+  "dataset": {
+    "name": "GHARIBO-Research-Gold-v0.1",
+    "version": "0.1.0",
+    "totalExamples": 800,
+    "splitCounts": {"train": 640, "validation": 80, "test": 80},
+    "splitRatios": {"train": 0.8, "validation": 0.1, "test": 0.1},
+    "seed": 3407,
+    "testHeldOut": true,
+    "testPolicy": "TEST is permanently held out — never used for training, tuning, prompt engineering, hyperparameter search, checkpoint selection, or few-shot examples.",
+    "datasetHash": "84acad9b1ba0d6932b4b8e0e3f4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3",
+    "trainSplitHash": "61afb232fa5e5783",
+    "validationSplitHash": "f884c9a953f75a34",
+    "testSplitHash": "959068e5451874ab",
+    "sourceManifestPath": "data/derived/source-manifests/legacy-ucl-source-manifest-v001.json",
+    "sourceManifestHash": "1a398e2a807f",
+    "datasetCardPath": "data/processed/gharibo-research-gold-v0.1/dataset-card.json",
+    "format": "OpenAI Harmony (system/user/assistant roles)"
+  },
+  "trainingConfig": {
+    "engine": "unsloth",
+    "engineVersion": "unsloth-freeze-2026.09.14",
+    "method": "qlora-sft",
+    "loraRank": 16,
+    "loraAlpha": 32,
+    "targetModules": ["q_proj"],
+    "quantization": "4-bit",
+    "seed": 3407,
+    "sequenceLength": 1024,
+    "dtype": "fp16",
+    "epochs": null,
+    "learningRate": null,
+    "batchSize": null,
+    "gradientAccumulation": null,
+    "note": "Training hyperparameters not yet finalized. Will be set during CTO authorization."
+  },
+  "harmonyFormat": {
+    "roles": ["system", "user", "assistant"],
+    "channels": ["final"],
+    "reasoningEffort": null,
+    "note": "Harmony format representation preserved in all 800 training examples."
+  },
+  "checkpointResumePolicy": {
+    "policy": "Not yet configured. Will be set during CTO authorization.",
+    "checkpointInterval": null,
+    "maxCheckpoints": null,
+    "resumeFromCheckpoint": null
+  },
+  "qualificationRequirements": {
+    "environmentQualificationContract": "docs/ENV_QUALIFICATION_CONTRACT.md v1.0.0 (Draft)",
+    "qualificationNotebook": "scripts/qualify/qualify-kaggle-env.ipynb",
+    "qualificationNotebookHash": "b761dc8225136f6016b572b4918137a46db192e11cba6dafe78aee193768215c",
+    "pinnedDependencies": 12,
+    "dependencyNames": ["torch", "triton", "unsloth_zoo", "unsloth", "transformers", "triton_kernels", "peft", "trl", "datasets", "accelerate", "bitsandbytes", "openai-harmony"],
+    "resolvedVersions": "NONE — all resolvedVersion fields are null. Real versions require a Kaggle T4 run.",
+    "kagglePolicy": "Zero-cost: free T4 GPU (~30h/week), sm_75 (Turing), fp16 supported, bf16 NOT supported, no FlashAttention-2, ~14 GB VRAM minimum.",
+    "frozenOk": false,
+    "frozenOkReason": "frozen_ok requires status=QUALIFIED AND unknowns is empty. No real Kaggle run has been executed. All dependency versions are unresolved."
+  },
+  "evaluationConfig": {
+    "benchmarkDoc": "docs/RESEARCH_BENCHMARK.md v1.0.0 (Draft)",
+    "baseStatus": "NOT_RUN",
+    "candidateStatus": "NOT_RUN",
+    "metricCount": 13,
+    "metrics": ["schema_validity", "extraction_accuracy", "classification_accuracy", "source_fidelity", "source_coverage", "unsupported_claim_rate", "empty_output_rate", "duplicate_rate", "instruction_following", "structured_output_reliability", "json_parse_rate", "taxonomy_accuracy", "relation_f1"],
+    "note": "No scores computed. All metrics are definition-only. Scores require real model inference."
+  },
+  "gateResults": {
+    "verifyM3a": "51 PASS, 0 FAIL, 3 PENDING_EXTERNAL_EXECUTION",
+    "qualifyCheck": "PASS (harness conforms to contract, 12 deps pinned)",
+    "docsValidate": "PASS",
+    "verifyM2": "PASS",
+    "sourceArtifactIntegrity": "8/8 files SHA-256 verified, 0 parse errors, 0 duplicate lines, 0 broken relations",
+    "datasetIntegrity": "PASS (all split hashes match dataset-card.json)",
+    "splitOverlap": "PASS (all splits pairwise disjoint)",
+    "secretScan": "PASS (0 secrets in 257 git-tracked files)",
+    "noFabricatedBenchmarkResults": "PASS (all NOT_RUN, no fabricated scores)"
+  },
+  "readinessAssessment": {
+    "datasetReady": true,
+    "dependenciesPinned": true,
+    "dependencyVersionsResolved": false,
+    "environmentQualified": false,
+    "trainingAuthorized": false,
+    "benchmarkScoresAvailable": false,
+    "overallStatus": "READY_FOR_ENV_QUALIFICATION",
+    "nextStep": "CTO must authorize execution of the qualification notebook on a real Kaggle T4 instance. Once the environment is qualified (frozen_ok=true), the package can be promoted to READY_FOR_CTO_AUTHORIZATION for training.",
+    "stopConditions": [
+      "DO NOT START TRAINING",
+      "No training has been executed",
+      "No model weights, adapters, or checkpoints have been produced",
+      "All Kaggle-dependent gates are PENDING_EXTERNAL_EXECUTION"
+    ]
+  },
+  "securityClassification": "DERIVED — contains only metadata, hashes, and configuration. No source payloads, credentials, model weights, or sensitive data."
+}

@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.1.0 |
+| **Version** | 1.3.0 |
 | **Last Updated** | 2026-09-14 |
 
 > Part of the Milestone 1 architecture baseline. The promotion gates below are a frozen decision —
@@ -15,6 +15,42 @@
 > what is actually enforced and where (M1 enforced promotion in the UI only; M2 adds server-side
 > enforcement in the registry API). (2) The first registered entry, `GHARIBO-exp-001`, and its
 > lineage are documented below.
+
+> **v1.3.0 — Milestone 3A autonomous work session: `GHARIBO-exp-001` remains an EXPERIMENT, now
+> READY_FOR_ENV_QUALIFICATION (2026-09-13).** The autonomous work session completed all Sections A–H:
+> source artifact forensics (8 files, 18,646 records, zero errors), gold dataset construction
+> (`GHARIBO-Research-Gold-v0.1`, 800 Harmony-format examples, 640/80/80 split), dependency freeze
+> promotion (6→12 pinned entries), verify-m3a gate runner (12 gates, 51 checks PASS, 3
+> PENDING_EXTERNAL_EXECUTION), benchmark metric definitions (13 metrics, all NOT_RUN), and the
+> GHARIBO-exp-001 readiness package. The experiment status is **unchanged** — no training has been
+> executed, no evaluation has produced a score, and no package has been issued. The readiness
+> package (`data/derived/experiment-packages/GHARIBO-exp-001-readiness.json`) establishes that all
+> prerequisites for environment qualification are met except a real Kaggle T4 run.
+>
+> **Experiment card — `GHARIBO-exp-001` (as of M3A autonomous session):**
+>
+> | Field | Value |
+> |---|---|
+> | **model_name** | `GHARIBO-exp-001` |
+> | **status** | `EXPERIMENT` (unchanged — no training run, no evaluation) |
+> | **training_run_id** | none — no run exists |
+> | **dataset_version** | `GHARIBO-Research-Gold-v0.1` (800 examples, 640/80/80 split, hashes verified) |
+> | **package_id** | none — the Training Package was not issued (`frozenOk = false`; requires real Kaggle T4 run) |
+> | **evaluation_score** | `NOT_RUN` — no execution produced a score (never `0`, never an estimate) |
+> | **engine_dependency_count** | 12 pinned entries (set complete; all `resolvedVersion = null`) |
+> | **readiness_status** | `READY_FOR_ENV_QUALIFICATION` — all M3A deliverables complete; Kaggle T4 run is the next gate |
+> | **promotable to CANDIDATE** | **No** — promotion requires ≥1 evaluation result *and* a training-run reference, neither of which exists |
+>
+> **What changed.** The dataset now exists (`GHARIBO-Research-Gold-v0.1`, 800 examples in OpenAI
+> Harmony format, deterministic 80/10/10 split with verified hashes). The engine dependency freeze
+> set is complete at 12 entries (6 original + 6 promoted recipe deps). The verify-m3a gate runner
+> validates 12 gates with 51 checks PASS and 3 PENDING_EXTERNAL_EXECUTION (Kaggle-dependent). All
+> benchmark metrics are defined but NOT_RUN — no fabricated scores.
+>
+> **What did not change.** No training was executed. No model weights, adapters, or checkpoints
+> were produced. No evaluation score exists. The experiment status remains EXPERIMENT. The
+> Training Package was not issued because `frozenOk = false` (requires `status = QUALIFIED` and
+> `unknowns` empty from a real Kaggle run).
 
 ## Overview
 
@@ -101,7 +137,7 @@ The "V1" label is reserved. It can only be applied through an explicit promotion
 
 ## First Experiment — `GHARIBO-exp-001`
 
-Milestone 2 prepares — but does **not** run — the first official experiment. It is registered as
+Milestones 2 and 3A prepare — but do **not** run — the first official experiment. It is registered as
 an **EXPERIMENT only**.
 
 | Field | Value |
@@ -113,6 +149,10 @@ an **EXPERIMENT only**.
 | **engine** | Unsloth Core |
 | **compute worker** | Kaggle Notebooks (free NVIDIA T4) |
 | **artifact storage** | Hugging Face private repo (optional, free allowance) + local fallback |
+| **dataset_version** | `GHARIBO-Research-Gold-v0.1` (800 examples, 640/80/80 split) |
+| **engine_deps** | 12 pinned entries (all `resolvedVersion = null`) |
+| **readiness** | `READY_FOR_ENV_QUALIFICATION` |
+| **verify-m3a** | 51 PASS, 0 FAIL, 3 PENDING_EXTERNAL_EXECUTION |
 
 **Lineage rule.** `GHARIBO-exp-001` is *derived from* `openai/gpt-oss-20b`. The base model is the
 **initial candidate only** — it is not permanently GHARIBO's foundation, and no paid inference

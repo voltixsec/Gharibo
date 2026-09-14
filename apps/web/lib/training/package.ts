@@ -73,9 +73,30 @@ export const PINNED_ENGINE_DEPENDENCIES: EngineDependency[] = [
   {
     name: "triton_kernels",
     source: "git",
-    spec: "@05b2c186c1b6c9a08375389d5efe9cb4c401c075",
+    // The package lives in a subdirectory of the triton monorepo, so the
+    // `#subdirectory=` fragment is required for the spec to be installable.
+    spec: "@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels",
     resolvedVersion: null,
     url: "https://github.com/triton-lang/triton.git",
+  },
+  // ---- Direct recipe dependencies (contract §4.5 promotion — 6→12) ----
+  // These are required by the gpt-oss-20b QLoRA+SFT recipe. They are pinned
+  // here (pinned_in_package_ts = true) so the qualification harness records
+  // them in `dependencies[]`, not `additional_dependencies[]`. The spec is
+  // the bare package name because the resolved version is not known until a
+  // real Kaggle T4 run; the harness resolves it and records the frozen form
+  // (name==version) into the manifest at run time. Nothing is invented.
+  { name: "peft", source: "pip", spec: "peft", resolvedVersion: null, url: null },
+  { name: "trl", source: "pip", spec: "trl", resolvedVersion: null, url: null },
+  { name: "datasets", source: "pip", spec: "datasets", resolvedVersion: null, url: null },
+  { name: "accelerate", source: "pip", spec: "accelerate", resolvedVersion: null, url: null },
+  { name: "bitsandbytes", source: "pip", spec: "bitsandbytes", resolvedVersion: null, url: null },
+  {
+    name: "openai-harmony",
+    source: "pip",
+    spec: "openai-harmony",
+    resolvedVersion: null,
+    url: null,
   },
 ];
 

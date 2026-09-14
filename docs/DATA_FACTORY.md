@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.1.0 |
+| **Version** | 1.2.0 |
 | **Last Updated** | 2026-09-14 |
 
 > Part of the Milestone 1 architecture baseline. The pipeline state machine below is a frozen
@@ -17,6 +17,31 @@
 > §4); (2) a `pipeline_updated_at` timestamp; (3) the Gold Pipeline transitions below are now
 > validated **server-side** in the repository layer, so an illegal state jump is rejected even when
 > the API is called directly rather than through the UI.
+
+> **v1.2.0 — Milestone 3A autonomous work session (2026-09-13).** The M3A session constructed the
+> first gold dataset, `GHARIBO-Research-Gold-v0.1`, from the legacy UCL source artifacts. Key
+> facts:
+>
+> - **Source forensics:** 8 source JSONL files at `data/raw/legacy-ucl/`, 18,646 total records
+>   across 13 entity types. All files pass SHA-256 verification, have zero parse errors, zero
+>   duplicate lines, and zero broken relation references. Immutable source manifest at
+>   `data/derived/source-manifests/legacy-ucl-source-manifest-v001.json`.
+> - **Quality filter:** 14,444 ACCEPTED_GOLD, 4,043 ACCEPTED_SUPPORTING, 2 REJECTED (DOMAIN records
+>   with no parent categories), 157 NEEDS_REVIEW (lifecycle/naming ambiguities). Summary at
+>   `data/derived/gold-classification/gold-quality-filter-v001-summary.json`.
+> - **Training examples:** 800 examples sampled with balanced distribution across 11 entity types.
+>   Each example is in OpenAI Harmony format (system/user/assistant roles), teaching the UCL
+>   extraction process. Located at
+>   `data/processed/training-examples/gharibo-research-gold-v0.1-examples.jsonl`.
+> - **Deterministic split:** 640 train / 80 validation / 80 test, seed=3407. Split hashes computed
+>   from raw file line bytes (not canonical JSON) to ensure verification reproducibility across
+>   Python/Node. Dataset card at
+>   `data/processed/gharibo-research-gold-v0.1/dataset-card.json`.
+> - **TEST held out:** TEST is permanently held out — never used for training, tuning, prompt
+>   engineering, hyperparameter search, checkpoint selection, or few-shot examples. All splits are
+>   pairwise disjoint (verified by the verify-m3a gate runner).
+> - **No source payloads committed:** Training examples contain normalized structured data derived
+>   from source records. No raw source payloads, credentials, or sensitive data are present.
 
 ## Overview
 

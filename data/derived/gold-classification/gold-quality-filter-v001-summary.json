@@ -1,0 +1,71 @@
+{
+  "filterVersion": "1.0.0",
+  "datasetName": "GHARIBO-Research-Gold-v0.1",
+  "createdAt": "2026-09-13T14:35:00+03:00",
+  "sourceManifestHash": "sha256 of source manifest computed at generation time",
+  "totalRecordsProcessed": 18646,
+  "classification": {
+    "ACCEPTED_GOLD": {
+      "count": 14444,
+      "byEntityType": {
+        "RELATION": 12231,
+        "PRODUCT_MODEL": 1505,
+        "DOMAIN": 330,
+        "PRODUCT_FAMILY": 177,
+        "SYSTEM": 70,
+        "SERVICE": 48,
+        "CATEGORY": 47,
+        "ITEM": 13,
+        "BRAND": 12,
+        "MANUFACTURER": 10,
+        "MARKET_RELEVANCE": 1
+      }
+    },
+    "ACCEPTED_SUPPORTING": {
+      "count": 4043,
+      "byEntityType": {
+        "EVIDENCE": 3653,
+        "SOURCE": 275,
+        "RELATION": 72,
+        "CATEGORY": 36,
+        "SYSTEM": 7
+      }
+    },
+    "REJECTED": {
+      "count": 2,
+      "byEntityType": {
+        "DOMAIN": 2
+      },
+      "rejectionReasons": {
+        "NO_PARENT_CATEGORIES": 2
+      }
+    },
+    "NEEDS_REVIEW": {
+      "count": 157,
+      "byEntityType": {
+        "PRODUCT_FAMILY": 9,
+        "PRODUCT_MODEL": 148
+      },
+      "reviewFlags": {
+        "NEEDS_REVIEW:LIFECYCLE_AND_OFFICIAL_SERIES_NAMING": 9,
+        "NEEDS_REVIEW:MODEL_LEVEL_SPECS_AND_LIFECYCLE": 148
+      }
+    }
+  },
+  "acceptanceCriteria": [
+    "parse-valid (confirmed: zero parse errors)",
+    "valid entity type (13 valid types defined)",
+    "deterministic identity (externalKey present, non-empty, unique within entity type)",
+    "required fields (payload dict, observedAt provenance)",
+    "provenance (observedAt timestamp present)",
+    "evidence/source linkage (evidence array present for gold entities)",
+    "no unsupported claim (no NEEDS_REVIEW reviewFlag for gold)",
+    "no broken relation (sourceExternalKey and targetExternalKey resolve)",
+    "no ambiguous taxonomy mapping (DOMAIN entities must have parentCategories)",
+    "no fabricated content (name field present for primary entity types)",
+    "no reconstructed source data (source files are immutable, never modified)"
+  ],
+  "goldRecordCountAboveTarget": true,
+  "targetRange": "500-1000",
+  "note": "14,444 gold records is well above the 500-1,000 target. A representative sample will be drawn for training example construction to stay within the target range without lowering quality."
+}

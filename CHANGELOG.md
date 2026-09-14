@@ -18,10 +18,81 @@ milestone; a milestone is only listed as released once it is committed and pushe
 
 ## [Unreleased]
 
+### Milestone 3A — Training Readiness
+
+**Status: READY_FOR_ENV_QUALIFICATION — dataset built, deps pinned, gates pass. No training executed.**
+
+Milestone 3A autonomous work session completed Sections A–H of the CTO-authorized scope.
+The earlier conclusion that "UCL never existed" has been corrected: historical UCL production
+artifacts existed externally and have now been physically supplied to `data/raw/legacy-ucl/`.
+
+#### Added
+
+- **Section A — Source artifact forensics:** 8 legacy UCL files forensically analyzed (byte size,
+  SHA-256, line/record count, JSON/JSONL parse validity, entity-type distribution, external key
+  uniqueness, duplicate-line count, source/evidence linkage, relation referential integrity, master-
+  state reconciliation). Immutable source manifest created at
+  `data/derived/source-manifests/legacy-ucl-source-manifest-v001.json`. 18,646 total records,
+  0 parse errors, 0 duplicate lines, 0 broken relation references.
+- **Section B — Gold dataset quality filter:** 14,444 ACCEPTED_GOLD / 4,043 ACCEPTED_SUPPORTING /
+  2 REJECTED / 157 NEEDS_REVIEW. Rejection reasons recorded. Acceptance criteria enforced:
+  parse-valid, valid entity type, deterministic identity, required fields, provenance, evidence,
+  no unsupported claim, no broken relation, no ambiguous taxonomy, no fabricated content.
+- **Section C — Training examples:** 800 examples in OpenAI Harmony format (system/user/assistant),
+  teaching the UCL extraction process (source→understand→extract→classify→normalize→relate→ground→
+  validate→structured output). No invented chain-of-thought. Balanced across 11 entity types.
+- **Section D — Dataset version `GHARIBO-Research-Gold-v0.1`:** 640 train / 80 validation / 80 test,
+  all pairwise disjoint. Deterministic seeded split (seed=3407, 80/10/10). TEST permanently held out.
+  Dataset hash, split hashes, source manifest hash, transformation version, provenance map, dataset card.
+- **Section E — Dependency freeze (6→12):** Promoted peft, trl, datasets, accelerate, bitsandbytes,
+  openai-harmony into `PINNED_ENGINE_DEPENDENCIES`. No floating git branches, no `>=` ranges in freeze.
+  `resolvedVersion: null` for all — real versions require a Kaggle T4 run.
+- **Section F — `verify-m3a.mjs`:** 12 gates, 51 checks PASS, 0 FAIL, 3 PENDING_EXTERNAL_EXECUTION.
+  Gates: dataset integrity, split overlap, deterministic regeneration, secret scan, Training Package
+  hash reproduction, source artifact integrity, deterministic dataset regeneration, provenance coverage,
+  notebook drift, documentation facts, no fabricated benchmark results, Kaggle-dependent gates.
+  `verify:m3a` and `verify:all` npm scripts added.
+- **Section G — Benchmark:** 13 metric definitions, Base=NOT_RUN, Candidate=NOT_RUN. No fabricated scores.
+- **Section H — `GHARIBO-exp-001` readiness package:** Status READY_FOR_ENV_QUALIFICATION. References
+  git SHA, base revision, dataset, hashes, config, Harmony format, qualification requirements, eval config.
+- A runnable **Kaggle environment qualification harness** — detects the free GPU / CUDA / VRAM /
+  compute capability, installs the training stack via `uv`, resolves the exact working versions and
+  git SHAs, verifies a fresh environment reproduces the set, and emits a machine-readable freeze
+  manifest that pastes into `PINNED_ENGINE_DEPENDENCIES`. **No version is pre-filled.**
+- **Benchmark metric definitions** for the held-out TEST split (schema validity, extraction,
+  classification, evidence fidelity, unsupported-claim rate, duplicate handling, relation accuracy,
+  instruction following, structured-output reliability). Definitions only — **no scores exist**;
+  BASE vs CANDIDATE remain `NOT_RUN` until a real execution produces them.
+- The **dependency-freeze contract** (the schema the harness emits, compatible with the M2
+  `EngineDependency` type and the `snake_case` manifest wire format).
+
+#### Corrected
+
+- **Earlier UCL conclusion:** The statement that "UCL never existed" was incorrect. The local VOKA DB
+  is a dev/demo DB (empty of historical data). Historical UCL production artifacts existed externally
+  and have now been physically supplied to `data/raw/legacy-ucl/`. PROJECT_STATE.md and this CHANGELOG
+  have been updated to reflect the correction.
+
+#### Changed
+
+- `PROJECT_STATE.md` — Milestone 3A status updated to READY_FOR_ENV_QUALIFICATION (§1, §3.1).
+  Earlier UCL conclusion corrected. §7.4 governance obligations discharged.
+- `apps/web/lib/training/package.ts` — `PINNED_ENGINE_DEPENDENCIES` promoted 6→12 (added peft, trl,
+  datasets, accelerate, bitsandbytes, openai-harmony). `triton_kernels` spec carries `#subdirectory=`
+  fragment.
+- `scripts/qualify/qualify-kaggle-env.mjs` — `UNPINNED_QUALIFICATION_ENTRIES` emptied (5 deps promoted
+  to pinned). Install detail added for 6 new deps. `EXTRA_INVENTORY` is now empty.
+- `scripts/qualify/check-qualify-harness.mjs` — `REQUIRED_PINNED` expanded to 12. `REQUIRED_ADDITIONAL`
+  and `REQUIRED_HARMONY_CANDIDATES` emptied.
+- `package.json` — `verify:m3a` and `verify:all` scripts added.
+
+---
+
 ### Milestone 2 — Zero-Cost Training Pipeline
 
-**Status: in progress.** Infrastructure to prepare the first official experiment
-(`GHARIBO-exp-001`) without executing it. No training has been run; no weights downloaded.
+**Status: complete and pushed (`5e286c6`, `9735fe4`).** Infrastructure to prepare the first official
+experiment (`GHARIBO-exp-001`) without executing it. No training has been run; no weights
+downloaded.
 
 #### Added
 
