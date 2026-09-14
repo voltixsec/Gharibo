@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Architecture |
 | **Status** | Frozen |
-| **Version** | 1.1.1 |
+| **Version** | 1.1.2 |
 | **Last Updated** | 2026-09-14 |
 | **Project Name** | `gharibo_ai_lab` |
 | **Based On** | `docs/PRD.md` (v1.0.0) |
@@ -16,6 +16,12 @@
 > From this point, changing it requires an ADR and a version bump per
 > `docs/DOCUMENTATION_GOVERNANCE.md` §5. The countable claims in §2.7 are machine-checked by
 > `npm run docs:validate` — update that block whenever the code changes.
+
+> **v1.1.2 — ADR count moved to 17 (2026-09-14).** Three ADRs were accepted — ADR-0015
+> (Universal Commercial + Procurement Knowledge Graph), ADR-0016 (VOKA ↔ GHARIBO integration
+> boundary) and ADR-0017 (GHARIBO Master State as the single source of truth). The only change to
+> this frozen baseline is the machine-checked `adrs` fact in §2.7 (14 → 17); nothing else in the
+> frozen baseline changed.
 
 > **v1.1.0 — Milestone 2 extension (2026-09-14).** Milestone 2 is **additive**: it introduces the
 > provider-neutral `TrainingWorker` abstraction, the canonical Training Package, content-addressed
@@ -317,7 +323,7 @@ change with it** — that is what keeps the frozen baseline honest.
 | api_handlers | 53 |
 | sqlite_tables | 17 |
 | dashboard_pages | 11 |
-| adrs | 14 |
+| adrs | 17 |
 <!-- /docs:facts -->
 
 | Metric | Meaning |

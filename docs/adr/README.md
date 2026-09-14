@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-09-14 |
 
 This directory holds the decision log for GHARIBO AI LAB. An ADR captures **why** the
@@ -33,6 +33,9 @@ Governance rules (statuses, ownership, when an ADR is required) live in
 | [ADR-0012](ADR-0012-canonical-training-package.md) | The canonical Training Package as the portable, reproducible training contract | Accepted | 2026-09-14 |
 | [ADR-0013](ADR-0013-content-addressed-dataset-versions.md) | Content-addressed immutable dataset versions with deterministic hashed splits | Accepted | 2026-09-14 |
 | [ADR-0014](ADR-0014-zero-cost-artifact-policy.md) | Zero-cost artifact policy — optional private HF, local fallback, never GitHub | Accepted | 2026-09-14 |
+| [ADR-0015](ADR-0015-universal-commercial-procurement-knowledge-graph.md) | Universal Commercial + Procurement Knowledge Graph as the library architecture | Accepted | 2026-09-14 |
+| [ADR-0016](ADR-0016-voka-gharibo-integration-boundary.md) | VOKA ↔ GHARIBO integration boundary — intelligence behind an AI Gateway | Accepted | 2026-09-14 |
+| [ADR-0017](ADR-0017-master-state-single-source-of-truth.md) | GHARIBO Master State as the canonical single source of truth | Accepted | 2026-09-14 |
 
 ## Conventions
 

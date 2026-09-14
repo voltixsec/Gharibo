@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.2.0 |
+| **Version** | 1.3.0 |
 | **Last Updated** | 2026-09-14 |
 
 The authoritative index of every governed document. Rules for ownership, statuses, and change
@@ -20,7 +20,7 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 |----------|------|-------|------|--------|---------|--------------|
 | Product Requirements | `docs/PRD.md` | Product | PRD | Approved | 1.0.0 | 2026-09-14 |
 | Product Requirements (M2) | `docs/PRD_MILESTONE_2.md` | Product | PRD | Approved | 1.0.0 | 2026-09-14 |
-| System Architecture | `docs/ARCHITECTURE.md` | Architecture | Architecture | Frozen | 1.1.1 | 2026-09-14 |
+| System Architecture | `docs/ARCHITECTURE.md` | Architecture | Architecture | Frozen | 1.1.2 | 2026-09-14 |
 | System Architecture (M2) | `docs/ARCHITECTURE_MILESTONE_2.md` | Architecture | Architecture | Frozen | 1.0.0 | 2026-09-14 |
 | Training Strategy | `docs/TRAINING_STRATEGY.md` | Architecture | Domain spec | Frozen | 1.3.0 | 2026-09-14 |
 | Environment Qualification Contract | `docs/ENV_QUALIFICATION_CONTRACT.md` | Architecture | Domain spec | Draft | 1.2.0 | 2026-09-14 |
@@ -29,15 +29,17 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 | Research Benchmark | `docs/RESEARCH_BENCHMARK.md` | Architecture | Domain spec | Draft | 1.1.0 | 2026-09-14 |
 | Research Gym | `docs/RESEARCH_GYM.md` | Architecture | Domain spec | Frozen | 1.0.0 | 2026-09-14 |
 | Model Registry | `docs/MODEL_REGISTRY.md` | Architecture | Domain spec | Frozen | 1.3.0 | 2026-09-14 |
-| Roadmap | `docs/ROADMAP.md` | Product | Roadmap | Approved | 1.1.0 | 2026-09-14 |
+| Roadmap | `docs/ROADMAP.md` | Product | Roadmap | Approved | 1.2.0 | 2026-09-14 |
 | Documentation Governance | `docs/DOCUMENTATION_GOVERNANCE.md` | Architecture | Governance | Frozen | 1.0.0 | 2026-09-14 |
-| Document Register | `docs/DOCUMENT_REGISTER.md` | Architecture | Governance | Living | 1.2.0 | 2026-09-14 |
-| ADR Index | `docs/adr/README.md` | Architecture | Governance | Living | 1.0.0 | 2026-09-14 |
+| Document Register | `docs/DOCUMENT_REGISTER.md` | Architecture | Governance | Living | 1.3.0 | 2026-09-14 |
+| Master State (generated) | `docs/GHARIBO_MASTER_STATE.md` | Architecture | Governance | Living | 1.0.0 | 2026-09-14 |
+| Master State (canonical) | `governance/GHARIBO_MASTER_STATE.json` | Architecture | Governance | Living | 1.0.0 | 2026-09-14 |
+| ADR Index | `docs/adr/README.md` | Architecture | Governance | Living | 1.1.0 | 2026-09-14 |
 | ADR Template | `docs/adr/TEMPLATE.md` | Architecture | Governance | Living | 1.0.0 | 2026-09-14 |
 | Class Diagram | `docs/class-diagram.mermaid` | Architecture | Diagram | Frozen | 1.0.0 | 2026-09-14 |
 | Sequence Diagram | `docs/sequence-diagram.mermaid` | Architecture | Diagram | Frozen | 1.0.0 | 2026-09-14 |
 | README (Runbook) | `README.md` | Architecture | Runbook | Living | 1.0.0 | 2026-09-14 |
-| Project State | `PROJECT_STATE.md` | Architecture | Governance | Living | 1.0.0 | 2026-09-14 |
+| Project State | `PROJECT_STATE.md` | Architecture | Governance | Living | 1.1.0 | 2026-09-14 |
 | Changelog | `CHANGELOG.md` | Delivery | Delivery note | Living | 1.0.0 | 2026-09-14 |
 | Delivery Overview | `overview.md` | Delivery | Delivery note | Superseded | 1.0.0 | 2026-09-14 |
 
@@ -59,6 +61,9 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 | ADR-0012 | `docs/adr/ADR-0012-canonical-training-package.md` | Accepted | 2026-09-14 |
 | ADR-0013 | `docs/adr/ADR-0013-content-addressed-dataset-versions.md` | Accepted | 2026-09-14 |
 | ADR-0014 | `docs/adr/ADR-0014-zero-cost-artifact-policy.md` | Accepted | 2026-09-14 |
+| ADR-0015 | `docs/adr/ADR-0015-universal-commercial-procurement-knowledge-graph.md` | Accepted | 2026-09-14 |
+| ADR-0016 | `docs/adr/ADR-0016-voka-gharibo-integration-boundary.md` | Accepted | 2026-09-14 |
+| ADR-0017 | `docs/adr/ADR-0017-master-state-single-source-of-truth.md` | Accepted | 2026-09-14 |
 
 ## Notes
 

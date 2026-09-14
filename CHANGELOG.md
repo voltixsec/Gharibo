@@ -18,6 +18,53 @@ milestone; a milestone is only listed as released once it is committed and pushe
 
 ## [Unreleased]
 
+### Governance — GHARIBO Master State & Universal Commercial + Procurement Knowledge Graph
+
+**Status: documentation/governance only. No training executed. No model weights downloaded.**
+
+#### Added
+
+- `governance/GHARIBO_MASTER_STATE.json` — the canonical, machine-readable single source of
+  truth for the project (schemaVersion `1.0.0`): project, current state, architecture references,
+  governance, the decision log DEC-0001..DEC-0020, the approved post-training roadmap
+  STAGE-1..STAGE-7, training, datasets, experiments, models, the Universal Commercial +
+  Procurement Knowledge Graph direction, procurement intelligence, tools/connectors, security/IP,
+  validation, blockers, next actions and history.
+- `scripts/master/generate-master-state.mjs` — a deterministic generator (Node builtins only) that
+  renders `docs/GHARIBO_MASTER_STATE.md` from the canonical JSON, with `--check` drift detection.
+- `scripts/master/validate-master-state.mjs` — the integrity validator: schema/sections, decision-id
+  and status rules, roadmap statuses, experiment/model/dataset references, current-state
+  consistency, the "training has not started" invariant, byte-exact Markdown sync (it imports the
+  generator's render function), a secret scan, private-dataset exposure, machine-path and
+  supersession checks.
+- `docs/GHARIBO_MASTER_STATE.md` — the generated human view (never hand-edited).
+- ADR-0015 — Universal Commercial + Procurement Knowledge Graph as the library architecture.
+- ADR-0016 — VOKA ↔ GHARIBO integration boundary behind an AI Gateway.
+- ADR-0017 — GHARIBO Master State as the canonical single source of truth.
+- DEC-0001..DEC-0020 — the durable decision log.
+- The approved post-training roadmap STAGE-1..STAGE-7 (approved direction only; nothing scheduled).
+
+#### Changed
+
+- `package.json` — added `master:generate` and `master:validate`; `docs:validate` now runs
+  `validate-docs.mjs` followed by `validate-master-state.mjs` (non-circular — the master validator
+  never calls `docs:validate`).
+- `docs/DOCUMENT_REGISTER.md` — v1.2.0 → v1.3.0; registered the master state (canonical +
+  generated) and ADR-0015..ADR-0017; updated the `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` and
+  `PROJECT_STATE.md` rows, and aligned the `docs/adr/README.md` row to v1.1.0.
+- `docs/ARCHITECTURE.md` — v1.1.1 → v1.1.2; the machine-checked `docs:facts` `adrs` fact moved
+  14 → 17 (ADR-0015..ADR-0017); nothing else in the frozen baseline changed.
+- `docs/ROADMAP.md` — v1.1.0 → v1.2.0; added the approved post-training roadmap
+  (STAGE-1..STAGE-7) as direction, not scheduled work.
+- `PROJECT_STATE.md` — v1.0.0 → v1.1.0; corrected the frozen-baseline snapshot row to v1.1.2 and
+  added a Master State section.
+
+#### Notes
+
+- **No training executed, no model weights downloaded, no gold example content modified, the
+  accepted M3B split and dataset hash are unchanged, and this change is documentation/governance
+  only.**
+
 ### Milestone 3B — Split Integrity, Split-Aware Audit and Qualification Safety
 
 **Status: in progress. No training executed. No model weights downloaded.**

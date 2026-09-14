@@ -1,0 +1,1184 @@
+{
+  "schemaVersion": "1.0.0",
+  "masterStateVersion": "1.0.0",
+  "updatedAt": "2026-09-14",
+  "project": {
+    "id": "GHARIBO",
+    "name": "GHARIBO AI LAB",
+    "repository": "voltixsec/Gharibo",
+    "repositoryVisibility": "PUBLIC",
+    "program": "GHARIBO AI LAB",
+    "currentMajorProgram": "Post-training infrastructure and qualification",
+    "currentMilestone": "M3B",
+    "currentMilestoneTitle": "Gold Audit + Free Environment Qualification",
+    "decisionAuthority": "CTO"
+  },
+  "currentState": {
+    "trainingStatus": "NOT_STARTED",
+    "trainingHasStarted": false,
+    "trainingInvariant": "TRAINING HAS NOT STARTED",
+    "currentMilestone": "M3B",
+    "milestoneStatus": "IN_PROGRESS",
+    "blockerSummary": "A real free-Kaggle T4 qualification run is required to resolve the 12 pinned engine dependency versions and produce the qualification hash.",
+    "dataset": {
+      "id": "GHARIBO-Research-Gold-v0.1",
+      "exampleCount": 800,
+      "splitSeed": "20260914",
+      "split": {
+        "train": 640,
+        "validation": 80,
+        "test": 80
+      },
+      "audit": {
+        "cohortSize": 100,
+        "pass": 100,
+        "needsReview": 0,
+        "fail": 0,
+        "auditedTestCount": 0
+      }
+    }
+  },
+  "architecture": {
+    "frozenBaseline": {
+      "document": "docs/ARCHITECTURE.md",
+      "version": "1.1.2",
+      "status": "Frozen",
+      "extends": "docs/ARCHITECTURE_MILESTONE_2.md"
+    },
+    "decisionRecords": "docs/adr/",
+    "decisionRecordCount": 17,
+    "factsBlock": "docs/ARCHITECTURE.md#docs:facts",
+    "backend": "Next.js Route Handlers (ADR-0001)",
+    "persistence": "SQLite + better-sqlite3 behind a Repository Pattern (ADR-0002)",
+    "monorepo": "npm workspaces (ADR-0006)",
+    "pythonServices": "FastAPI ML services, CORS allow-list (ADR-0009)",
+    "masterStateArtifact": "governance/GHARIBO_MASTER_STATE.json"
+  },
+  "governance": {
+    "documentationGovernance": "docs/DOCUMENTATION_GOVERNANCE.md",
+    "documentRegister": "docs/DOCUMENT_REGISTER.md",
+    "adrIndex": "docs/adr/README.md",
+    "masterStateGenerator": "scripts/master/generate-master-state.mjs",
+    "masterStateValidator": "scripts/master/validate-master-state.mjs",
+    "masterStateGovernanceRule": {
+      "adr": "docs/adr/ADR-0017-master-state-single-source-of-truth.md",
+      "statement": "A material GHARIBO decision affecting architecture, training, datasets, experiments, models, knowledge graph, procurement intelligence, integrations, security/IP or roadmap is NOT an accepted project decision until (1) governance/GHARIBO_MASTER_STATE.json is updated, (2) validation passes, (3) required ADR/doc updates are completed, and (4) the change is checkpointed in Git.",
+      "appliesTo": [
+        "architecture",
+        "training",
+        "datasets",
+        "experiments",
+        "models",
+        "knowledgeGraph",
+        "procurementIntelligence",
+        "integrations",
+        "securityAndIP",
+        "roadmap"
+      ]
+    },
+    "commands": {
+      "generate": "npm run master:generate",
+      "validate": "npm run master:validate",
+      "docsValidate": "npm run docs:validate"
+    }
+  },
+  "decisions": [
+    {
+      "id": "DEC-0001",
+      "date": "2026-09-14",
+      "title": "Next.js Route Handlers as the application backend",
+      "status": "ACCEPTED",
+      "decision": "Use Next.js App Router Route Handlers (app/api/**/route.ts) as the application backend, behind a thin controller to repository to service layering.",
+      "rationale": "A single deployable full-stack app keeps the vertical slice small and typed end-to-end; file-based Route Handlers give a server-only API surface without running a separate backend process.",
+      "scope": [
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0001-nextjs-route-handlers-as-backend.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0002",
+      "date": "2026-09-14",
+      "title": "SQLite + better-sqlite3 behind a Repository Pattern",
+      "status": "ACCEPTED",
+      "decision": "Persist to SQLite via better-sqlite3, accessed only through a Repository Pattern so the storage engine can be swapped without touching controllers or UI.",
+      "rationale": "SQLite is file-based and zero-ops for a single-node lab, and the repository boundary makes a later PostgreSQL swap a repository-only change (P2-04).",
+      "scope": [
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0002-sqlite-better-sqlite3-repository-pattern.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0003",
+      "date": "2026-09-14",
+      "title": "One provider abstraction with interchangeable backends",
+      "status": "ACCEPTED",
+      "decision": "Route all model access through a single ModelProvider interface with four interchangeable backends (openai-compatible, ollama, vllm, huggingface).",
+      "rationale": "Provider-neutrality prevents lock-in to a single vendor and lets the Playground stream from any configured backend, configured at runtime from the database rather than hard-coded.",
+      "scope": [
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0003-single-provider-abstraction.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0004",
+      "date": "2026-09-14",
+      "title": "Store provider credentials by reference, never as values",
+      "status": "ACCEPTED",
+      "decision": "Store provider credentials as an env-var reference (api_key_ref); raw values live only in the local environment and are resolved at call time.",
+      "rationale": "A public repository must never contain a secret; referencing credentials by name keeps the database and the repository free of credential values.",
+      "scope": [
+        "securityAndIP"
+      ],
+      "references": [
+        "docs/adr/ADR-0004-credentials-by-reference.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0005",
+      "date": "2026-09-14",
+      "title": "Training is launch-ready only in Milestone 1",
+      "status": "ACCEPTED",
+      "decision": "Milestone 1 ships training as launch-ready only: full configuration plus a real pre-flight check, with execution gated.",
+      "rationale": "The lab must never claim training it has not run; gating execution keeps every metric honest and forbids fabricated results.",
+      "scope": [
+        "training"
+      ],
+      "references": [
+        "docs/adr/ADR-0005-training-launch-ready-only.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0006",
+      "date": "2026-09-14",
+      "title": "npm workspaces monorepo with a shared types package",
+      "status": "ACCEPTED",
+      "decision": "Structure the repository as an npm workspaces monorepo (apps/web, packages/shared) with a shared, type-only types package.",
+      "rationale": "Native workspaces add no tooling and let the web app and the Python services share one authoritative type definition.",
+      "scope": [
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0006-npm-workspaces-monorepo.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0007",
+      "date": "2026-09-14",
+      "title": "Data Factory as an explicit pipeline state machine",
+      "status": "ACCEPTED",
+      "decision": "Model data curation as an explicit state machine RAW to NORMALIZED to REVIEW_REQUIRED to APPROVED to TRAINING_READY, with REJECTED, enforced server-side.",
+      "rationale": "An explicit, server-enforced state machine makes the provenance of every training record auditable and makes an illegal state jump impossible even when the API is called directly.",
+      "scope": [
+        "datasets",
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0007-data-factory-pipeline-state-machine.md",
+        "docs/DATA_FACTORY.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0008",
+      "date": "2026-09-14",
+      "title": "Gate model promotion through registry statuses",
+      "status": "ACCEPTED",
+      "decision": "Gate model promotion through registry statuses EXPERIMENT to CANDIDATE to ACCEPTED to DEPRECATED, enforced in the repository layer.",
+      "rationale": "A model earns its version number: evaluation, not intent, is the gate, and enforcement belongs in the repository rather than only in the UI.",
+      "scope": [
+        "models"
+      ],
+      "references": [
+        "docs/adr/ADR-0008-model-registry-status-gates.md",
+        "docs/MODEL_REGISTRY.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0009",
+      "date": "2026-09-14",
+      "title": "Restrict CORS on Python services to an explicit allow-list",
+      "status": "ACCEPTED",
+      "decision": "The Python FastAPI ML services allow CORS only from an explicit allow-list.",
+      "rationale": "Wildcard CORS on an ML service is an avoidable exposure; an explicit allow-list is the safe default.",
+      "scope": [
+        "securityAndIP",
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0009-python-service-cors-allowlist.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0010",
+      "date": "2026-09-14",
+      "title": "Root scripts delegate to workspaces; Next.js pinned at the repo root",
+      "status": "ACCEPTED",
+      "decision": "Root npm scripts delegate to the workspace, and Next.js is pinned at the repository root.",
+      "rationale": "A single entry point per operation keeps CI and local usage identical and avoids version skew across workspaces.",
+      "scope": [
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0010-root-scripts-delegate-to-workspaces.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0011",
+      "date": "2026-09-14",
+      "title": "Provider-neutral TrainingWorker abstraction with Kaggle as Worker #1",
+      "status": "ACCEPTED",
+      "decision": "Define a provider-neutral TrainingWorker interface; Kaggle is Worker #1, not the architecture.",
+      "rationale": "The free-Kaggle worker must be replaceable; the interface, not the provider, is the durable contract.",
+      "scope": [
+        "training",
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0011-training-worker-abstraction.md",
+        "docs/TRAINING_STRATEGY.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0012",
+      "date": "2026-09-14",
+      "title": "The canonical Training Package as the portable training contract",
+      "status": "ACCEPTED",
+      "decision": "Define the canonical Training Package as the portable, reproducible training contract exported from the AI LAB.",
+      "rationale": "A single content-addressed package makes a training run reproducible on any worker and decouples the lab from the training environment.",
+      "scope": [
+        "training"
+      ],
+      "references": [
+        "docs/adr/ADR-0012-canonical-training-package.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0013",
+      "date": "2026-09-14",
+      "title": "Content-addressed immutable dataset versions with deterministic hashed splits",
+      "status": "ACCEPTED",
+      "decision": "Version datasets by content address and produce deterministic, hashed TRAIN / VALIDATION / TEST splits.",
+      "rationale": "Immutable, content-addressed versions and deterministic splits are what make an experiment re-runnable and its provenance verifiable.",
+      "scope": [
+        "datasets"
+      ],
+      "references": [
+        "docs/adr/ADR-0013-content-addressed-dataset-versions.md",
+        "docs/DATA_FACTORY.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0014",
+      "date": "2026-09-14",
+      "title": "Zero-cost artifact policy — optional private HF, local fallback, never GitHub",
+      "status": "ACCEPTED",
+      "decision": "Store model artifacts in an optional private Hugging Face repo with a complete local fallback; GitHub holds source and documentation only.",
+      "rationale": "Artifacts must survive the ephemeral runtime at zero cost, and a public repository must never carry weights.",
+      "scope": [
+        "training",
+        "securityAndIP"
+      ],
+      "references": [
+        "docs/adr/ADR-0014-zero-cost-artifact-policy.md",
+        "docs/TRAINING_STRATEGY.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0015",
+      "date": "2026-09-14",
+      "title": "Zero monetary cost training policy (CEO mandate)",
+      "status": "ACCEPTED",
+      "decision": "Training must operate at zero monetary cost: free compute (Kaggle T4), free-tier storage, and a local fallback; no paid provider may become a dependency.",
+      "rationale": "A binding CEO mandate: capability must not depend on a purchased GPU machine or a paid training provider.",
+      "scope": [
+        "training",
+        "roadmap"
+      ],
+      "references": [
+        "docs/TRAINING_STRATEGY.md",
+        "docs/ROADMAP.md",
+        "docs/adr/ADR-0011-training-worker-abstraction.md",
+        "docs/adr/ADR-0014-zero-cost-artifact-policy.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0016",
+      "date": "2026-09-14",
+      "title": "Initial 800-example gold split cut at seed 3407",
+      "status": "SUPERSEDED",
+      "decision": "Cut the first GHARIBO-Research-Gold-v0.1 split (640 / 80 / 80) at seed 3407.",
+      "rationale": "Superseded. Its TEST split contained 10 of the 100 audited examples, so TEST was not genuinely held out, and the assignment was not reproducible from any committed source because the seed-3407 generator was never versioned. The decision was replaced by DEC-0017 (audit-aware deterministic split at seed 20260914).",
+      "scope": [
+        "datasets"
+      ],
+      "references": [
+        "docs/DATA_FACTORY.md",
+        "scripts/split/cut-gold-split.py"
+      ],
+      "supersedes": null,
+      "supersededBy": "DEC-0017",
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0017",
+      "date": "2026-09-14",
+      "title": "Audit-aware deterministic gold split at seed 20260914",
+      "status": "ACCEPTED",
+      "decision": "Re-cut the split with a committed, audit-aware deterministic generator (seed 20260914) that quarantines the 100-example audit cohort into TRAIN + VALIDATION, guaranteeing audited ∩ TEST = 0.",
+      "rationale": "The superseded seed-3407 TEST split was contaminated and not reproducible. A committed generator plus an audit-quarantine rule makes the split reproducible and genuinely holds TEST out.",
+      "scope": [
+        "datasets"
+      ],
+      "references": [
+        "docs/adr/ADR-0013-content-addressed-dataset-versions.md",
+        "docs/DATA_FACTORY.md",
+        "scripts/split/cut-gold-split.py",
+        "scripts/gold_cohort.py"
+      ],
+      "supersedes": "DEC-0016",
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0018",
+      "date": "2026-09-14",
+      "title": "Universal Commercial + Procurement Knowledge Graph as the library architecture",
+      "status": "ACCEPTED",
+      "decision": "Model the GHARIBO library as a Universal Commercial + Procurement Knowledge Graph with PRODUCTS, SERVICES and ORGANIZATIONS as first-class entities and evidence/provenance as first-class concepts.",
+      "rationale": "A flat product catalog cannot express who supplies, installs, integrates and maintains a system, nor the evidence behind a commercial claim.",
+      "scope": [
+        "knowledgeGraph",
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0015-universal-commercial-procurement-knowledge-graph.md",
+        "docs/DATA_FACTORY.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0019",
+      "date": "2026-09-14",
+      "title": "VOKA ↔ GHARIBO integration boundary behind an AI Gateway",
+      "status": "ACCEPTED",
+      "decision": "Integrate VOKA and GHARIBO only across an explicit AI Gateway boundary.",
+      "rationale": "An explicit boundary keeps the two systems independently deployable and prevents VOKA's private commercial and transaction data from leaking into GHARIBO's public surface.",
+      "scope": [
+        "integrations",
+        "architecture"
+      ],
+      "references": [
+        "docs/adr/ADR-0016-voka-gharibo-integration-boundary.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    },
+    {
+      "id": "DEC-0020",
+      "date": "2026-09-14",
+      "title": "GHARIBO Master State as the canonical single source of truth",
+      "status": "ACCEPTED",
+      "decision": "Establish governance/GHARIBO_MASTER_STATE.json as the canonical machine-readable project state, with a deterministic generator, a validator and a generated human view.",
+      "rationale": "A single validated source of truth stops the document set drifting from the code and makes a material decision official only once it is recorded, validated, documented and checkpointed.",
+      "scope": [
+        "architecture",
+        "roadmap"
+      ],
+      "references": [
+        "docs/adr/ADR-0017-master-state-single-source-of-truth.md",
+        "docs/DOCUMENTATION_GOVERNANCE.md",
+        "governance/GHARIBO_MASTER_STATE.json"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
+    }
+  ],
+  "roadmap": {
+    "status": "APPROVED_DIRECTION",
+    "note": "Recorded here as approved direction. NOTHING beyond the current milestone is executed or scheduled.",
+    "stages": [
+      {
+        "id": "STAGE-1",
+        "name": "GHARIBO-exp-001",
+        "method": "QLoRA + SFT using Unsloth",
+        "dataset": "GHARIBO-Research-Gold-v0.1 (current 800 verified Gold examples)",
+        "purpose": [
+          "establish a measurable baseline",
+          "teach structured evidence-grounded behaviour",
+          "schema adherence",
+          "provenance discipline",
+          "evidence to entity to relation construction",
+          "no-fabrication behaviour"
+        ],
+        "status": "NOT_STARTED",
+        "dependsOn": []
+      },
+      {
+        "id": "STAGE-2",
+        "name": "UCL FACTORY CHALLENGE",
+        "method": "After successful exp-001 evaluation, ask GHARIBO to produce approximately 300-500 NEW candidate records from a domain/system not clearly represented in the training examples.",
+        "dataset": "New candidate records from an under-represented domain (CANDIDATE until verified)",
+        "purpose": [
+          "outputs remain CANDIDATE records until verified",
+          "validate identity, schema, evidence, provenance, relations, duplicates, unsupported claims and hallucinations",
+          "measure whether GHARIBO learned the PROCESS rather than memorized examples"
+        ],
+        "status": "PLANNED",
+        "dependsOn": [
+          "STAGE-1"
+        ]
+      },
+      {
+        "id": "STAGE-3",
+        "name": "GHARIBO-Research-Gold-v0.2",
+        "method": "Built primarily from failures, hard cases, boundary cases, verified new generations, human-approved corrections and validator-approved difficult examples.",
+        "dataset": "GHARIBO-Research-Gold-v0.2",
+        "purpose": [
+          "grow the dataset from difficulty, not volume",
+          "explicitly NOT volume for its own sake"
+        ],
+        "status": "PLANNED",
+        "dependsOn": [
+          "STAGE-2"
+        ]
+      },
+      {
+        "id": "STAGE-4",
+        "name": "PREFERENCE TRAINING",
+        "method": "Generate multiple candidate outputs; use deterministic validators, evidence verification, judge evaluation and selective human review to create CHOSEN vs REJECTED; evaluate DPO or ORPO.",
+        "dataset": "Preference pairs derived from validated candidate outputs",
+        "purpose": [
+          "create CHOSEN vs REJECTED pairs",
+          "evaluate DPO ORPO",
+          "do not commit to one method until benchmark evidence exists"
+        ],
+        "status": "PLANNED",
+        "dependsOn": [
+          "STAGE-3"
+        ]
+      },
+      {
+        "id": "STAGE-5",
+        "name": "GHARIBO-exp-003",
+        "method": "GRPO / RLVR. Build the GHARIBO-UCL-Verifier Environment. Core principle: DO NOT ONLY TEACH GHARIBO THE ANSWER — CREATE A REAL ENVIRONMENT WITH SOURCES, RULES, VERIFIERS AND REWARDS.",
+        "dataset": "Verifier environment over sources, rules, verifiers and rewards",
+        "purpose": [
+          "record the reward dimensions: schema validity, source validity, evidence fidelity, entity identity correctness, normalization correctness, relation integrity, provenance completeness, duplicate avoidance, unsupported-claim avoidance, hallucinated-field avoidance, correct abstention / NEEDS_REVIEW",
+          "record the severe penalties: fabricated evidence, fabricated fields, invented supplier relationships, broken provenance, unsupported authorization claims, false commercial facts"
+        ],
+        "status": "PLANNED",
+        "dependsOn": [
+          "STAGE-4"
+        ]
+      },
+      {
+        "id": "STAGE-6",
+        "name": "AGENTIC TRAINING",
+        "method": "Future tool ecosystem may include Firecrawl, Hugging Face, GitHub, MCP tools, Verifiers, Atropos and controlled browser/search tools.",
+        "dataset": "Tool-interaction trajectories (future)",
+        "purpose": [
+          "future agentic tool ecosystem",
+          "controlled browser/search tools"
+        ],
+        "status": "FUTURE",
+        "dependsOn": [
+          "STAGE-5"
+        ]
+      },
+      {
+        "id": "STAGE-7",
+        "name": "CAPABILITY SPECIALIZATION",
+        "method": "Potential separate capability adapters, with a future runtime that may route tasks to specialized adapters/models.",
+        "dataset": "Per-capability datasets (future)",
+        "purpose": [
+          "potential separate capability adapters: Research / Knowledge Factory, Coding, VOKA Commercial, Engineering, Vision / Document Intelligence",
+          "do NOT implement now",
+          "the future runtime may route tasks to specialized adapters/models"
+        ],
+        "status": "FUTURE",
+        "dependsOn": [
+          "STAGE-6"
+        ]
+      }
+    ]
+  },
+  "training": {
+    "status": "NOT_STARTED",
+    "hasStarted": false,
+    "invariant": "TRAINING HAS NOT STARTED",
+    "engine": {
+      "id": "unsloth-core",
+      "name": "Unsloth Core",
+      "note": "Pinned install set required; a bare `pip install unsloth` is insufficient."
+    },
+    "method": "QLoRA + SFT",
+    "quantization": "4-bit",
+    "baseModelCandidate": "openai/gpt-oss-20b",
+    "worker": {
+      "id": "KaggleTrainingWorker",
+      "provider": "Kaggle Notebooks (free NVIDIA T4)",
+      "interface": "TrainingWorker",
+      "note": "Kaggle is Worker #1, not GHARIBO's architecture; the interface stays provider-neutral."
+    },
+    "computePolicy": "ZERO_COST",
+    "prohibitedProviders": [
+      "Together AI",
+      "RunPod",
+      "Vertex AI",
+      "Lambda",
+      "CoreWeave",
+      "Google Colab"
+    ],
+    "artifactPolicy": {
+      "external": "Hugging Face private repo (optional, free allowance)",
+      "fallback": "local export/download — GHARIBO must work with no external artifact repo configured",
+      "github": "source code + docs only — never model artifacts"
+    },
+    "weightsDownloaded": false,
+    "adaptersProduced": 0,
+    "checkpointsProduced": 0,
+    "evaluationResults": 0
+  },
+  "datasets": {
+    "GHARIBO-Research-Gold-v0.1": {
+      "id": "GHARIBO-Research-Gold-v0.1",
+      "status": "ACCEPTED",
+      "format": "OpenAI Harmony",
+      "exampleCount": 800,
+      "contentFrozen": true,
+      "split": {
+        "seed": "20260914",
+        "generator": "scripts/split/cut-gold-split.py",
+        "cohortDefinition": "scripts/gold_cohort.py",
+        "counts": {
+          "train": 640,
+          "validation": 80,
+          "test": 80
+        }
+      },
+      "audit": {
+        "cohortSize": 100,
+        "pass": 100,
+        "needsReview": 0,
+        "fail": 0,
+        "auditedTestCount": 0,
+        "artifact": "scripts/audit/gold_audit_100.py",
+        "splitAware": true,
+        "deterministic": true
+      },
+      "hashes": {
+        "algorithm": "sha256",
+        "lineHashConvention": "sha256 of raw line bytes",
+        "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5"
+      },
+      "notes": [
+        "Content-frozen: no gold example content has been modified; the dataset hash is unchanged since construction.",
+        "Split is audit-aware and deterministic: the 100-example audit cohort is quarantined into TRAIN + VALIDATION, so audited ∩ TEST = 0 by construction.",
+        "TEST is permanently held out — never used for training, tuning, prompt engineering, hyperparameter search, checkpoint selection or few-shot examples.",
+        "No raw source payload is included: training examples contain normalized structured data derived from source records. The full dataset hash is recorded in the gitignored local dataset card.",
+        "Derived from the physically supplied 18,646-record legacy UCL snapshot (7 available files); it is NOT the complete historical ~20,087-record corpus. The 1,441-record gap is the missing VOKA_UCL_SECURITY_BATCH_004.jsonl artifact, which must not be reconstructed."
+      ]
+    }
+  },
+  "experiments": {
+    "GHARIBO-exp-001": {
+      "id": "GHARIBO-exp-001",
+      "status": "EXPERIMENT",
+      "baseModel": "openai/gpt-oss-20b",
+      "datasetVersion": "GHARIBO-Research-Gold-v0.1",
+      "method": "QLoRA + SFT",
+      "engine": "Unsloth Core",
+      "worker": "KaggleTrainingWorker",
+      "trainingRunId": null,
+      "packageId": null,
+      "evaluationStatus": "NOT_RUN",
+      "evaluationScore": null,
+      "readinessStatus": "READY_FOR_ENV_QUALIFICATION",
+      "engineDependencyCount": 12,
+      "resolvedEngineDependencies": 0,
+      "promotionTarget": "GHARIBO-V0.1",
+      "promotable": false,
+      "promotionBlockedReason": "Promotion requires at least one evaluation result and a training-run reference; neither exists.",
+      "references": [
+        "docs/MODEL_REGISTRY.md",
+        "docs/TRAINING_STRATEGY.md"
+      ]
+    }
+  },
+  "models": {
+    "baseModelCandidates": [
+      {
+        "id": "openai/gpt-oss-20b",
+        "role": "INITIAL_BASE_MODEL_CANDIDATE",
+        "status": "CANDIDATE",
+        "note": "Initial candidate only — NOT the permanent foundation. No promotion without evaluation.",
+        "derivedModels": [
+          "GHARIBO-exp-001"
+        ]
+      }
+    ],
+    "derivedModels": [
+      {
+        "id": "GHARIBO-exp-001",
+        "status": "EXPERIMENT",
+        "note": "Registered as an EXPERIMENT only. No training run, no evaluation."
+      },
+      {
+        "id": "GHARIBO-V0.1",
+        "status": "NOT_CREATED",
+        "note": "Reserved name. Cannot be created without evaluation and promotion (ADR-0008)."
+      }
+    ]
+  },
+  "knowledgeGraph": {
+    "status": "APPROVED_DIRECTION_NOT_IMPLEMENTED",
+    "adr": "docs/adr/ADR-0015-universal-commercial-procurement-knowledge-graph.md",
+    "name": "Universal Commercial + Procurement Knowledge Graph",
+    "isProductCatalog": false,
+    "supportedSubjectTypes": [
+      "PRODUCT",
+      "SERVICE",
+      "ORGANIZATION"
+    ],
+    "concepts": [
+      "CATEGORY",
+      "DOMAIN",
+      "SYSTEM",
+      "MANUFACTURER",
+      "BRAND",
+      "PRODUCT_FAMILY",
+      "PRODUCT_MODEL",
+      "ITEM",
+      "SERVICE",
+      "ORGANIZATION",
+      "SOURCE",
+      "EVIDENCE",
+      "RELATION",
+      "MARKET_RELEVANCE"
+    ],
+    "organizationModel": {
+      "durableIdentity": "ORGANIZATION",
+      "note": "SUPPLIER / CONTRACTOR / DISTRIBUTOR are contextual ROLES, not mutually-exclusive company identities.",
+      "roles": [
+        "MANUFACTURER",
+        "DISTRIBUTOR",
+        "DEALER",
+        "SUPPLIER",
+        "CONTRACTOR",
+        "SUBCONTRACTOR",
+        "SYSTEM_INTEGRATOR",
+        "SERVICE_PROVIDER",
+        "MAINTENANCE_PROVIDER"
+      ],
+      "multiRoleAllowed": true
+    },
+    "relationTypes": [
+      "MANUFACTURES",
+      "BRANDS",
+      "DISTRIBUTES",
+      "DEALS_IN",
+      "SUPPLIES",
+      "INSTALLS",
+      "INTEGRATES",
+      "SUBCONTRACTS",
+      "SERVICES",
+      "MAINTAINS",
+      "AUTHORIZED_FOR",
+      "CERTIFIED_FOR",
+      "CAPABLE_OF",
+      "OPERATES_IN",
+      "SERVES_MARKET",
+      "SUPPORTS",
+      "RELATED_TO"
+    ],
+    "relationTargets": [
+      "CATEGORY",
+      "DOMAIN",
+      "SYSTEM",
+      "BRAND",
+      "PRODUCT_FAMILY",
+      "PRODUCT_MODEL",
+      "ITEM",
+      "SERVICE",
+      "GEOGRAPHY"
+    ],
+    "relationAttributes": [
+      "evidence",
+      "provenance",
+      "sourceUrl",
+      "sourceReference",
+      "confidence",
+      "observedAt",
+      "validFrom",
+      "validUntil",
+      "geography",
+      "scope",
+      "lifecycle",
+      "status",
+      "verificationState"
+    ],
+    "evidenceFirstClass": true,
+    "stableKnowledge": [
+      "organization identity",
+      "manufacturer identity",
+      "brand ownership",
+      "product identity",
+      "capabilities",
+      "system classifications",
+      "service categories",
+      "supported geographies",
+      "verified role relationships"
+    ],
+    "timeSensitiveCommercialData": [
+      "current price",
+      "stock availability",
+      "lead time",
+      "MOQ",
+      "payment terms",
+      "quotation validity",
+      "current contact person",
+      "current dealer status",
+      "current authorization status",
+      "current freight",
+      "current market pricing"
+    ],
+    "timeSensitivePolicy": "Time-sensitive commercial data must NOT be treated as permanent model truth. It belongs in a live database, governed observation records, RAG, search, tools and supplier quotation history. GHARIBO learns HOW TO DISCOVER AND VERIFY, not memorize.",
+    "generationLifecycle": [
+      "GHARIBO_GENERATION",
+      "CANDIDATE",
+      "SCHEMA_VALIDATION",
+      "IDENTITY_DUPLICATE_CHECK",
+      "SOURCE_EVIDENCE_CHECK",
+      "RELATION_INTEGRITY_CHECK",
+      "ACCEPTED",
+      "NEEDS_REVIEW",
+      "REJECTED",
+      "GOVERNED_KNOWLEDGE_GRAPH"
+    ],
+    "generatedIsNeverGold": true,
+    "selfImprovementFlywheel": [
+      "INITIAL_GOLD_DATA",
+      "GHARIBO_TRAINING",
+      "GHARIBO_GENERATES_CANDIDATES",
+      "VERIFIERS_EVIDENCE_HUMAN_REVIEW",
+      "ACCEPTED_KNOWLEDGE",
+      "HARD_VALUABLE_TRAINING_EXAMPLES",
+      "NEXT_GHARIBO_VERSION"
+    ],
+    "selfTrainingGuardrail": "GHARIBO MUST NOT blindly train on its own outputs; self-generated data must pass independent verification to prevent model collapse and self-reinforcement of errors."
+  },
+  "procurementIntelligence": {
+    "status": "APPROVED_DIRECTION_NOT_IMPLEMENTED",
+    "adr": "docs/adr/ADR-0015-universal-commercial-procurement-knowledge-graph.md",
+    "supportedQuestions": [
+      "Who supplies this product?",
+      "Who distributes this brand?",
+      "Who installs this system?",
+      "Who maintains it?",
+      "Which companies operate in Kuwait?",
+      "Which companies serve GCC markets?",
+      "Which organizations are authorized?",
+      "Which contractors are capable of this system?",
+      "Which service companies provide this service?"
+    ],
+    "relationPatterns": [
+      {
+        "from": "PRODUCT",
+        "relation": "SUPPLIED_BY",
+        "to": "ORGANIZATION"
+      },
+      {
+        "from": "BRAND",
+        "relation": "DISTRIBUTED_BY",
+        "to": "ORGANIZATION"
+      },
+      {
+        "from": "SYSTEM",
+        "relation": "INTEGRATED_BY",
+        "to": "ORGANIZATION"
+      },
+      {
+        "from": "SYSTEM",
+        "relation": "INSTALLED_BY",
+        "to": "ORGANIZATION"
+      },
+      {
+        "from": "SERVICE",
+        "relation": "PROVIDED_BY",
+        "to": "ORGANIZATION"
+      },
+      {
+        "from": "SYSTEM",
+        "relation": "MAINTAINED_BY",
+        "to": "ORGANIZATION"
+      }
+    ],
+    "authorizationClaimPolicy": "Never claim a company is authorized unless supported by suitable evidence.",
+    "privateInternalIntelligence": {
+      "visibility": "PRIVATE_INTERNAL",
+      "separatedFromPublicEvidence": true,
+      "neverPublic": true,
+      "dimensions": [
+        "quotation response speed",
+        "price competitiveness",
+        "delivery performance",
+        "documentation quality",
+        "rejection history",
+        "dispute history",
+        "responsiveness",
+        "payment-term history",
+        "previous PO history",
+        "project performance"
+      ]
+    },
+    "procurementFlow": [
+      "IDENTIFY_NEED",
+      "DISCOVER_CANDIDATE_ORGANIZATIONS",
+      "VERIFY_ROLES_AND_CAPABILITY",
+      "VERIFY_AUTHORIZATION_EVIDENCE",
+      "REQUEST_QUOTATION",
+      "COMPARE_RESPONSES",
+      "SELECT_AND_RECORD_OBSERVATION"
+    ],
+    "askPolicy": {
+      "publicQuestion": "WHO COULD / SHOULD WE ASK?",
+      "privateQuestion": "WHO DID WE ASK, WHAT DID THEY QUOTE, HOW DID THEY PERFORM?",
+      "statement": "The public knowledge graph answers who COULD or SHOULD be asked. The private internal record answers who WAS asked and how they performed. The two must never be conflated or merged.",
+      "publicBasis": "stable knowledge graph + public evidence",
+      "privateBasis": "private internal procurement intelligence"
+    },
+    "vokaIntegration": {
+      "adr": "docs/adr/ADR-0016-voka-gharibo-integration-boundary.md",
+      "boundary": "AI Gateway",
+      "status": "APPROVED_DIRECTION_NOT_IMPLEMENTED",
+      "statement": "VOKA and GHARIBO integrate only across an explicit AI Gateway boundary. VOKA's private commercial and transaction history stays private and must never flow into GHARIBO's public knowledge surface."
+    }
+  },
+  "toolsAndConnectors": {
+    "status": "PLANNED_OPTIONAL",
+    "policy": "Keep internal interfaces provider-neutral. GHARIBO must not become dependent on a proprietary connector.",
+    "connectors": [
+      {
+        "id": "huggingface",
+        "purpose": "models / datasets / research / future artifact workflows",
+        "status": "PLANNED"
+      },
+      {
+        "id": "firecrawl",
+        "purpose": "future commercial web research / crawling / structured evidence extraction",
+        "status": "PLANNED"
+      },
+      {
+        "id": "github",
+        "purpose": "source/code/governance operations",
+        "status": "CONNECTED"
+      },
+      {
+        "id": "mcp",
+        "purpose": "future agentic tool interface",
+        "status": "PLANNED"
+      }
+    ]
+  },
+  "securityAndIP": {
+    "policy": "PUBLIC SOURCE CODE DOES NOT MEAN PUBLIC INTELLIGENCE.",
+    "publicRepository": "voltixsec/Gharibo",
+    "mustRemainPrivate": [
+      "training datasets",
+      "private Gold examples",
+      "private evaluation sets",
+      "TEST data",
+      "adapters",
+      "LoRA weights",
+      "checkpoints",
+      "fine-tuned GHARIBO weights",
+      "internal prompts",
+      "internal reward functions where commercially sensitive",
+      "supplier intelligence",
+      "procurement graph",
+      "supplier performance",
+      "VOKA transaction history",
+      "private benchmarks",
+      "commercial observations",
+      "API keys",
+      "credentials",
+      "secrets"
+    ],
+    "repositoryRule": "The public repository must NEVER accidentally contain any of the private assets above.",
+    "masterStateRule": "The master state contains architecture and governance only — never confidential business data, secrets or dataset payloads."
+  },
+  "validation": {
+    "commands": [
+      {
+        "id": "master:generate",
+        "command": "npm run master:generate",
+        "asserts": "regenerates docs/GHARIBO_MASTER_STATE.md from the canonical JSON"
+      },
+      {
+        "id": "master:validate",
+        "command": "npm run master:validate",
+        "asserts": "master state integrity (schema, sections, references, consistency, markdown sync, privacy)"
+      },
+      {
+        "id": "docs:validate",
+        "command": "npm run docs:validate",
+        "asserts": "documentation governance + master state validation"
+      },
+      {
+        "id": "verify:m2",
+        "command": "npm run verify:m2 -- --check",
+        "asserts": "docs:facts metrics match the source tree"
+      },
+      {
+        "id": "verify:m3a",
+        "command": "npm run verify:m3a",
+        "asserts": "Milestone 3A/3B gate runner"
+      },
+      {
+        "id": "qualify:check",
+        "command": "npm run qualify:check",
+        "asserts": "qualification notebook + harness drift and training-free safety"
+      },
+      {
+        "id": "typecheck",
+        "command": "npm run typecheck",
+        "asserts": "TypeScript"
+      },
+      {
+        "id": "lint",
+        "command": "npm run lint",
+        "asserts": "ESLint"
+      },
+      {
+        "id": "test",
+        "command": "npm test",
+        "asserts": "vitest suite"
+      },
+      {
+        "id": "build",
+        "command": "npm run build",
+        "asserts": "Next.js production build"
+      }
+    ],
+    "requiredBeforeCommit": [
+      "master:generate",
+      "master:validate",
+      "docs:validate",
+      "verify:m2",
+      "verify:m3a",
+      "qualify:check",
+      "typecheck",
+      "lint",
+      "test",
+      "build"
+    ],
+    "lastVerifiedCheckpoint": "386be838327f6a7e22e7ced074c5c482b80158bc",
+    "lastVerifiedAt": "2026-09-14",
+    "lastVerifiedCheckpointNote": "The gate suite above was run on the working tree based on this checkpoint; the SHA of the commit containing it is recorded in the next master-state revision.",
+    "results": [
+      {
+        "gate": "master:generate",
+        "command": "npm run master:generate",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "unchanged: docs/GHARIBO_MASTER_STATE.md (357 lines); output byte-stable across two consecutive runs (sha256 21590b51a598436314f1b535fbb171e4ca6d7992164463d5f70eed3c812ae011)",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "master:validate",
+        "command": "npm run master:validate",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "18/18 checks PASS (json, schema, sections, decision-ids, decision-status, roadmap, experiment-refs, model-refs, dataset-refs, consistency, training-invariant, markdown, secrets, privacy, machine-paths, adr-link, supersession, references)",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "docs:validate",
+        "command": "npm run docs:validate",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "documentation governance PASSED (38 markdown + 2 diagram docs, 17 ADRs, facts api_route_files=36/api_handlers=53/sqlite_tables=17/dashboard_pages=11/adrs=17, 23 register docs) followed by master state 18/18 PASS",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "verify:m2",
+        "command": "npm run verify:m2 -- --check",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "docs:facts block matches the source tree (api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=17)",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "verify:m3a",
+        "command": "npm run verify:m3a",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "54 check(s) passed; 0 NOT_APPLICABLE; 3 PENDING_EXTERNAL_EXECUTION (real Kaggle GPU run required); 0 FAIL",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "qualify:check",
+        "command": "npm run qualify:check",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "harness matches package.ts and conforms to qualification contract (13 cells, content address 7fe6b0e11889212de990eaad2ac4c35de685ef544d430cf23a0d11bd96a0ed44)",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "typecheck",
+        "command": "npm run typecheck",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "tsc --noEmit completed with no errors (apps/web)",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "lint",
+        "command": "npm run lint",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "next lint: No ESLint warnings or errors",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "test",
+        "command": "npm test",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "153/153 tests passed across 4 files (smoke 47, m2-workers 26, m2-training 51, m2-repositories 29)",
+        "verifiedAt": "2026-09-14"
+      },
+      {
+        "gate": "build",
+        "command": "npm run build",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "Next.js production build: Compiled successfully; Generating static pages (31/31)",
+        "environmentLimitation": false,
+        "verifiedAt": "2026-09-14"
+      }
+    ],
+    "note": "results are recorded by QA after a full gate run; this section must never claim a gate that was not actually executed."
+  },
+  "blockers": [
+    {
+      "id": "BLK-0001",
+      "status": "OPEN",
+      "title": "Free-Kaggle T4 qualification run required",
+      "detail": "The 12 pinned engine dependency versions are unresolved (resolvedVersion = null by design — never fabricate) and no qualification hash exists. A real free-Kaggle T4 run is required.",
+      "blocks": [
+        "STAGE-1"
+      ],
+      "references": [
+        "docs/ENV_QUALIFICATION_CONTRACT.md",
+        "docs/TRAINING_STRATEGY.md"
+      ]
+    }
+  ],
+  "nextActions": [
+    {
+      "id": "ACT-0001",
+      "priority": "P0",
+      "action": "Run the qualification notebook on a free Kaggle T4 session to resolve the 12 pinned engine dependency versions and produce the qualification hash.",
+      "requires": "CTO authorization",
+      "references": [
+        "docs/ENV_QUALIFICATION_CONTRACT.md"
+      ]
+    },
+    {
+      "id": "ACT-0002",
+      "priority": "P0",
+      "action": "Freeze the engine dependency set (architecture §15 O3) once the qualification hash exists.",
+      "requires": "ACT-0001",
+      "references": [
+        "docs/ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "ACT-0003",
+      "priority": "P1",
+      "action": "Begin STAGE-1 (GHARIBO-exp-001) only after the environment is qualified and training is explicitly authorized.",
+      "requires": "ACT-0001, ACT-0002, CTO authorization",
+      "references": [
+        "docs/MODEL_REGISTRY.md"
+      ]
+    }
+  ],
+  "history": [
+    {
+      "revision": "1.0.0",
+      "date": "2026-09-14",
+      "summary": "Established the GHARIBO master state, the deterministic generator/validator pair, and the approved Universal Commercial + Procurement Knowledge Graph direction (ADR-0015..ADR-0017).",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "A commit SHA cannot be embedded in the commit that contains it; the SHA is recorded in the next master-state revision.",
+      "changes": [
+        "added governance/GHARIBO_MASTER_STATE.json",
+        "added scripts/master/generate-master-state.mjs",
+        "added scripts/master/validate-master-state.mjs",
+        "added docs/GHARIBO_MASTER_STATE.md (generated)",
+        "added ADR-0015, ADR-0016, ADR-0017",
+        "added DEC-0001..DEC-0020",
+        "recorded the post-training roadmap STAGE-1..STAGE-7"
+      ],
+      "trainingExecuted": false
+    }
+  ]
+}

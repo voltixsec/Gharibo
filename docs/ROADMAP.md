@@ -5,7 +5,7 @@
 | **Document Owner** | Product (GHARIBO AI LAB) |
 | **Type** | Roadmap |
 | **Status** | Approved |
-| **Version** | 1.1.0 |
+| **Version** | 1.2.0 |
 | **Last Updated** | 2026-09-14 |
 
 > The milestone progression below is a planning document, not a frozen baseline. It may change as
@@ -164,6 +164,22 @@ Executed on **free** compute under the zero-cost policy. Not started.
 - [ ] Custom tokenizers
 - [ ] Model distillation
 - [ ] Automated hyperparameter optimization
+
+## Post-Training Roadmap (Approved Direction)
+
+| Stage | Name | Status | Purpose |
+|-------|------|--------|---------|
+| STAGE-1 | `GHARIBO-exp-001` | NOT_STARTED | Establish a measurable baseline with QLoRA + SFT on the current 800 verified Gold examples; teach evidence-grounded behaviour, schema adherence and no-fabrication discipline. |
+| STAGE-2 | UCL FACTORY CHALLENGE | PLANNED | After exp-001 evaluates, ask GHARIBO to produce ~300-500 NEW candidate records from an under-represented domain; verify them to test whether the PROCESS was learned rather than examples memorized. |
+| STAGE-3 | `GHARIBO-Research-Gold-v0.2` | PLANNED | Grow the dataset from failures, hard cases, boundary cases and verified new generations — explicitly not volume for its own sake. |
+| STAGE-4 | PREFERENCE TRAINING | PLANNED | Generate multiple candidates, verify them, and build CHOSEN vs REJECTED pairs; evaluate DPO or ORPO without committing to one method until benchmark evidence exists. |
+| STAGE-5 | `GHARIBO-exp-003` | PLANNED | GRPO / RLVR over the `GHARIBO-UCL-Verifier` environment: create a real environment with sources, rules, verifiers and rewards, with explicit reward dimensions and severe penalties. |
+| STAGE-6 | AGENTIC TRAINING | FUTURE | A future tool ecosystem (Firecrawl, Hugging Face, GitHub, MCP tools, Verifiers, Atropos, controlled browser/search tools). |
+| STAGE-7 | CAPABILITY SPECIALIZATION | FUTURE | Potential separate capability adapters (Research / Knowledge Factory, Coding, VOKA Commercial, Engineering, Vision / Document Intelligence) with a future routing runtime. |
+
+> **Approved direction only.** This post-training roadmap is approved **direction**; nothing beyond
+> the current milestone is executed or scheduled. The canonical machine-readable record is
+> `governance/GHARIBO_MASTER_STATE.json`; the architecture decisions behind it are ADR-0015..ADR-0017.
 
 ## Key Principles Throughout
 

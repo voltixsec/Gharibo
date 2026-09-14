@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-09-14 |
 
 The single source of truth for **where the project actually is** — as opposed to where it is
@@ -26,11 +26,32 @@ the document index is [`docs/DOCUMENT_REGISTER.md`](docs/DOCUMENT_REGISTER.md).
 | **Package version** | `0.1.0` |
 | **Current milestone** | Milestone 3A — Training Readiness — **READY_FOR_ENV_QUALIFICATION** (see §3.1) |
 | **Last completed milestone** | Milestone 2 — Zero-Cost Training Pipeline (complete at `9735fe4`) |
-| **Frozen baseline** | `docs/ARCHITECTURE.md` v1.1.0 (extends v1.0.0, M1) |
+| **Frozen baseline** | `docs/ARCHITECTURE.md` v1.1.2 (extends v1.0.0, M1) |
 | **Runtime port** | `3000` (GHARIBO web app — unchanged) |
 | **Model training status** | **Not started.** No weights downloaded. No experiment executed. |
 | **Training budget** | **Zero monetary cost** — binding CEO constraint (see §4) |
 | **Training readiness** | **READY_FOR_ENV_QUALIFICATION.** Dataset built, deps pinned, gates pass; Kaggle GPU run required next. See §3.1 |
+
+---
+
+## 1b. Master State
+
+The canonical, machine-readable project state is
+[`governance/GHARIBO_MASTER_STATE.json`](governance/GHARIBO_MASTER_STATE.json). It is the single
+source of truth for the project; the human view
+[`docs/GHARIBO_MASTER_STATE.md`](docs/GHARIBO_MASTER_STATE.md) is **deterministically generated**
+from it and must **never be hand-edited**. Regenerate it with `npm run master:generate`; verify the
+whole artifact with `npm run master:validate`.
+
+The governance rule from ADR-0017: a material decision affecting architecture, training, datasets,
+experiments, models, knowledge graph, procurement intelligence, integrations, security/IP or roadmap
+is **not an accepted project decision** until (1) the master state is updated, (2) validation passes,
+(3) the required ADR/doc updates are completed, and (4) the change is checkpointed in Git.
+
+The master state also records **approved direction** that is not yet built — the Universal
+Commercial + Procurement Knowledge Graph (ADR-0015), the VOKA ↔ GHARIBO integration boundary
+(ADR-0016), and the post-training roadmap STAGE-1..STAGE-7. These are approved **direction**, not
+delivered capability: nothing beyond the current milestone is executed or scheduled.
 
 ---
 
