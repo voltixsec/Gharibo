@@ -5,11 +5,16 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-09-14 |
 
 > Part of the Milestone 1 architecture baseline. The promotion gates below are a frozen decision —
 > see `docs/adr/ADR-0008-model-registry-status-gates.md`.
+
+> **v1.1.0 — M2 corrections (2026-09-14).** Two changes: (1) Hard Rule 5 is restated to match
+> what is actually enforced and where (M1 enforced promotion in the UI only; M2 adds server-side
+> enforcement in the registry API). (2) The first registered entry, `GHARIBO-exp-001`, and its
+> lineage are documented below.
 
 ## Overview
 
@@ -73,7 +78,10 @@ EXPERIMENT -> CANDIDATE -> ACCEPTED
 2. **Every model has a unique name** — no duplicates allowed
 3. **Every model references its training run** — full lineage is preserved
 4. **Every model references its dataset version** — reproducibility guaranteed
-5. **Promotion is gated** — the system blocks invalid transitions
+5. **Promotion is gated** — invalid transitions are rejected. In Milestone 1 this gate was
+   enforced in the **UI only**; from Milestone 2 the registry API rejects transitions that are
+   not in the allowed set (`EXPERIMENT → CANDIDATE → ACCEPTED → DEPRECATED`), so the gate holds
+   even when the API is called directly. See ADR-0008.
 
 ## Model Naming Convention
 
@@ -90,6 +98,29 @@ GHARIBO derived:
 ```
 
 The "V1" label is reserved. It can only be applied through an explicit promotion in the registry UI.
+
+## First Experiment — `GHARIBO-exp-001`
+
+Milestone 2 prepares — but does **not** run — the first official experiment. It is registered as
+an **EXPERIMENT only**.
+
+| Field | Value |
+|-------|-------|
+| **model_name** | `GHARIBO-exp-001` |
+| **status** | `EXPERIMENT` |
+| **derived_from (lineage)** | `openai/gpt-oss-20b` |
+| **method** | 4-bit QLoRA + SFT |
+| **engine** | Unsloth Core |
+| **compute worker** | Kaggle Notebooks (free NVIDIA T4) |
+| **artifact storage** | Hugging Face private repo (optional, free allowance) + local fallback |
+
+**Lineage rule.** `GHARIBO-exp-001` is *derived from* `openai/gpt-oss-20b`. The base model is the
+**initial candidate only** — it is not permanently GHARIBO's foundation, and no paid inference
+budget may be spent on a base-model bake-off. A different foundation may be chosen later through
+a recorded decision, not by silently swapping the base.
+
+**Promotion rule.** `GHARIBO-exp-001` may **not** be promoted to `GHARIBO-V0.1` (or any other
+name) without evaluation. No evaluation has been run, so no promotion is possible today.
 
 ## Future Model Family
 

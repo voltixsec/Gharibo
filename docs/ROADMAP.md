@@ -5,11 +5,16 @@
 | **Document Owner** | Product (GHARIBO AI LAB) |
 | **Type** | Roadmap |
 | **Status** | Approved |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-09-14 |
 
 > The milestone progression below is a planning document, not a frozen baseline. It may change as
 > milestones complete; the frozen architecture baseline is `docs/ARCHITECTURE.md`.
+
+> **v1.1.0 — Zero-cost policy (2026-09-14).** Milestone 2 onward is planned under a binding
+> **zero monetary cost** constraint. Free training compute (Kaggle Notebooks, T4) replaces any
+> assumption of a purchased GPU machine or a paid training provider. See
+> `docs/TRAINING_STRATEGY.md` §"Compute & Cost Policy (Zero-Cost)" and ADR-0011..ADR-0014.
 
 ## Overview
 
@@ -81,61 +86,62 @@ Advanced Model Training
 - [x] SQLite persistence
 - [x] Python FastAPI services
 
-## Next: Milestone 2 — First Real Dataset
+## In Progress: Milestone 2 — Zero-Cost Training Pipeline
 
-- [ ] Configure a real provider (OpenAI-compatible or Ollama)
-- [ ] Collect training data through Playground
-- [ ] Run Research Gym tasks on a real domain
-- [ ] Review and approve data in Data Factory
-- [ ] Assemble first versioned dataset
-- [ ] Export to JSONL
+Infrastructure to *prepare* the first official experiment (`GHARIBO-exp-001`) without executing it.
 
-## Next: Milestone 3 — First LoRA Experiment
+- [x] M2 PRD + M2 architecture + ADR-0011..ADR-0014
+- [ ] Canonical Training Package schema (provider-neutral contract)
+- [ ] `TrainingWorker` abstraction + `KaggleTrainingWorker` (Worker #1)
+- [ ] Kaggle notebook generator (hardware check, pinned deps, hash verification, QLoRA, checkpoint/resume)
+- [ ] Export from AI LAB → Colab/Kaggle-ready Training Package
+- [ ] Dataset Gold Pipeline: `RAW → NORMALIZED → REVIEW → APPROVED → TRAINING_READY` → immutable version → `TRAIN` / `VALIDATION` / `TEST`
+- [ ] Provenance + hashes (dataset hash, split hashes, git SHA, base-model revision, engine version, env metadata)
+- [ ] Training page extensions
+- [ ] `GHARIBO-exp-001` registered as an **EXPERIMENT only**
+- [ ] **Not in scope:** running training, downloading weights, fabricating benchmarks
 
-- [ ] Install PyTorch + ML dependencies on GPU machine
-- [ ] Select base model (e.g., Qwen-2.5-7B-Instruct)
-- [ ] Run pre-flight check (must be READY)
-- [ ] Configure LoRA training run
-- [ ] Execute training (real, not stubbed)
-- [ ] Monitor training logs
-- [ ] Save checkpoint
+## Next: Milestone 3 — First Real Training Run (GHARIBO-exp-001)
 
-## Next: Milestone 4 — SFT
+Executed on **free** compute under the zero-cost policy. Not started.
 
-- [ ] Prepare SFT dataset (instruction-response pairs)
-- [ ] Configure SFT training run
-- [ ] Execute training
-- [ ] Evaluate checkpoint
+- [ ] Approve a dataset version to `TRAINING_READY`
+- [ ] Export its Training Package from the AI LAB
+- [ ] Run the Kaggle notebook on a free **T4** session (single GPU — no multi-GPU requirement)
+- [ ] Train 4-bit **QLoRA + SFT** on `openai/gpt-oss-20b` with **Unsloth Core**
+- [ ] Checkpoint, resume across sessions if interrupted, save LoRA adapter + trainer state
+- [ ] Persist logs and artifacts outside the ephemeral runtime; optionally upload to a private HF repo
+- [ ] **Requires explicit CTO authorization to execute**
 
-## Next: Milestone 5 — Evaluation
+## Next: Milestone 4 — Evaluation
 
-- [ ] Run benchmarks on trained checkpoint
+- [ ] Run benchmarks on the trained checkpoint
 - [ ] Compare base model vs. GHARIBO candidate
 - [ ] Check for regressions
-- [ ] Decide on promotion
+- [ ] Decide on promotion — no promotion to `GHARIBO-V0.1` without evaluation
 
-## Next: Milestone 6 — GHARIBO-V0.1
+## Next: Milestone 5 — GHARIBO-V0.1
 
-- [ ] Promote best experiment to CANDIDATE
+- [ ] Promote the best experiment to CANDIDATE
 - [ ] Register in Model Registry
 - [ ] Deploy for internal testing
 - [ ] Gather feedback
 
-## Next: Milestone 7 — DPO
+## Next: Milestone 6 — DPO
 
 - [ ] Collect preference data (chosen/rejected pairs)
 - [ ] Configure DPO training
 - [ ] Execute training
 - [ ] Evaluate improvement
 
-## Next: Milestone 8 — GRPO
+## Next: Milestone 7 — GRPO
 
 - [ ] Define verifiable tasks (math, code, structured output)
 - [ ] Configure GRPO training
 - [ ] Execute training
 - [ ] Evaluate on verifiable benchmarks
 
-## Next: Milestone 9 — GHARIBO-V1
+## Next: Milestone 8 — GHARIBO-V1
 
 - [ ] Final evaluation pass
 - [ ] Promote to ACCEPTED in registry
@@ -166,3 +172,4 @@ Advanced Model Training
 3. **Evidence-based promotion** — models earn their version numbers
 4. **Infrastructure first** — build the tools before using them
 5. **Data quality over quantity** — curated > scraped
+6. **Zero monetary cost** — free compute (Kaggle T4), free-tier storage, local fallback; no paid provider may become a dependency

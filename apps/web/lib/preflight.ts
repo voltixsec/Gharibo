@@ -1,9 +1,12 @@
 /**
- * Pre-flight proxy — calls the Python trainer service.
- * If the service is unreachable, returns a PreflightResult with overallReady=false
- * and a trainer_service NOT_READY item (so the UI always renders a result).
+ * Pre-flight proxy — calls the Python trainer service, and (M2) honours `dataset_id`
+ * by checking the selected dataset version locally.
+ *
+ * If the trainer service is unreachable, returns a PreflightResult with
+ * overallReady=false and a trainer_service NOT_READY item (so the UI always renders).
  */
 import { config } from "@/lib/config";
+import { datasetsRepository } from "@/lib/db/repositories";
 import type { PreflightResult, PreflightCheckItem, PreflightStatus } from "@gharibo/shared";
 
 interface TrainerPreflightResponse {
@@ -15,7 +18,7 @@ interface TrainerPreflightResponse {
 /**
  * Runs the pre-flight check by calling the trainer service.
  * @param baseModel - Optional base model name to check availability.
- * @param datasetId - Optional dataset ID to check validity.
+ * @param datasetId - Optional dataset ID; M2 checks its version is TRAINING_READY.
  */
 export async function runPreflight(
   baseModel?: string,
@@ -26,6 +29,15 @@ export async function runPreflight(
   if (datasetId) params.set("dataset_id", datasetId);
 
   const url = `${config.trainerUrl}/preflight${params.toString() ? "?" + params.toString() : ""}`;
+
+  // M2: honour dataset_id locally (the trainer service only receives it as a hint).
+  const datasetCheck = checkDatasetVersion(datasetId);
+  const datasetItems = datasetCheck ? [datasetCheck] : [];
+  const datasetReady = datasetCheck ? datasetCheck.status === "READY" : true;
+
+  let trainerItems: PreflightCheckItem[];
+  let trainerReady: boolean;
+  let checkedAt: string;
 
   try {
     const controller = new AbortController();
@@ -38,27 +50,53 @@ export async function runPreflight(
     }
 
     const data = (await response.json()) as TrainerPreflightResponse;
-
-    return {
-      overallReady: data.overall_ready,
-      items: data.items.map(mapItem),
-      checkedAt: data.checked_at || new Date().toISOString(),
-    };
+    trainerItems = data.items.map(mapItem);
+    trainerReady = data.overall_ready;
+    checkedAt = data.checked_at || new Date().toISOString();
   } catch (error) {
-    // Return a result that always renders — trainer service unreachable
     const message = error instanceof Error ? error.message : "Unknown error";
+    trainerItems = [
+      {
+        check: "trainer_service",
+        status: "NOT_READY" as PreflightStatus,
+        detail: `Trainer service unreachable at ${config.trainerUrl}: ${message}`,
+      },
+    ];
+    trainerReady = false;
+    checkedAt = new Date().toISOString();
+  }
+
+  return {
+    overallReady: trainerReady && datasetReady,
+    items: [...trainerItems, ...datasetItems],
+    checkedAt,
+  };
+}
+
+/** Checks that the selected dataset version exists and is TRAINING_READY. */
+function checkDatasetVersion(datasetId?: string): PreflightCheckItem | null {
+  if (!datasetId) return null;
+  const dataset = datasetsRepository.get(datasetId);
+  if (!dataset) {
     return {
-      overallReady: false,
-      items: [
-        {
-          check: "trainer_service",
-          status: "NOT_READY" as PreflightStatus,
-          detail: `Trainer service unreachable at ${config.trainerUrl}: ${message}`,
-        },
-      ],
-      checkedAt: new Date().toISOString(),
+      check: "dataset_version",
+      status: "NOT_READY",
+      detail: `Dataset not found: ${datasetId}`,
     };
   }
+  if (dataset.status !== "TRAINING_READY") {
+    return {
+      check: "dataset_version",
+      status: "NOT_READY",
+      detail: `Dataset "${dataset.name}" ${dataset.version} is ${dataset.status ?? "DRAFT"} — cut a TRAINING_READY version first`,
+    };
+  }
+  const hash = dataset.datasetHash ?? "unknown";
+  return {
+    check: "dataset_version",
+    status: "READY",
+    detail: `Dataset "${dataset.name}" ${dataset.version} is TRAINING_READY (hash ${hash.slice(0, 12)}…)`,
+  };
 }
 
 /** Maps the Python service's snake_case response to our TS type. */

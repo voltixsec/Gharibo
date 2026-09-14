@@ -222,6 +222,62 @@ export const SCHEMA_STATEMENTS: string[] = [
     updated_at TEXT NOT NULL
   );`,
 
+  // --- M2 tables (architecture §6.1) ---
+
+  // training_packages — issued, immutable Training Packages.
+  `CREATE TABLE IF NOT EXISTS training_packages (
+    id TEXT PRIMARY KEY,
+    experiment_id TEXT NOT NULL,
+    schema_version TEXT NOT NULL,
+    manifest TEXT NOT NULL,
+    manifest_hash TEXT NOT NULL,
+    dataset_id TEXT,
+    dataset_version_id TEXT,
+    run_id TEXT,
+    worker_id TEXT NOT NULL DEFAULT 'kaggle',
+    notebook_sha256 TEXT,
+    bundle_path TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (dataset_id) REFERENCES datasets(id) ON DELETE SET NULL,
+    FOREIGN KEY (run_id) REFERENCES training_runs(run_id) ON DELETE SET NULL
+  );`,
+
+  // dataset_splits — deterministic split membership per dataset version.
+  `CREATE TABLE IF NOT EXISTS dataset_splits (
+    dataset_id TEXT NOT NULL,
+    split_name TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    record_line_hash TEXT NOT NULL,
+    PRIMARY KEY (dataset_id, split_name, record_id),
+    FOREIGN KEY (dataset_id) REFERENCES datasets(id) ON DELETE CASCADE,
+    FOREIGN KEY (record_id) REFERENCES data_factory_records(id) ON DELETE CASCADE
+  );`,
+
+  // training_artifacts — per-file artifact integrity hashes (manifest-of-hashes).
+  `CREATE TABLE IF NOT EXISTS training_artifacts (
+    id TEXT PRIMARY KEY,
+    package_id TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    rollup_hash TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (package_id) REFERENCES training_packages(id) ON DELETE CASCADE
+  );`,
+
+  // training_run_events — resilience state-transition audit log.
+  `CREATE TABLE IF NOT EXISTS training_run_events (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    reason TEXT,
+    source TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES training_runs(run_id) ON DELETE CASCADE
+  );`,
+
   // Indexes for performance on common queries
   `CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);`,
   `CREATE INDEX IF NOT EXISTS idx_data_factory_status ON data_factory_records(verification_status);`,
@@ -230,6 +286,11 @@ export const SCHEMA_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_training_runs_status ON training_runs(status);`,
   `CREATE INDEX IF NOT EXISTS idx_evaluations_model ON evaluation_results(model_id);`,
   `CREATE INDEX IF NOT EXISTS idx_dataset_records_dataset ON dataset_records(dataset_id);`,
+  // M2 indexes
+  `CREATE INDEX IF NOT EXISTS idx_training_packages_experiment ON training_packages(experiment_id);`,
+  `CREATE INDEX IF NOT EXISTS idx_dataset_splits_dataset ON dataset_splits(dataset_id, split_name);`,
+  `CREATE INDEX IF NOT EXISTS idx_training_artifacts_package ON training_artifacts(package_id);`,
+  `CREATE INDEX IF NOT EXISTS idx_run_events_run ON training_run_events(run_id);`,
 ];
 
 /** Default settings seeded on first migration. */

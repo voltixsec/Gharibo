@@ -6,14 +6,20 @@
 /** Supported fine-tuning methods. */
 export type TrainingMethod = "lora" | "qlora" | "sft";
 
-/** Training run lifecycle status. */
+/**
+ * Training run lifecycle status.
+ * M1: DRAFT, QUEUED, RUNNING, COMPLETED, FAILED, CANCELLED.
+ * M2 adds: INTERRUPTED, RESUMABLE (free-tier resilience — §10).
+ */
 export type RunStatus =
   | "DRAFT"
   | "QUEUED"
   | "RUNNING"
   | "COMPLETED"
   | "FAILED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "INTERRUPTED"
+  | "RESUMABLE";
 
 /** A training run configuration + status. */
 export interface TrainingRun {
@@ -43,4 +49,19 @@ export interface TrainingRun {
   preflightResult: string | null;
   createdAt: string;
   updatedAt: string;
+  // --- M2 additions: engine values the package derives from (never hardcoded) ---
+  maxSeqLength?: number | null;
+  optimizer?: string | null;
+  warmupSteps?: number | null;
+  lrSchedulerType?: string | null;
+  weightDecay?: number | null;
+  dtype?: string | null;
+  saveStrategy?: string | null;
+  saveSteps?: number | null;
+  saveTotalLimit?: number | null;
+  baseModelRevision?: string | null;
+  loaderModelId?: string | null;
+  workerId?: string | null;
+  packageId?: string | null;
+  resumeFromCheckpoint?: string | null;
 }

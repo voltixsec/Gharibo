@@ -29,6 +29,10 @@ Governance rules (statuses, ownership, when an ADR is required) live in
 | [ADR-0008](ADR-0008-model-registry-status-gates.md) | Gate model promotion through registry statuses | Accepted | 2026-09-14 |
 | [ADR-0009](ADR-0009-python-service-cors-allowlist.md) | Restrict CORS on Python services to an explicit allow-list | Accepted | 2026-09-14 |
 | [ADR-0010](ADR-0010-root-scripts-delegate-to-workspaces.md) | Root scripts delegate to workspaces; Next.js pinned at the repo root | Accepted | 2026-09-14 |
+| [ADR-0011](ADR-0011-training-worker-abstraction.md) | Provider-neutral `TrainingWorker` abstraction with Kaggle as Worker #1 | Accepted | 2026-09-14 |
+| [ADR-0012](ADR-0012-canonical-training-package.md) | The canonical Training Package as the portable, reproducible training contract | Accepted | 2026-09-14 |
+| [ADR-0013](ADR-0013-content-addressed-dataset-versions.md) | Content-addressed immutable dataset versions with deterministic hashed splits | Accepted | 2026-09-14 |
+| [ADR-0014](ADR-0014-zero-cost-artifact-policy.md) | Zero-cost artifact policy — optional private HF, local fallback, never GitHub | Accepted | 2026-09-14 |
 
 ## Conventions
 

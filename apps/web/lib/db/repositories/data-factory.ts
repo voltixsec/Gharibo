@@ -1,9 +1,13 @@
 /**
  * Data Factory records repository — CRUD + search/filter + bulk + status transitions.
  * Maps SQLite rows ↔ DataFactoryRecord domain objects.
+ *
+ * M2: `transition` enforces the Gold Pipeline server-side (§7.3) — this is NEW
+ * enforcement; M1 enforced nothing server-side.
  */
 import { db } from "@/lib/db/index";
 import type { DataFactoryRecord, VerificationStatus, ValidationResult } from "@gharibo/shared";
+import { HttpError } from "@gharibo/shared";
 import { genId, now, safeJsonParse } from "@/lib/utils";
 
 interface DataFactoryRow {
@@ -16,6 +20,7 @@ interface DataFactoryRow {
   expected_output: string | null;
   chosen_output: string | null;
   rejected_output: string | null;
+  reasoning: string | null;
   source: string | null;
   source_url: string | null;
   license: string | null;
@@ -27,6 +32,7 @@ interface DataFactoryRow {
   source_training_example_id: string | null;
   created_at: string;
   updated_at: string;
+  pipeline_updated_at: string | null;
 }
 
 function rowToRecord(row: DataFactoryRow): DataFactoryRecord {
@@ -40,6 +46,7 @@ function rowToRecord(row: DataFactoryRow): DataFactoryRecord {
     expectedOutput: row.expected_output,
     chosenOutput: row.chosen_output,
     rejectedOutput: row.rejected_output,
+    reasoning: row.reasoning,
     source: row.source,
     sourceUrl: row.source_url,
     license: row.license,
@@ -51,8 +58,23 @@ function rowToRecord(row: DataFactoryRow): DataFactoryRecord {
     sourceTrainingExampleId: row.source_training_example_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    pipelineUpdatedAt: row.pipeline_updated_at,
   };
 }
+
+/**
+ * Allowed Gold Pipeline transitions (§7.3).
+ * RAW → NORMALIZED → REVIEW_REQUIRED → APPROVED → TRAINING_READY,
+ * with REVIEW_REQUIRED → REJECTED.
+ */
+export const ALLOWED_VERIFICATION_TRANSITIONS: Record<VerificationStatus, VerificationStatus[]> = {
+  RAW: ["NORMALIZED"],
+  NORMALIZED: ["REVIEW_REQUIRED"],
+  REVIEW_REQUIRED: ["APPROVED", "REJECTED"],
+  APPROVED: ["TRAINING_READY"],
+  TRAINING_READY: [],
+  REJECTED: [],
+};
 
 export interface ListOptions {
   status?: VerificationStatus;
@@ -104,13 +126,13 @@ export const dataFactoryRepository = {
     db()
       .prepare(
         `INSERT INTO data_factory_records (id, task_type, domain, language, input, context,
-         expected_output, chosen_output, rejected_output, source, source_url, license,
+         expected_output, chosen_output, rejected_output, reasoning, source, source_url, license,
          verification_status, quality_score, difficulty, tags, validation_results,
-         source_training_example_id, created_at, updated_at)
+         source_training_example_id, created_at, updated_at, pipeline_updated_at)
          VALUES (@id, @task_type, @domain, @language, @input, @context,
-         @expected_output, @chosen_output, @rejected_output, @source, @source_url, @license,
+         @expected_output, @chosen_output, @rejected_output, @reasoning, @source, @source_url, @license,
          @verification_status, @quality_score, @difficulty, @tags, @validation_results,
-         @source_training_example_id, @created_at, @updated_at)`,
+         @source_training_example_id, @created_at, @updated_at, @pipeline_updated_at)`,
       )
       .run({
         id,
@@ -122,6 +144,7 @@ export const dataFactoryRepository = {
         expected_output: input.expectedOutput,
         chosen_output: input.chosenOutput,
         rejected_output: input.rejectedOutput,
+        reasoning: input.reasoning ?? null,
         source: input.source,
         source_url: input.sourceUrl,
         license: input.license,
@@ -133,6 +156,7 @@ export const dataFactoryRepository = {
         source_training_example_id: input.sourceTrainingExampleId,
         created_at: ts,
         updated_at: ts,
+        pipeline_updated_at: ts,
       });
     return this.get(id)!;
   },
@@ -146,8 +170,8 @@ export const dataFactoryRepository = {
     db()
       .prepare(
         `UPDATE data_factory_records SET task_type = ?, domain = ?, language = ?, input = ?,
-         context = ?, expected_output = ?, chosen_output = ?, rejected_output = ?, source = ?,
-         source_url = ?, license = ?, verification_status = ?, quality_score = ?, difficulty = ?,
+         context = ?, expected_output = ?, chosen_output = ?, rejected_output = ?, reasoning = ?,
+         source = ?, source_url = ?, license = ?, verification_status = ?, quality_score = ?, difficulty = ?,
          tags = ?, validation_results = ?, updated_at = ? WHERE id = ?`,
       )
       .run(
@@ -159,6 +183,7 @@ export const dataFactoryRepository = {
         merged.expectedOutput,
         merged.chosenOutput,
         merged.rejectedOutput,
+        merged.reasoning ?? null,
         merged.source,
         merged.sourceUrl,
         merged.license,
@@ -171,6 +196,27 @@ export const dataFactoryRepository = {
         id,
       );
     return this.get(id);
+  },
+
+  /**
+   * Server-side Gold Pipeline transition (§7.3). Rejects any illegal move with a 400
+   * and records `pipeline_updated_at`. This closes the M1 gap where the state machine
+   * was enforced only in the UI.
+   */
+  transition(id: string, to: VerificationStatus, opts?: { reason?: string }): DataFactoryRecord {
+    const current = this.get(id);
+    if (!current) throw new HttpError(404, "Data Factory record not found");
+    const allowed = ALLOWED_VERIFICATION_TRANSITIONS[current.verificationStatus] ?? [];
+    if (!allowed.includes(to)) {
+      throw new HttpError(400, `Illegal pipeline transition ${current.verificationStatus} → ${to}`);
+    }
+    const ts = now();
+    db()
+      .prepare(
+        "UPDATE data_factory_records SET verification_status = ?, pipeline_updated_at = ?, updated_at = ? WHERE id = ?",
+      )
+      .run(to, ts, ts, id);
+    return this.get(id)!;
   },
 
   bulk(ids: string[], action: "approve" | "reject" | "tag", value?: string): number {

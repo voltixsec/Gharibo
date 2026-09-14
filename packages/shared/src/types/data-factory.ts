@@ -33,6 +33,8 @@ export interface DataFactoryRecord {
   expectedOutput: string | null;
   chosenOutput: string | null;
   rejectedOutput: string | null;
+  /** Chain-of-thought reasoning; maps to the Harmony `analysis` channel (never user-facing). */
+  reasoning?: string | null;
   source: string | null;
   sourceUrl: string | null;
   license: string | null;
@@ -44,4 +46,6 @@ export interface DataFactoryRecord {
   sourceTrainingExampleId: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Timestamp of the last Gold Pipeline transition (M2 audit). */
+  pipelineUpdatedAt?: string | null;
 }

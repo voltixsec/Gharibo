@@ -9,6 +9,8 @@ export * from "./training-example";
 export * from "./data-factory";
 export * from "./dataset";
 export * from "./training-run";
+export * from "./training-package";
+export * from "./training-worker";
 export * from "./model-registry";
 export * from "./research";
 export * from "./experiment";

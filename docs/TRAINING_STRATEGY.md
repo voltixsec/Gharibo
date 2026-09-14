@@ -5,11 +5,18 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-09-14 |
 
 > Part of the Milestone 1 architecture baseline. See `docs/DOCUMENTATION_GOVERNANCE.md` §5 for
 > change control and `docs/ARCHITECTURE.md` §1.3 for how this subsystem is wired.
+
+> **v1.1.0 — Zero-cost policy (2026-09-14).** Milestone 2 establishes a binding **zero monetary
+> cost** constraint on training. The compute policy in §"Compute & Cost Policy (Zero-Cost)" below
+> is authoritative; it is recorded in ADR-0011 (provider-neutral `TrainingWorker`, Kaggle as
+> Worker #1), ADR-0012 (canonical Training Package), ADR-0013 (content-addressed dataset
+> versions), and ADR-0014 (zero-cost artifact policy). The incremental design lives in
+> `docs/ARCHITECTURE_MILESTONE_2.md`.
 
 ## Philosophy
 
@@ -29,6 +36,55 @@ GHARIBO follows a disciplined training philosophy:
 
 ### Principle
 Do not attempt to permanently train daily news, prices, or rapidly changing data into model weights. Use web research, retrieval, tools, and external knowledge stores for dynamic information. Train the model's ability to USE these tools effectively, not to memorize their output.
+
+## Compute & Cost Policy (Zero-Cost)
+
+**Binding constraint:** GHARIBO training infrastructure must currently operate at **zero monetary
+cost**. This is a CEO-level constraint and may not be relaxed without an explicit written change.
+
+| Concern | Decision |
+|---------|----------|
+| **Primary training worker** | Kaggle Notebooks — **free GPU tier** |
+| **Target accelerator** | NVIDIA **T4** |
+| **Multi-GPU** | Kaggle may expose T4 ×2, but the first recipe **must not require** multi-GPU execution |
+| **Training engine** | **Unsloth Core** (pinned install set — a bare `pip install unsloth` is insufficient) |
+| **Initial base candidate** | `openai/gpt-oss-20b` — the **initial candidate only**, not permanently the foundation |
+| **Initial method** | 4-bit **QLoRA + SFT** |
+| **First experiment** | `GHARIBO-exp-001` (registered as an EXPERIMENT only) |
+| **Paid providers** | **Prohibited** — no Together AI, RunPod, Vertex AI, Lambda, CoreWeave, etc. |
+| **Paid inference bake-off** | **Prohibited** — model selection must not consume paid inference budget |
+| **Artifact storage** | Hugging Face **private** repo within the free allowance, plus a complete **local export/download fallback**. GitHub holds source and documentation only. |
+
+### Hardware reality (T4 = Turing, compute capability 7.5)
+
+The T4 is a Turing-generation GPU. This has concrete consequences the recipe must respect:
+
+- **bf16 is not supported** (bf16 requires compute capability ≥ 8.0) — the recipe uses **fp16**.
+- **FlashAttention-2 is unavailable** — do not enable it.
+- **VRAM is tight.** `gpt-oss-20b` in 4-bit QLoRA needs roughly 14 GB minimum (16 GB recommended)
+  on a 16 GB T4. The recipe must verify VRAM before starting and degrade sequence length if needed.
+
+### Free-tier resilience (mandatory)
+
+Because a Kaggle session is ephemeral and time-limited (≈30 h/week of GPU), a run must **never** be
+required to complete in one session. The pipeline must support:
+
+1. checkpointing;
+2. resume-from-checkpoint (automatic when a checkpoint is supplied);
+3. deterministic dataset versions;
+4. immutable experiment IDs;
+5. partial-run recovery;
+6. artifact integrity hashes;
+7. interrupted-session recovery;
+8. training logs persisted **outside** the ephemeral runtime;
+9. explicit `FAILED` / `INTERRUPTED` / `RESUMABLE` states.
+
+### Format correctness
+
+`gpt-oss-20b` is trained in the **OpenAI Harmony** format (roles `system` / `developer` / `user` /
+`assistant` / `tool`; channels `final` / `analysis` / `commentary`). Training data must preserve
+Harmony formatting — records are mapped to Harmony conversations by the canonical Training Package
+(ADR-0012), never hand-serialized per-experiment.
 
 ## Training Methods (Phase 1)
 

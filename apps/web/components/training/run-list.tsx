@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate, truncate } from "@/lib/utils";
@@ -13,6 +14,8 @@ const STATUS_BADGE: Record<string, "default" | "secondary" | "success" | "destru
   COMPLETED: "success",
   FAILED: "destructive",
   CANCELLED: "outline",
+  INTERRUPTED: "warning",
+  RESUMABLE: "default",
 };
 
 export function RunList() {
@@ -53,9 +56,10 @@ export function RunList() {
         ) : (
           <div className="flex flex-col gap-2">
             {runs.map((run) => (
-              <div
+              <Link
                 key={run.runId}
-                className="flex items-center justify-between rounded-md border p-3"
+                href={`/training/${run.runId}`}
+                className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-accent"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -77,7 +81,7 @@ export function RunList() {
                 >
                   {run.status}
                 </Badge>
-              </div>
+              </Link>
             ))}
           </div>
         )}

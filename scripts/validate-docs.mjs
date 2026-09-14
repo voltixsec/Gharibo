@@ -74,10 +74,12 @@ function parseMermaidMeta(text) {
 // ---------------------------------------------------------------- 1. metadata
 const isAdrFile = (f) => /ADR-\d{4}-/.test(f);
 
+// Root-level documents that are part of the governed set (repo root, not under docs/).
+const ROOT_DOCS = ['README.md', 'overview.md', 'PROJECT_STATE.md', 'CHANGELOG.md'];
+
 const mdDocs = [
   ...walk(p('docs'), (f) => f.endsWith('.md')),
-  p('README.md'),
-  p('overview.md'),
+  ...ROOT_DOCS.map((f) => p(f)),
 ].filter(existsSync);
 
 const REQUIRED_DOC_FIELDS = ['Document Owner', 'Type', 'Status', 'Version', 'Last Updated'];
@@ -206,7 +208,7 @@ if (!existsSync(registerPath)) {
   const rows = [...registerText.matchAll(/^\|\s*([^|]+?)\s*\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$/gm)];
   let compared = 0;
   for (const [, name, rel, , , status, version] of rows) {
-    if (!rel.startsWith('docs/') && rel !== 'README.md' && rel !== 'overview.md') continue;
+    if (!rel.startsWith('docs/') && !ROOT_DOCS.includes(rel)) continue;
     if (!existsSync(p(rel))) {
       fail('register', `${name.trim()}: path "${rel}" does not exist`);
       continue;

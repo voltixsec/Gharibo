@@ -5,16 +5,25 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Architecture |
 | **Status** | Frozen |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-09-14 |
 | **Project Name** | `gharibo_ai_lab` |
 | **Based On** | `docs/PRD.md` (v1.0.0) |
+| **Extended By** | `docs/ARCHITECTURE_MILESTONE_2.md` (v1.0.0) — M2 zero-cost training pipeline (ADR-0011..0014) |
 
 > **Baseline freeze — 2026-09-14.** This document is the frozen architecture baseline for
 > Milestone 1 (the vertical slice). It reflects what was actually built, not what was planned.
 > From this point, changing it requires an ADR and a version bump per
 > `docs/DOCUMENTATION_GOVERNANCE.md` §5. The countable claims in §2.7 are machine-checked by
 > `npm run docs:validate` — update that block whenever the code changes.
+
+> **v1.1.0 — Milestone 2 extension (2026-09-14).** Milestone 2 is **additive**: it introduces the
+> provider-neutral `TrainingWorker` abstraction, the canonical Training Package, content-addressed
+> dataset versions, and the zero-cost artifact policy. The full incremental design lives in
+> `docs/ARCHITECTURE_MILESTONE_2.md`; the decisions are recorded in ADR-0011 (worker abstraction),
+> ADR-0012 (training package), ADR-0013 (dataset versions), and ADR-0014 (zero-cost artifacts).
+> Nothing in this M1 baseline is invalidated — the M1 tables, routes, and pages remain the
+> contract, and M2 extends them.
 
 ---
 
@@ -304,11 +313,11 @@ change with it** — that is what keeps the frozen baseline honest.
 <!-- docs:facts -->
 | Metric | Value |
 |--------|-------|
-| api_route_files | 28 |
-| api_handlers | 44 |
-| sqlite_tables | 13 |
-| dashboard_pages | 10 |
-| adrs | 10 |
+| api_route_files | 36 |
+| api_handlers | 53 |
+| sqlite_tables | 17 |
+| dashboard_pages | 11 |
+| adrs | 14 |
 <!-- /docs:facts -->
 
 | Metric | Meaning |

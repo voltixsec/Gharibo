@@ -16,4 +16,11 @@ export interface Experiment {
   trainingRunId: string | null;
   createdAt: string;
   updatedAt: string;
+  // --- M2 additions (optional for pre-M2 rows) ---
+  /** The content-addressed Training Package this experiment is based on. */
+  packageId?: string | null;
+  /** The canonical manifest JSON (snake_case) for the referenced package. */
+  manifest?: Record<string, unknown>;
+  /** Full provenance record (dataset/split hashes, git SHA, engine, env, rollup). */
+  provenance?: Record<string, unknown>;
 }

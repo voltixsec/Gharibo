@@ -5,11 +5,18 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-09-14 |
 
 > Part of the Milestone 1 architecture baseline. The pipeline state machine below is a frozen
 > decision — see `docs/adr/ADR-0007-data-factory-pipeline-state-machine.md`.
+
+> **v1.1.0 — Milestone 2 additions (2026-09-14).** Three additive changes, none of which alter the
+> M1 state machine: (1) an optional `reasoning` field on the record schema, which carries the
+> model's reasoning trace into the Harmony `analysis` channel (see `docs/ARCHITECTURE_MILESTONE_2.md`
+> §4); (2) a `pipeline_updated_at` timestamp; (3) the Gold Pipeline transitions below are now
+> validated **server-side** in the repository layer, so an illegal state jump is rejected even when
+> the API is called directly rather than through the UI.
 
 ## Overview
 
@@ -44,6 +51,7 @@ RAW -> NORMALIZED -> REVIEW_REQUIRED -> APPROVED -> TRAINING_READY
 | expected_output | text | No | Ground truth (if available) |
 | chosen_output | text | No | Preferred response (for DPO) |
 | rejected_output | text | No | Rejected response (for DPO) |
+| reasoning | text | No | Optional reasoning trace (M2) — mapped to the Harmony `analysis` channel; never emitted to the final answer |
 | source | string | No | Where the data came from |
 | source_url | string | No | Original URL |
 | license | string | No | License of the data |
@@ -54,6 +62,7 @@ RAW -> NORMALIZED -> REVIEW_REQUIRED -> APPROVED -> TRAINING_READY
 | validation_results | JSON | Auto | Results from validation engine |
 | created_at | datetime | Auto | Creation timestamp |
 | updated_at | datetime | Auto | Last update timestamp |
+| pipeline_updated_at | datetime | Auto | Last pipeline-state change (M2) |
 
 ## Validation Engine
 
