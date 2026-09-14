@@ -435,6 +435,13 @@ Each entity has an analogous repository. All return shared domain objects.
 
 ### 3.4 SQLite Schema (CREATE TABLE statements)
 
+> **Milestone 2 additions.** The DDL below is the frozen **M1** baseline (13 tables). Milestone 2
+> adds **4 tables** (`training_packages`, `dataset_splits`, `training_artifacts`,
+> `training_run_events` → 17 total) and adds columns to `datasets`, `data_factory_records`,
+> `training_runs`, and `experiments` (e.g. `experiments.package_id` / `manifest` / `provenance`)
+> via idempotent `ensureColumn`. The authoritative additive DDL is
+> [`docs/ARCHITECTURE_MILESTONE_2.md`](ARCHITECTURE_MILESTONE_2.md) §6.
+
 ```sql
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
