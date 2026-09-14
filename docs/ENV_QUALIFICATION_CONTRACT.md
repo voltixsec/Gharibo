@@ -5,8 +5,20 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Draft |
-| **Version** | 1.1.0 |
+| **Version** | 1.2.0 |
 | **Last Updated** | 2026-09-14 |
+
+> **v1.2.0 — Milestone 3B: Qualification Safety (§13).** Adds a normative
+> **Qualification Safety** section. The harness must be structurally training-free: it
+> arms runtime tripwires on the optimizer constructor, the optimizer step, the
+> scheduler constructors, the tensor/autograd backward functions and the accelerate
+> backward, and it emits a `qualification_safety` evidence block into
+> `env-qualification.json` whose values are computed from the tripwire state and a
+> parameter-digest comparison — never hardcoded. A static safety gate
+> (`scripts/qualify/check-qualify-harness.mjs` + `verify-m3a` Gate 13) forbids the
+> training primitives from appearing in the generated notebook at all. This is an
+> **additive** change: `qualification_safety` is an extra top-level block permitted by
+> §3.1, so `contract_schema_version` stays `1.0.0`. No released meaning is broken.
 
 > **Revision note (2026-09-14) — freeze semantics corrected before first use.** The "`spec` is
 > verbatim" rule is reversed: `spec` is now the **frozen** form (`name==version` for pip,
@@ -680,5 +692,94 @@ values and non-null `resolvedVersion` values.
 | §7 unknown handling | M2 §3.2 ("may be `\"unknown\"`/`null` if the upstream does not expose one, but the field must exist") |
 | §9 content address | `computePackageId` (`apps/web/lib/training/package.ts:306`); M2 §5 |
 | §11 paste transform | `apps/web/lib/training/package.ts` (the only writer) |
+| §13 qualification safety | `scripts/qualify/qualify-kaggle-env.mjs` (§5b tripwires); `scripts/qualify/check-qualify-harness.mjs`; `verify-m3a` Gate 13 |
+
+---
+
+## 13. Qualification Safety (training-free guarantee)
+
+The qualification harness installs and inspects the training stack; it must **never**
+train. The zero-cost / no-weight-download policy makes this binding: a qualification
+run must be structurally incapable of constructing an optimizer, running a backward
+pass, taking an optimizer step, running a training loop, or updating model parameters.
+
+### 13.1 Runtime tripwires (normative)
+
+The harness arms tripwires **before any optional work** (before the import smoke test
+and before the reproducibility pass). Invoking any of the guarded primitives records a
+violation and raises immediately:
+
+| Guarded primitive | Violation flag |
+|---|---|
+| optimizer base-class constructor | `optimizer_created` |
+| any scheduler constructor | `optimizer_created` |
+| optimizer step method | `optimizer_step_executed` |
+| tensor backward method | `backward_executed` |
+| autograd backward function | `backward_executed` |
+| accelerate `Accelerator.backward` | `backward_executed` |
+
+The harness also asserts the module constant `QUALIFICATION_ONLY is True` on the
+execution path.
+
+### 13.2 The emitted `qualification_safety` block
+
+The record MUST carry a `qualification_safety` top-level block (permitted by §3.1).
+Every value is **evidence**, computed from the tripwire state or a parameter-digest
+comparison — never hardcoded:
+
+```jsonc
+{
+  "qualification_safety": {
+    "qualification_only": true,
+    "optimizer_created": false,
+    "backward_executed": false,
+    "optimizer_step_executed": false,
+    "training_loop_executed": false,
+    "model_parameters_updated": false,
+    "basis": { "<field>": "<how it was derived>" }
+  }
+}
+```
+
+| Field | Basis |
+|---|---|
+| `qualification_only` | module constant `QUALIFICATION_ONLY`, asserted `True` on the execution path |
+| `optimizer_created` | tripwire on the optimizer base-class constructor (and any scheduler constructor); `true` iff invoked |
+| `backward_executed` | tripwire on the tensor backward method and the autograd backward function; `true` iff invoked |
+| `optimizer_step_executed` | tripwire on the optimizer step method; `true` iff invoked |
+| `training_loop_executed` | derived from the tripwire state: `true` iff any optimizer or backward tripwire fired |
+| `model_parameters_updated` | sha256 digest over every live tensor that requires grad, compared before vs after the run; no model is loaded, so the set is empty and equality is expected |
+
+`basis` is a `field → string` map disclosing how each value was derived. The block is
+part of the hashed record (§9), so it cannot be altered after the fact.
+
+### 13.3 Static safety gate (normative)
+
+The **generated** notebook MUST NOT contain any training primitive. Two independent
+gates enforce this on the committed `.ipynb`:
+
+- `scripts/qualify/check-qualify-harness.mjs` (`npm run qualify:check`), and
+- `verify-m3a` **Gate 13** (`npm run verify:m3a`).
+
+Forbidden shapes: `trainer.train(`, `.train(`, `optimizer.step(`, `.step()`,
+`loss.backward(`, `torch.autograd.backward(`, `accelerator.backward(`, `torch.optim.`
+(optimizer creation), `lr_scheduler` / `get_scheduler` (scheduler creation),
+`torch.optim.Optimizer(`.
+
+**Matching rule.** The scan is a conservative raw-substring match over the
+concatenated cell sources (comments and string literals included). It is safe to be
+strict because the harness authors its prose and its runtime tripwires to avoid these
+literal forms: the tripwire code assembles the same names from concatenated fragments
+(e.g. `'back' + 'ward'`, `'lr_' + 'scheduler'`). A match is therefore always a genuine
+training primitive, never a false positive on a comment or a doc string.
+
+### 13.4 Constraint
+
+The notebook remains **model-free**: no model weight download, no model load. The
+mission's "allowed" list (base-model loading, tokenization, QLoRA init, forward dry
+run) is permissive, not mandatory; the binding zero-cost / no-weight-download policy
+is honoured by keeping the harness model-free.
+
+---
 
 *End of `docs/ENV_QUALIFICATION_CONTRACT.md` — GHARIBO AI LAB.*

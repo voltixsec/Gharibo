@@ -1,0 +1,1707 @@
+{
+  "artifactVersion": "1.1.0",
+  "artifactType": "GOLD_AUDIT_100",
+  "generatedBy": "scripts/audit/gold_audit_100.py",
+  "createdBy": "GHARIBO AI Lab — M3B Phase 1 (split-aware)",
+  "datasetName": "GHARIBO-Research-Gold-v0.1",
+  "datasetVersion": "0.1.0",
+  "splitSeed": 20260914,
+  "auditSize": 100,
+  "samplingMethod": "Deterministic stratified (proportional by entity type, seed=3407); audit cohort quarantined into TRAIN+VALIDATION — TEST is never audited",
+  "allocation": {
+    "RELATION": 27,
+    "PRODUCT_FAMILY": 22,
+    "DOMAIN": 12,
+    "PRODUCT_MODEL": 12,
+    "SYSTEM": 9,
+    "SERVICE": 6,
+    "CATEGORY": 6,
+    "ITEM": 2,
+    "BRAND": 2,
+    "MANUFACTURER": 1,
+    "MARKET_RELEVANCE": 1
+  },
+  "splitIsolation": {
+    "trainAudited": 83,
+    "validationAudited": 17,
+    "testAudited": 0,
+    "testIsolationHolds": true
+  },
+  "summary": {
+    "PASS": 100,
+    "NEEDS_REVIEW": 0,
+    "FAIL": 0,
+    "total": 100
+  },
+  "splitBreakdown": {
+    "train": 83,
+    "validation": 17,
+    "test": 0
+  },
+  "entityTypeBreakdown": {
+    "RELATION": {
+      "PASS": 27,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "PRODUCT_FAMILY": {
+      "PASS": 22,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "DOMAIN": {
+      "PASS": 12,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "PRODUCT_MODEL": {
+      "PASS": 12,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "SYSTEM": {
+      "PASS": 9,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "SERVICE": {
+      "PASS": 6,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "CATEGORY": {
+      "PASS": 6,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "ITEM": {
+      "PASS": 2,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "BRAND": {
+      "PASS": 2,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "MANUFACTURER": {
+      "PASS": 1,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    },
+    "MARKET_RELEVANCE": {
+      "PASS": 1,
+      "NEEDS_REVIEW": 0,
+      "FAIL": 0
+    }
+  },
+  "issueCodeBreakdown": {},
+  "acceptancePolicy": {
+    "allPass": true,
+    "hasNeedsReview": false,
+    "hasFail": false,
+    "hasSystematicDefect": false
+  },
+  "results": [
+    {
+      "auditIndex": 1,
+      "exampleLineIndex": 592,
+      "split": "validation",
+      "entityType": "RELATION",
+      "externalKey": "relation:child_of:e50a4d61d41507fa490d",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:child_of:e50a4d61d41507fa490d",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 2,
+      "exampleLineIndex": 605,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:branded_by:86ba710a5af6ea6ddde7",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:branded_by:86ba710a5af6ea6ddde7",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 3,
+      "exampleLineIndex": 606,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:global-map:child-of:cb0d9681d47a932374ed",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+        "externalKey": "relation:global-map:child-of:cb0d9681d47a932374ed",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 4,
+      "exampleLineIndex": 608,
+      "split": "validation",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_family:ab07f12aaac6ca4e670d",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:belongs_to_family:ab07f12aaac6ca4e670d",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 5,
+      "exampleLineIndex": 611,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_family:6c1327bfef0b068d",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "relation:belongs_to_family:6c1327bfef0b068d",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 6,
+      "exampleLineIndex": 627,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:child_of:ea3d686dfafcbb174d04",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:child_of:ea3d686dfafcbb174d04",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 7,
+      "exampleLineIndex": 633,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_family:2a0df56fc68d0e25b434",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:belongs_to_family:2a0df56fc68d0e25b434",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 8,
+      "exampleLineIndex": 635,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_category:5f96e17468189e83de7d",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:belongs_to_category:5f96e17468189e83de7d",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 9,
+      "exampleLineIndex": 640,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:parent_of:525f3a4cf164717f74c7",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:parent_of:525f3a4cf164717f74c7",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 10,
+      "exampleLineIndex": 644,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:related_to:be168c24dee220d8",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "relation:related_to:be168c24dee220d8",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 11,
+      "exampleLineIndex": 647,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:global-map:child-of:a88ca58757292f4c1c9b",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+        "externalKey": "relation:global-map:child-of:a88ca58757292f4c1c9b",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 12,
+      "exampleLineIndex": 655,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:child_of:644752b3110dd1929c10",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:child_of:644752b3110dd1929c10",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 13,
+      "exampleLineIndex": 656,
+      "split": "validation",
+      "entityType": "RELATION",
+      "externalKey": "relation:branded_by:f0041dc161314d988c1a",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:branded_by:f0041dc161314d988c1a",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 14,
+      "exampleLineIndex": 659,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:branded_by:4dc079ca2d77af02",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "relation:branded_by:4dc079ca2d77af02",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 15,
+      "exampleLineIndex": 662,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_family:46a2883aac6dac29f7b5",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:belongs_to_family:46a2883aac6dac29f7b5",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 16,
+      "exampleLineIndex": 669,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:parent_of:cc0e52659fc6b9e8b1f6",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:parent_of:cc0e52659fc6b9e8b1f6",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 17,
+      "exampleLineIndex": 681,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:manufactured_by:a525a9621f5d38b002f3",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:manufactured_by:a525a9621f5d38b002f3",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 18,
+      "exampleLineIndex": 682,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:manufactured_by:d6cca7bcc0181946",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "relation:manufactured_by:d6cca7bcc0181946",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 19,
+      "exampleLineIndex": 685,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:global-map:child-of:c5a918a3b5cb6feb9bdf",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+        "externalKey": "relation:global-map:child-of:c5a918a3b5cb6feb9bdf",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 20,
+      "exampleLineIndex": 699,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:child_of:13a994ccacaf9cc8ce3c",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:child_of:13a994ccacaf9cc8ce3c",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 21,
+      "exampleLineIndex": 709,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_category:7a5fd211b817f70948df",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:belongs_to_category:7a5fd211b817f70948df",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 22,
+      "exampleLineIndex": 724,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:manufactured_by:2851c4e331163eed08f4",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:manufactured_by:2851c4e331163eed08f4",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 23,
+      "exampleLineIndex": 728,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_category:7a019dacc0ae0a04a44a",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:belongs_to_category:7a019dacc0ae0a04a44a",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 24,
+      "exampleLineIndex": 750,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_family:1c6dee66e2ba888dfdea",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "relation:belongs_to_family:1c6dee66e2ba888dfdea",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 25,
+      "exampleLineIndex": 759,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:global-map:child-of:e8d4720ada90a0f6170e",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_CORE_DOMAIN_RELATIONS_001.jsonl",
+        "externalKey": "relation:global-map:child-of:e8d4720ada90a0f6170e",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 26,
+      "exampleLineIndex": 768,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:security-registry:parent_of:d5367a75481c062e09d0",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "relation:security-registry:parent_of:d5367a75481c062e09d0",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 27,
+      "exampleLineIndex": 777,
+      "split": "train",
+      "entityType": "RELATION",
+      "externalKey": "relation:belongs_to_category:29726853a2daf172",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "relation:belongs_to_category:29726853a2daf172",
+        "entityType": "RELATION"
+      }
+    },
+    {
+      "auditIndex": 28,
+      "exampleLineIndex": 307,
+      "split": "validation",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:axis:axis-p14-series",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "family:axis:axis-p14-series",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 29,
+      "exampleLineIndex": 308,
+      "split": "validation",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:axis:axis-q18-series",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "family:axis:axis-q18-series",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 30,
+      "exampleLineIndex": 311,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:hikvision:hikvision-network-ptz-eol-group",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "family:hikvision:hikvision-network-ptz-eol-group",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 31,
+      "exampleLineIndex": 329,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:suprema:xpass-s2",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "family:suprema:xpass-s2",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 32,
+      "exampleLineIndex": 335,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:suprema:output-module",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "family:suprema:output-module",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 33,
+      "exampleLineIndex": 342,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:hid:hid-signo-biometric",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "family:hid:hid-signo-biometric",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 34,
+      "exampleLineIndex": 355,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:moxa:moxa-eds-p506e-series",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "family:moxa:moxa-eds-p506e-series",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 35,
+      "exampleLineIndex": 357,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:moxa:moxa-tn-g4500-series",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "family:moxa:moxa-tn-g4500-series",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 36,
+      "exampleLineIndex": 361,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:moxa:eds-4012-series",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "family:moxa:eds-4012-series",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 37,
+      "exampleLineIndex": 372,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:moxa:rks-g4030-pl-series",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "family:moxa:rks-g4030-pl-series",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 38,
+      "exampleLineIndex": 376,
+      "split": "validation",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:moxa:ics-g7750a-series",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "family:moxa:ics-g7750a-series",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 39,
+      "exampleLineIndex": 386,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:axis:axis-network-i-o-relay-modules",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "family:axis:axis-network-i-o-relay-modules",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 40,
+      "exampleLineIndex": 426,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:dahua:dahua-pro-series-network-cameras",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:dahua:dahua-pro-series-network-cameras",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 41,
+      "exampleLineIndex": 428,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:dahua:dahua-wireless-indoor-cameras",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:dahua:dahua-wireless-indoor-cameras",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 42,
+      "exampleLineIndex": 437,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:hikvision:ds-71-recorder-family",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:hikvision:ds-71-recorder-family",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 43,
+      "exampleLineIndex": 442,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:hikvision:ds-78-recorder-family",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:hikvision:ds-78-recorder-family",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 44,
+      "exampleLineIndex": 444,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:hikvision:ds-81-recorder-family",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:hikvision:ds-81-recorder-family",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 45,
+      "exampleLineIndex": 445,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:hikvision:ds-86-recorder-family",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:hikvision:ds-86-recorder-family",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 46,
+      "exampleLineIndex": 449,
+      "split": "validation",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:hikvision:ds-mp-recorder-family",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:hikvision:ds-mp-recorder-family",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 47,
+      "exampleLineIndex": 452,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:hikvision:hikvision-hilook-nvr-families",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:hikvision:hikvision-hilook-nvr-families",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 48,
+      "exampleLineIndex": 465,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:tp-link:omada-access-max-switches",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:tp-link:omada-access-max-switches",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 49,
+      "exampleLineIndex": 477,
+      "split": "train",
+      "entityType": "PRODUCT_FAMILY",
+      "externalKey": "family:tp-link:vigi-surveillance-kits",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "family:tp-link:vigi-surveillance-kits",
+        "entityType": "PRODUCT_FAMILY"
+      }
+    },
+    {
+      "auditIndex": 50,
+      "exampleLineIndex": 202,
+      "split": "validation",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:printing-systems",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:printing-systems",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 51,
+      "exampleLineIndex": 211,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:roads-and-highways",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:roads-and-highways",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 52,
+      "exampleLineIndex": 232,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:architectural-specialties",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:architectural-specialties",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 53,
+      "exampleLineIndex": 233,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:electric-vehicles",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:electric-vehicles",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 54,
+      "exampleLineIndex": 244,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:airport-ground-support-equipment",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:airport-ground-support-equipment",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 55,
+      "exampleLineIndex": 250,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:home-automation",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:home-automation",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 56,
+      "exampleLineIndex": 260,
+      "split": "validation",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:industrial-boilers-and-steam-systems",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:industrial-boilers-and-steam-systems",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 57,
+      "exampleLineIndex": 261,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:solid-waste-collection",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:solid-waste-collection",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 58,
+      "exampleLineIndex": 273,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:enterprise-storage",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:enterprise-storage",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 59,
+      "exampleLineIndex": 284,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:baggage-handling-systems",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:baggage-handling-systems",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 60,
+      "exampleLineIndex": 286,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:building-energy-storage",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:building-energy-storage",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 61,
+      "exampleLineIndex": 295,
+      "split": "train",
+      "entityType": "DOMAIN",
+      "externalKey": "domain:global:quality-management-systems-software",
+      "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CORE_DOMAIN_REGISTRY_001.jsonl",
+        "externalKey": "domain:global:quality-management-systems-software",
+        "entityType": "DOMAIN"
+      }
+    },
+    {
+      "auditIndex": 62,
+      "exampleLineIndex": 478,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:ubiquiti:unifi-compact-series:flex-mini-2-5g",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "model:ubiquiti:unifi-compact-series:flex-mini-2-5g",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 63,
+      "exampleLineIndex": 482,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:tp-link:omada-unmanaged-switches:ds105g-m2",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:tp-link:omada-unmanaged-switches:ds105g-m2",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 64,
+      "exampleLineIndex": 488,
+      "split": "validation",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:i-pro:i-pro-x-series:wv-x15302a-z1ln",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:i-pro:i-pro-x-series:wv-x15302a-z1ln",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 65,
+      "exampleLineIndex": 493,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:moxa:moxa-eds-4008-series:eds-4008-2mst-lv-t",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "model:moxa:moxa-eds-4008-series:eds-4008-2mst-lv-t",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 66,
+      "exampleLineIndex": 498,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:axis:axis-m10-series:axis-m1075-l-mk-ii",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:axis:axis-m10-series:axis-m1075-l-mk-ii",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 67,
+      "exampleLineIndex": 500,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:dahua:dahua-discontinued-network-cameras:ipc-hfw21249t-s-il",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:dahua:dahua-discontinued-network-cameras:ipc-hfw21249t-s-il",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 68,
+      "exampleLineIndex": 508,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:i-pro:i-pro-s-series:wv-s66600-z3",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:i-pro:i-pro-s-series:wv-s66600-z3",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 69,
+      "exampleLineIndex": 516,
+      "split": "validation",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:i-pro:i-pro-s-series:wv-s66300-z4ln",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:i-pro:i-pro-s-series:wv-s66300-z4ln",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 70,
+      "exampleLineIndex": 531,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:hikvision:ds-90-recorder-family:ds-9004huhi-f8-n",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:hikvision:ds-90-recorder-family:ds-9004huhi-f8-n",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 71,
+      "exampleLineIndex": 556,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:suprema:xpass-2:xp2-mapb",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "model:suprema:xpass-2:xp2-mapb",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 72,
+      "exampleLineIndex": 562,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:hikvision:hikvision-ds-2td-thermal-camera-family:ds-2td1217-3-v1",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:hikvision:hikvision-ds-2td-thermal-camera-family:ds-2td1217-3-v1",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 73,
+      "exampleLineIndex": 576,
+      "split": "train",
+      "entityType": "PRODUCT_MODEL",
+      "externalKey": "model:tp-link:omada-campus-switches:s6500-48g6xf",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_003.jsonl",
+        "externalKey": "model:tp-link:omada-campus-switches:s6500-48g6xf",
+        "entityType": "PRODUCT_MODEL"
+      }
+    },
+    {
+      "auditIndex": 74,
+      "exampleLineIndex": 36,
+      "split": "validation",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:analog-cvbs-dvr-cctv",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:analog-cvbs-dvr-cctv",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 75,
+      "exampleLineIndex": 39,
+      "split": "train",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:hdcvi-surveillance",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:hdcvi-surveillance",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 76,
+      "exampleLineIndex": 45,
+      "split": "train",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:nvr-ip-surveillance",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:nvr-ip-surveillance",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 77,
+      "exampleLineIndex": 46,
+      "split": "train",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:vms-managed-ip-surveillance",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:vms-managed-ip-surveillance",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 78,
+      "exampleLineIndex": 48,
+      "split": "train",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:multisite-federated-vms",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:multisite-federated-vms",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 79,
+      "exampleLineIndex": 66,
+      "split": "train",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:fixed-lpr-anpr",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:fixed-lpr-anpr",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 80,
+      "exampleLineIndex": 70,
+      "split": "train",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:standalone-offline-access-control",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:standalone-offline-access-control",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 81,
+      "exampleLineIndex": 101,
+      "split": "validation",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:redundant-ring-security-network",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:redundant-ring-security-network",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 82,
+      "exampleLineIndex": 104,
+      "split": "train",
+      "entityType": "SYSTEM",
+      "externalKey": "system:security:unified-physical-security-platform",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "system:security:unified-physical-security-platform",
+        "entityType": "SYSTEM"
+      }
+    },
+    {
+      "auditIndex": 83,
+      "exampleLineIndex": 115,
+      "split": "train",
+      "entityType": "SERVICE",
+      "externalKey": "service:security:capacity-topology-planning",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "service:security:capacity-topology-planning",
+        "entityType": "SERVICE"
+      }
+    },
+    {
+      "auditIndex": 84,
+      "exampleLineIndex": 118,
+      "split": "train",
+      "entityType": "SERVICE",
+      "externalKey": "service:security:compliance-validation",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "service:security:compliance-validation",
+        "entityType": "SERVICE"
+      }
+    },
+    {
+      "auditIndex": 85,
+      "exampleLineIndex": 127,
+      "split": "validation",
+      "entityType": "SERVICE",
+      "externalKey": "service:security:vms-deployment-configuration",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "service:security:vms-deployment-configuration",
+        "entityType": "SERVICE"
+      }
+    },
+    {
+      "auditIndex": 86,
+      "exampleLineIndex": 132,
+      "split": "train",
+      "entityType": "SERVICE",
+      "externalKey": "service:security:video-analytics-configuration",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "service:security:video-analytics-configuration",
+        "entityType": "SERVICE"
+      }
+    },
+    {
+      "auditIndex": 87,
+      "exampleLineIndex": 143,
+      "split": "train",
+      "entityType": "SERVICE",
+      "externalKey": "service:security:live-remote-video-operations",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "service:security:live-remote-video-operations",
+        "entityType": "SERVICE"
+      }
+    },
+    {
+      "auditIndex": 88,
+      "exampleLineIndex": 144,
+      "split": "train",
+      "entityType": "SERVICE",
+      "externalKey": "service:security:cross-site-operational-insights",
+      "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_SYSTEM_SERVICE_REGISTRY_001.jsonl",
+        "externalKey": "service:security:cross-site-operational-insights",
+        "entityType": "SERVICE"
+      }
+    },
+    {
+      "auditIndex": 89,
+      "exampleLineIndex": 158,
+      "split": "train",
+      "entityType": "CATEGORY",
+      "externalKey": "category:global:utilities-and-municipal-services",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+        "externalKey": "category:global:utilities-and-municipal-services",
+        "entityType": "CATEGORY"
+      }
+    },
+    {
+      "auditIndex": 90,
+      "exampleLineIndex": 161,
+      "split": "train",
+      "entityType": "CATEGORY",
+      "externalKey": "category:global:industrial-and-manufacturing",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+        "externalKey": "category:global:industrial-and-manufacturing",
+        "entityType": "CATEGORY"
+      }
+    },
+    {
+      "auditIndex": 91,
+      "exampleLineIndex": 165,
+      "split": "train",
+      "entityType": "CATEGORY",
+      "externalKey": "category:global:construction",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+        "externalKey": "category:global:construction",
+        "entityType": "CATEGORY"
+      }
+    },
+    {
+      "auditIndex": 92,
+      "exampleLineIndex": 176,
+      "split": "train",
+      "entityType": "CATEGORY",
+      "externalKey": "category:global:transportation-and-mobility",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+        "externalKey": "category:global:transportation-and-mobility",
+        "entityType": "CATEGORY"
+      }
+    },
+    {
+      "auditIndex": 93,
+      "exampleLineIndex": 179,
+      "split": "train",
+      "entityType": "CATEGORY",
+      "externalKey": "category:global:marine-and-maritime",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+        "externalKey": "category:global:marine-and-maritime",
+        "entityType": "CATEGORY"
+      }
+    },
+    {
+      "auditIndex": 94,
+      "exampleLineIndex": 197,
+      "split": "train",
+      "entityType": "CATEGORY",
+      "externalKey": "category:global:arts-culture-and-heritage",
+      "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_GLOBAL_CATEGORY_REGISTRY_001.jsonl",
+        "externalKey": "category:global:arts-culture-and-heritage",
+        "entityType": "CATEGORY"
+      }
+    },
+    {
+      "auditIndex": 95,
+      "exampleLineIndex": 30,
+      "split": "validation",
+      "entityType": "ITEM",
+      "externalKey": "item:ubiquiti:unifi-nvr-installation-essentials:lte-backup-pro",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "item:ubiquiti:unifi-nvr-installation-essentials:lte-backup-pro",
+        "entityType": "ITEM"
+      }
+    },
+    {
+      "auditIndex": 96,
+      "exampleLineIndex": 35,
+      "split": "train",
+      "entityType": "ITEM",
+      "externalKey": "item:ubiquiti:unifi-nvr-installation-essentials:power-distribution-hi-density",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_002.jsonl",
+        "externalKey": "item:ubiquiti:unifi-nvr-installation-essentials:power-distribution-hi-density",
+        "entityType": "ITEM"
+      }
+    },
+    {
+      "auditIndex": 97,
+      "exampleLineIndex": 10,
+      "split": "train",
+      "entityType": "BRAND",
+      "externalKey": "brand:axis",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "brand:axis",
+        "entityType": "BRAND"
+      }
+    },
+    {
+      "auditIndex": 98,
+      "exampleLineIndex": 11,
+      "split": "train",
+      "entityType": "BRAND",
+      "externalKey": "brand:hanwha-vision",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "brand:hanwha-vision",
+        "entityType": "BRAND"
+      }
+    },
+    {
+      "auditIndex": 99,
+      "exampleLineIndex": 1,
+      "split": "validation",
+      "entityType": "MANUFACTURER",
+      "externalKey": "manufacturer:hanwha",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "manufacturer:hanwha",
+        "entityType": "MANUFACTURER"
+      }
+    },
+    {
+      "auditIndex": 100,
+      "exampleLineIndex": 22,
+      "split": "validation",
+      "entityType": "MARKET_RELEVANCE",
+      "externalKey": "market-relevance:dahua:kuwait-labelled-variants",
+      "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+      "result": "PASS",
+      "issueCount": 0,
+      "issues": [],
+      "sourceProvenance": {
+        "sourceFile": "VOKA_UCL_SECURITY_BATCH_001.jsonl",
+        "externalKey": "market-relevance:dahua:kuwait-labelled-variants",
+        "entityType": "MARKET_RELEVANCE"
+      }
+    }
+  ]
+}

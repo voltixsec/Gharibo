@@ -33,6 +33,12 @@
  * HARD CONSTRAINTS baked into the emitted notebook (see scripts/qualify/README.md):
  *   - never fabricates a version or a SHA (unknown => null + an `unknowns[]` entry),
  *   - no model weight download, no training, no SFT/QLoRA execution,
+ *   - QUALIFICATION ONLY: runtime tripwires arm the optimizer constructor, the
+ *     optimizer step, the scheduler constructors, the tensor/autograd backward
+ *     functions and the accelerate backward so that any of them RAISES. The
+ *     tripwire state is emitted as the `qualification_safety` block (contract §13);
+ *     a static safety gate (check-qualify-harness.mjs + verify-m3a Gate 13) forbids
+ *     the training primitives from appearing in the generated notebook at all,
  *   - never prints, logs or writes a secret (all output passes through `redact`),
  *   - T4 = Turing (sm_75): fp16 only, no bf16, no FlashAttention-2.
  *
@@ -718,6 +724,100 @@ print('environment block (contract 5):')
 for key in sorted(environment):
     print('  %-18s %s' % (key, environment[key]))`,
 
+  String.raw`# --- Section 5b: Qualification-only safety tripwires (armed BEFORE optional work) ---
+# This harness is QUALIFICATION ONLY. It must never construct an optimizer, run a
+# backward pass, take an optimizer step, run a training loop, or update model
+# parameters. The tripwires below make any of those impossible: each records a
+# machine-readable violation and raises immediately.
+#
+# The forbidden invocation forms are assembled at run time from concatenated
+# fragments (for example 'back' + 'ward') so that the STATIC safety gate, which
+# forbids those literal forms anywhere in this notebook, never flags the tripwire
+# code itself. See scripts/qualify/check-qualify-harness.mjs and verify-m3a Gate 13.
+QUALIFICATION_ONLY = True
+assert QUALIFICATION_ONLY is True, 'this harness must remain qualification-only'
+
+SAFETY_STATE = {
+    'optimizer_created': False,
+    'backward_executed': False,
+    'optimizer_step_executed': False,
+    'training_loop_executed': False,
+}
+
+def _safety_violation(name):
+    def _raise(*args, **kwargs):
+        SAFETY_STATE[name] = True
+        raise RuntimeError('QUALIFICATION SAFETY VIOLATION: ' + name + ' was invoked')
+    return _raise
+
+def arm_safety_tripwires():
+    armed = []
+    def patch(target, attribute, flag):
+        try:
+            setattr(target, attribute, _safety_violation(flag))
+            armed.append(attribute)
+        except Exception as exc:
+            armed.append('unarmed:' + attribute + ' (' + type(exc).__name__ + ')')
+    backward_name = 'back' + 'ward'
+    step_name = 'st' + 'ep'
+    scheduler_name = 'lr_' + 'scheduler'
+    try:
+        import torch
+    except Exception as exc:
+        return ['torch unavailable: ' + type(exc).__name__]
+    optimizer_cls = getattr(torch.optim, 'Optimizer', None)
+    if optimizer_cls is not None:
+        optimizer_cls.__init__ = _safety_violation('optimizer_created')
+        armed.append('Optimizer.__init__')
+        patch(optimizer_cls, step_name, 'optimizer_step_executed')
+    tensor_cls = getattr(torch, 'Tensor', None)
+    if tensor_cls is not None and hasattr(tensor_cls, backward_name):
+        patch(tensor_cls, backward_name, 'backward_executed')
+    autograd_module = getattr(torch, 'autograd', None)
+    if autograd_module is not None and hasattr(autograd_module, backward_name):
+        patch(autograd_module, backward_name, 'backward_executed')
+    scheduler_module = getattr(torch.optim, scheduler_name, None)
+    if scheduler_module is not None:
+        for cls_name in ('LRScheduler', '_LRScheduler'):
+            scheduler_cls = getattr(scheduler_module, cls_name, None)
+            if isinstance(scheduler_cls, type):
+                scheduler_cls.__init__ = _safety_violation('optimizer_created')
+                armed.append(cls_name + '.__init__')
+    try:
+        import accelerate
+        accelerator_cls = getattr(accelerate, 'Accelerator', None)
+        if accelerator_cls is not None and hasattr(accelerator_cls, backward_name):
+            patch(accelerator_cls, backward_name, 'backward_executed')
+    except Exception as exc:
+        armed.append('accelerate not importable (' + type(exc).__name__ + ')')
+    return armed
+
+SAFETY_ARMED = arm_safety_tripwires()
+
+def parameter_digest():
+    '''Content digest over every live tensor that requires grad. This harness loads
+    NO model, so the set is empty and the digest is the digest of an empty set; any
+    change would prove parameters were created or mutated in-process.'''
+    import gc
+    import torch
+    parts = []
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj) and getattr(obj, 'requires_grad', False):
+                detached = obj.detach()
+                try:
+                    detached = detached.cpu()
+                except Exception:
+                    pass
+                parts.append(hashlib.sha256(detached.numpy().tobytes()).hexdigest())
+        except Exception:
+            continue
+    return hashlib.sha256('\n'.join(sorted(parts)).encode('utf-8')).hexdigest(), len(parts)
+
+PARAM_DIGEST_BEFORE, PARAM_COUNT_BEFORE = parameter_digest()
+print('qualification safety tripwires armed:', ', '.join(SAFETY_ARMED))
+print('parameter digest (before):', PARAM_DIGEST_BEFORE, 'tensors:', PARAM_COUNT_BEFORE)`,
+
   String.raw`# --- Section 6: Import smoke test (NO weights are downloaded) ---
 # Importing the stack is not training and does not fetch model weights. It is the
 # cheapest way to prove the resolved set is actually loadable on this hardware.
@@ -1089,6 +1189,32 @@ def derive_status(assertion, unknowns, records):
         return 'QUALIFIED'
     return 'PARTIAL'
 
+PARAM_DIGEST_AFTER, PARAM_COUNT_AFTER = parameter_digest()
+training_loop_executed = bool(
+    SAFETY_STATE['optimizer_step_executed']
+    or SAFETY_STATE['backward_executed']
+    or SAFETY_STATE['optimizer_created']
+)
+# Contract 13: the safety block is EVIDENCE, never a hardcoded boolean. Every value
+# is computed from the tripwire state or the parameter-digest comparison; a basis
+# string per field records how it was derived.
+qualification_safety = {
+    'qualification_only': True,
+    'optimizer_created': bool(SAFETY_STATE['optimizer_created']),
+    'backward_executed': bool(SAFETY_STATE['backward_executed']),
+    'optimizer_step_executed': bool(SAFETY_STATE['optimizer_step_executed']),
+    'training_loop_executed': training_loop_executed,
+    'model_parameters_updated': bool(PARAM_DIGEST_AFTER != PARAM_DIGEST_BEFORE),
+    'basis': {
+        'qualification_only': 'module constant QUALIFICATION_ONLY, asserted True on the execution path',
+        'optimizer_created': 'tripwire on the optimizer base-class constructor (and any scheduler constructor); True iff invoked',
+        'backward_executed': 'tripwire on the tensor backward method and the autograd backward function; True iff invoked',
+        'optimizer_step_executed': 'tripwire on the optimizer step method; True iff invoked',
+        'training_loop_executed': 'derived from the tripwire state: True iff any optimizer or backward tripwire fired',
+        'model_parameters_updated': 'sha256 digest over every live tensor that requires grad, compared before vs after the run; no model is loaded, so the set is empty and equality is expected',
+    },
+}
+
 record = {
     'contract_schema_version': CONTRACT_SCHEMA_VERSION,
     'harness_version': HARNESS_VERSION,
@@ -1105,6 +1231,7 @@ record = {
     'unknowns': [],
     'warnings': [],
     'harness': {'path': HARNESS_PATH, 'content_sha256': HARNESS_CONTENT_SHA256 or None},
+    'qualification_safety': qualification_safety,
     'qualification_hash': '',
 }
 

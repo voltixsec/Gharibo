@@ -7,7 +7,7 @@
  * cannot import them; the launcher exists solely to supply that loader plus a
  * throwaway SQLite database path.
  *
- * GATES (12 total)
+ * GATES (13 total)
  *   1.  dataset integrity validation    — content-addressed dataset hash
  *   2.  split overlap check             — deterministic seeded split invariants
  *   3.  deterministic regeneration      — same inputs → same bytes; seed drives the cut
@@ -20,6 +20,7 @@
  *   10. documentation facts             — docs:validate and verify:m2 --check
  *   11. no fabricated benchmark results — NOT_RUN status, no fake scores
  *   12. Kaggle-dependent gates          — PENDING_EXTERNAL_EXECUTION (real GPU required)
+ *   13. qualification safety (static)   — the harness contains no training primitive
  *
  * STATUS TYPES
  *   PASS — gate passed
@@ -1255,6 +1256,89 @@ function gateKaggleDependent(): Gate {
 }
 
 // ===========================================================================
+// Gate 13 — qualification safety (static, training-free)
+// ===========================================================================
+
+/**
+ * The qualification harness must never contain a training primitive. The notebook
+ * arms RUNTIME tripwires so that any optimizer construction/step, backward call or
+ * scheduler construction raises; this gate enforces the same invariant STATICALLY,
+ * on the generated notebook text, so a regression is caught even without a GPU.
+ *
+ * MATCHING RULE: a conservative raw-substring scan over the concatenated cell
+ * sources (comments and string literals included). It is safe to be strict because
+ * the tripwire code assembles the same names from concatenated fragments (e.g.
+ * 'back' + 'ward', 'lr_' + 'scheduler'), so the forbidden invocation shapes never
+ * appear in the notebook text. A match is therefore always a real primitive, never
+ * a false positive on prose.
+ */
+const TRAINING_PRIMITIVES = [
+  "trainer.train(",
+  ".train(",
+  "optimizer.step(",
+  ".step()",
+  "loss.backward(",
+  "torch.autograd.backward(",
+  "accelerator.backward(",
+  "torch.optim.",
+  "lr_scheduler",
+  "get_scheduler",
+  "torch.optim.Optimizer(",
+];
+
+function gateQualificationSafety(): Gate {
+  const checks: Check[] = [];
+  const notebookPath = path.join(ROOT, "scripts", "qualify", "qualify-kaggle-env.ipynb");
+
+  if (!fs.existsSync(notebookPath)) {
+    checks.push(fail("qualification notebook exists", `missing ${notebookPath}`));
+    return { id: "13", title: "qualification safety (static, training-free)", checks };
+  }
+
+  let notebookSource = "";
+  try {
+    const notebook = JSON.parse(fs.readFileSync(notebookPath, "utf8"));
+    notebookSource = (notebook.cells ?? [])
+      .map((c: any) => (Array.isArray(c.source) ? c.source.join("") : String(c.source ?? "")))
+      .join("\n");
+  } catch (e) {
+    checks.push(fail("qualification notebook parseable", `failed to parse: ${e}`));
+    return { id: "13", title: "qualification safety (static, training-free)", checks };
+  }
+
+  const found = TRAINING_PRIMITIVES.filter((token) => notebookSource.includes(token));
+  checks.push(
+    expect(
+      "no training primitive appears in the generated qualification notebook",
+      found.length === 0,
+      found.length === 0
+        ? `${TRAINING_PRIMITIVES.length} forbidden shapes scanned; 0 hits — the harness cannot train`
+        : `forbidden training primitive(s) present: ${found.join(" | ")}`,
+    ),
+  );
+
+  checks.push(
+    expect(
+      "the harness asserts QUALIFICATION_ONLY and arms runtime tripwires",
+      /assert QUALIFICATION_ONLY is True/.test(notebookSource) &&
+        /def arm_safety_tripwires\(\):/.test(notebookSource),
+      "QUALIFICATION_ONLY is asserted and arm_safety_tripwires() is present in the notebook",
+    ),
+  );
+
+  checks.push(
+    expect(
+      "the harness emits a qualification_safety evidence block from tripwire state + a parameter digest",
+      /'qualification_safety': qualification_safety/.test(notebookSource) &&
+        /PARAM_DIGEST_AFTER != PARAM_DIGEST_BEFORE/.test(notebookSource),
+      "qualification_safety is attached to the record and is not a hardcoded boolean",
+    ),
+  );
+
+  return { id: "13", title: "qualification safety (static, training-free)", checks };
+}
+
+// ===========================================================================
 // Run + report
 // ===========================================================================
 
@@ -1285,6 +1369,7 @@ runGate(gateNotebookDrift, "9", "notebook generator/render drift");
 runGate(gateDocumentationFacts, "10", "documentation facts");
 runGate(gateNoFabricatedBenchmarkResults, "11", "no fabricated benchmark results");
 runGate(gateKaggleDependent, "12", "Kaggle-dependent gates (external execution required)");
+runGate(gateQualificationSafety, "13", "qualification safety (static, training-free)");
 
 try {
   closeDb();

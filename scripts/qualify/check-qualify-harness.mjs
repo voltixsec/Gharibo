@@ -15,7 +15,9 @@
  *      §8 status, §9 content address, §10 self-validation);
  *   5. the T4/Turing constraints are encoded (sm_75 floor, fp16, no bf16, no FA2,
  *      TORCH_CUDA_ARCH_LIST=7.5);
- *   6. the harness stays qualification-only (no model download, no training);
+ *   6. the harness stays qualification-only: no model download, no training, and
+ *      no training primitive (optimizer construction/step, backward, scheduler
+ *      creation) appears in the generated notebook (contract §13);
  *   7. no secret-shaped literal and no secret-reading code path is present.
  *
  * Run: node scripts/qualify/check-qualify-harness.mjs
@@ -37,8 +39,10 @@ const NOTEBOOK_PATH = p("scripts", "qualify", "qualify-kaggle-env.ipynb");
 const PACKAGE_TS = p("apps", "web", "lib", "training", "package.ts");
 const CONTRACT_DOC = p("docs", "ENV_QUALIFICATION_CONTRACT.md");
 
-/** Contract version this harness targets. */
+/** Artifact schema version this harness targets (contract §3, `contract_schema_version`). */
 const CONTRACT_SCHEMA_VERSION = "1.0.0";
+/** Document version of docs/ENV_QUALIFICATION_CONTRACT.md this checker mirrors. */
+const CONTRACT_DOC_VERSION = "1.2.0";
 
 /** Every dependency the harness must resolve and record (Milestone 3A §A + §E promotion). */
 const REQUIRED_PINNED = [
@@ -77,7 +81,16 @@ const REQUIRED_TOP_LEVEL = [
   "qualification_hash",
 ];
 
-/** Strings that must NOT appear: they would mean the harness does more than qualify. */
+/** Strings that must NOT appear: they would mean the harness does more than qualify.
+ *
+ * MATCHING RULE: this is a CONSERVATIVE raw-substring scan over the generated
+ * notebook's cell sources (comments and string literals included). It is safe to be
+ * strict because the harness authors its prose and its runtime tripwires to avoid
+ * these literal forms: the tripwire code assembles the same names from concatenated
+ * fragments (e.g. 'back' + 'ward', 'lr_' + 'scheduler'), so the forbidden invocation
+ * shapes never appear in the notebook text even though the harness patches them at
+ * run time. A match is therefore always a genuine training primitive, never a
+ * false positive on a comment or a doc string. */
 const FORBIDDEN_TOKENS = [
   "from_pretrained",
   "FastLanguageModel",
@@ -92,6 +105,16 @@ const FORBIDDEN_TOKENS = [
   "hf_token",
   "trainer.train",
   ".train(",
+  // Training primitives (contract §13 Qualification Safety).
+  "optimizer.step(",
+  ".step()",
+  "loss.backward(",
+  "torch.autograd.backward(",
+  "accelerator.backward(",
+  "torch.optim.",
+  "lr_scheduler",
+  "get_scheduler",
+  "torch.optim.Optimizer(",
 ];
 
 /** Placeholder shapes that would indicate a fabricated version. */
@@ -331,6 +354,18 @@ const contractChecks = [
   ["uv install (not pip)", /'-m', 'pip', 'install', '--upgrade', '-qqq', 'uv'/],
   ["uv pip install with an explicit target", /UV, 'pip', 'install', \*TARGET_FLAGS/],
   ["redaction applied to output", /def redact\(/],
+  // §13 Qualification Safety — runtime tripwires + evidence block.
+  ["§13 QUALIFICATION_ONLY asserted", /assert QUALIFICATION_ONLY is True/],
+  ["§13 tripwire arm function", /def arm_safety_tripwires\(\):/],
+  ["§13 optimizer-constructor tripwire", /optimizer_cls\.__init__ = _safety_violation\('optimizer_created'\)/],
+  ["§13 optimizer-step tripwire", /patch\(optimizer_cls, step_name, 'optimizer_step_executed'\)/],
+  ["§13 tensor backward tripwire", /patch\(tensor_cls, backward_name, 'backward_executed'\)/],
+  ["§13 autograd backward tripwire", /patch\(autograd_module, backward_name, 'backward_executed'\)/],
+  ["§13 scheduler-constructor tripwire", /scheduler_cls\.__init__ = _safety_violation\('optimizer_created'\)/],
+  ["§13 accelerate backward tripwire", /patch\(accelerator_cls, backward_name, 'backward_executed'\)/],
+  ["§13 parameter-digest comparison", /PARAM_DIGEST_AFTER != PARAM_DIGEST_BEFORE/],
+  ["§13 qualification_safety on the record", /'qualification_safety': qualification_safety/],
+  ["§13 basis disclosure per field", /'basis': \{/],
 ];
 for (const [label, re] of contractChecks) {
   if (!re.test(notebookSource)) fail("contract", `missing: ${label}`);
@@ -385,7 +420,7 @@ console.log(line);
 console.log("GHARIBO AI LAB - qualification harness check");
 console.log(line);
 console.log(`  notebook        : ${path.relative(ROOT, NOTEBOOK_PATH).split(path.sep).join("/")}`);
-console.log(`  contract        : docs/ENV_QUALIFICATION_CONTRACT.md v${CONTRACT_SCHEMA_VERSION}`);
+console.log(`  contract        : docs/ENV_QUALIFICATION_CONTRACT.md v${CONTRACT_DOC_VERSION} (artifact schema ${CONTRACT_SCHEMA_VERSION})`);
 console.log(`  cells           : ${cellSources.length}`);
 console.log(`  dependencies[]  : ${inventory.pinned_dependencies.map((d) => d.name).join(", ")}`);
 console.log(`  additional[]    : ${inventory.additional_dependencies.map((d) => d.name).join(", ")} + harmony`);

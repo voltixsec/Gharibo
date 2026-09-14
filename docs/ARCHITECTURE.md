@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Architecture |
 | **Status** | Frozen |
-| **Version** | 1.1.0 |
+| **Version** | 1.1.1 |
 | **Last Updated** | 2026-09-14 |
 | **Project Name** | `gharibo_ai_lab` |
 | **Based On** | `docs/PRD.md` (v1.0.0) |
@@ -70,7 +70,7 @@ better-sqlite3 connection (lib/db/index.ts)  ← singleton, WAL mode, persists t
 
 ## 2. File List (with relative paths)
 
-> Paths are relative to repo root `C:\Dev\GHARIBO\`. Every file needed for the vertical slice is listed.
+> Paths are relative to the repository root. Every file needed for the vertical slice is listed.
 
 ### 2.0 Root Config & Monorepo Skeleton
 

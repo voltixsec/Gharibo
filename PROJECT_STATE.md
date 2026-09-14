@@ -97,6 +97,43 @@ of historical data. Historical UCL production artifacts existed externally and h
 to `data/raw/legacy-ucl/`. The earlier statement that "UCL never existed" is incorrect and has been corrected
 in this document and the CHANGELOG.
 
+**Dataset snapshot disclosure (M3B):** `GHARIBO-Research-Gold-v0.1` is derived from the physically supplied
+**18,646-record** legacy UCL snapshot (8 files, 7 available + 1 unavailable). The historical UCL master state
+records a corpus of approximately 20,087 records. The difference (1,441 records) corresponds to the missing
+`VOKA_UCL_SECURITY_BATCH_004.jsonl` artifact, which was not supplied and must not be reconstructed or invented.
+This limitation does not invalidate `GHARIBO-exp-001` — the current 18,646-record snapshot passes all quality
+gates (zero parse errors, zero broken relations, zero duplicate lines, verified referential integrity).
+
+**M3B Phase 1 — Gold Audit (100 examples, split-aware):** The 100-example audit cohort passes the
+12-criterion audit: **100 PASS / 0 NEEDS_REVIEW / 0 FAIL**, over **TRAIN + VALIDATION only**
+(train 83, validation 17). **TEST audited = 0.** The audit artifact
+(`data/derived/gold-audit/gold-audit-100-v001.json`, artifactVersion 1.1.0) records a per-example
+`split` field and a top-level `splitIsolation` block; two runs on the same inputs are
+byte-identical.
+
+**M3B — TEST-split supersession (contamination found and fixed):** The original
+`GHARIBO-Research-Gold-v0.1` split (seed `3407`) was **contaminated**: 10 of the 100 audited
+examples belonged to TEST, so TEST was not genuinely held out. The seed-3407 split was also not
+reproducible from any committed source (its generator was never versioned). It was **superseded**
+by a new committed, audit-aware deterministic split generator
+(`scripts/split/cut-gold-split.py`, seed `20260914`) that quarantines the 100-example audit cohort
+into TRAIN + VALIDATION, guaranteeing **audited ∩ TEST = 0**.
+
+| Split | Superseded (seed 3407) | Current (seed 20260914) |
+|-------|------------------------|--------------------------|
+| TRAIN | `61afb232fa5e5783463499d1ee24355c52cf56edc5fe11b3bda48795152c6a6c` | `84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2` |
+| VALIDATION | `f884c9a953f75a348ed257f84140878a519d6c9f96c9f39accd2660a51095906` | `063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787` |
+| TEST | `959068e5451874ab5c3398584c0187dfdb4815c6d00d3a37ca69a54d8f79f11b` (contaminated) | `55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b` |
+
+The dataset hash is unchanged (`84acad9b…`) — no gold example content was modified. Counts remain
+640 / 80 / 80.
+
+**Qualification safety (M3B):** The Kaggle qualification harness is now structurally
+training-free: runtime tripwires raise on any optimizer construction/step, backward call or
+scheduler construction, and a `qualification_safety` evidence block (contract §13) is emitted.
+A static safety gate (`qualify:check` + `verify:m3a` Gate 13) forbids the training primitives from
+appearing in the generated notebook at all.
+
 **Remaining blocker:** The Kaggle qualification notebook must be executed on a real T4 instance to resolve
 dependency versions, verify GPU compatibility, and produce a qualification_hash. This requires CTO authorization
 for Kaggle credentials. No training has been started.

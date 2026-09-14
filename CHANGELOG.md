@@ -18,6 +18,56 @@ milestone; a milestone is only listed as released once it is committed and pushe
 
 ## [Unreleased]
 
+### Milestone 3B — Split Integrity, Split-Aware Audit and Qualification Safety
+
+**Status: in progress. No training executed. No model weights downloaded.**
+
+#### Added
+
+- `scripts/split/cut-gold-split.py` — committed, audit-aware deterministic split generator (seed
+  `20260914`). Quarantines the 100-example audit cohort into TRAIN + VALIDATION so
+  **audited ∩ TEST = 0**. Writes `train/validation/test.jsonl` and updates `dataset-card.json`
+  (new seed, new hashes, `supersededSplits`, `splitProvenance`). Deterministic: two runs are
+  byte-identical.
+- `scripts/gold_cohort.py` — the shared, single definition of the 100-example audit cohort, imported
+  by both the split generator and the audit so they cannot drift.
+- `verify:m3a` **Gate 13 — qualification safety (static)**: the generated qualification notebook
+  must contain no training primitive.
+- `qualification_safety` block in `env-qualification.json` (contract §13), computed from runtime
+  tripwires + a parameter-digest comparison.
+
+#### Changed
+
+- `scripts/audit/gold_audit_100.py` — split-aware: loads the current splits, audits TRAIN +
+  VALIDATION only, records a per-example `split`, hard-fails if any audited example is in TEST, and
+  emits a `splitIsolation` block. artifactVersion `1.0.0 → 1.1.0`; the wall-clock `createdAt` was
+  removed so the artifact is deterministic.
+- `scripts/qualify/qualify-kaggle-env.mjs` — new Section 5b arms runtime tripwires (optimizer
+  constructor/step, scheduler constructors, tensor/autograd backward, accelerate backward) and
+  asserts `QUALIFICATION_ONLY is True`; Section 10 emits `qualification_safety`. Notebook
+  regenerated.
+- `scripts/qualify/check-qualify-harness.mjs` — `FORBIDDEN_TOKENS` extended with the training
+  primitives; contract checks added for §13.
+- `docs/ENV_QUALIFICATION_CONTRACT.md` — v1.1.0 → v1.2.0; new §13 Qualification Safety.
+- `docs/DATA_FACTORY.md` — v1.3.0 → v1.4.0; snapshot disclosure, TEST-split supersession and the
+  split-aware audit.
+- `docs/DOCUMENT_REGISTER.md` — v1.1.0 → v1.2.0; register rows updated.
+- `overview.md` — restored the 5-field governance metadata header (it had been overwritten with the
+  M3A report, breaking `docs:validate`).
+- `PROJECT_STATE.md` — M3B disclosure: snapshot, TEST-split supersession, split-aware audit,
+  qualification safety.
+
+#### Fixed
+
+- **`docs:validate` FAIL** — `overview.md` had lost its governance metadata header.
+- **TEST contamination** — the seed-3407 TEST split contained 10 of 100 audited examples; the split
+  was superseded by the audit-aware cut.
+
+#### Notes
+
+- No gold example content was modified. The dataset hash is unchanged (`84acad9b…`).
+- No training executed; no model weights downloaded.
+
 ### Milestone 3A — Training Readiness
 
 **Status: READY_FOR_ENV_QUALIFICATION — dataset built, deps pinned, gates pass. No training executed.**

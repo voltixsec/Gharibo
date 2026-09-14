@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.2.0 |
+| **Version** | 1.4.0 |
 | **Last Updated** | 2026-09-14 |
 
 > Part of the Milestone 1 architecture baseline. The pipeline state machine below is a frozen
@@ -42,6 +42,39 @@
 >   pairwise disjoint (verified by the verify-m3a gate runner).
 > - **No source payloads committed:** Training examples contain normalized structured data derived
 >   from source records. No raw source payloads, credentials, or sensitive data are present.
+> - **Snapshot disclosure (M3B):** `GHARIBO-Research-Gold-v0.1` is derived from the physically supplied
+>   **18,646-record** legacy UCL snapshot (7 available files). The historical UCL corpus was approximately
+>   20,087 records; the difference corresponds to the missing `VOKA_UCL_SECURITY_BATCH_004.jsonl`, which
+>   was not supplied and must not be reconstructed or invented. This limitation does not invalidate
+>   `GHARIBO-exp-001` — the current snapshot passes all quality gates.
+> - **Gold audit (M3B Phase 1):** 100 examples audited against 12 quality criteria. All 100 PASS.
+>   No systematic transformation defects found. No dataset regeneration required. Audit artifact at
+>   `data/derived/gold-audit/gold-audit-100-v001.json`.
+
+> **v1.4.0 — Milestone 3B (2026-09-14).** Snapshot disclosure, TEST-split supersession and the
+> split-aware gold audit.
+>
+> - **Snapshot disclosure.** `GHARIBO-Research-Gold-v0.1` is derived from the physically supplied
+>   **18,646-record** legacy UCL source snapshot (7 available files). It is **NOT** the complete
+>   historical **20,087-record** corpus. The 1,441-record gap is the missing
+>   `VOKA_UCL_SECURITY_BATCH_004.jsonl` artifact, which was not supplied. **Missing historical
+>   artifacts must not be reconstructed.** The 18,646-record snapshot passes all quality gates.
+> - **TEST-split supersession.** The original split (seed `3407`) was **contaminated**: 10 of the
+>   100 audited examples belonged to TEST, so TEST was not truly held out. That split was
+>   **superseded** by a new audit-aware, committed split generator
+>   (`scripts/split/cut-gold-split.py`, seed `20260914`). The superseded TEST hash was
+>   `959068e5451874ab5c3398584c0187dfdb4815c6d00d3a37ca69a54d8f79f11b`; the new TEST hash is
+>   `55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b`. New TRAIN hash
+>   `84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2`, new VALIDATION hash
+>   `063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787`. The dataset hash is
+>   unchanged (`84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5`) because no gold
+>   example content changed. The 100-example audit cohort is quarantined into TRAIN + VALIDATION,
+>   so **audited ∩ TEST = 0** by construction.
+> - **Gold audit (split-aware, re-run).** 100 PASS / 0 NEEDS_REVIEW / 0 FAIL over **TRAIN +
+>   VALIDATION only** (train 83, validation 17); **TEST audited = 0**. Artifact
+>   `data/derived/gold-audit/gold-audit-100-v001.json` (artifactVersion 1.1.0) now records a
+>   `splitIsolation` block and a per-example `split` field. Deterministic: two runs are
+>   byte-identical.
 
 ## Overview
 
