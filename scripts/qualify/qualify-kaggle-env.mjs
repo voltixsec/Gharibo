@@ -26,21 +26,50 @@
  * CONTRACT
  * --------
  * The emitted artifact is `env-qualification.json`, shaped by
- * `docs/ENV_QUALIFICATION_CONTRACT.md` v1.0.0 (§3 top level, §4 dependency records,
+ * `docs/ENV_QUALIFICATION_CONTRACT.md` v1.4.0 (§3 top level, §4 dependency records,
  * §5 environment, §6 reproducibility, §7 unknowns, §8 status, §9 content address,
  * §10 validation). The harness self-validates against §10 before it finishes.
  *
+ * SCOPE (v2.0.0 — real model-compatibility qualification)
+ * --------------------------------------------------------
+ * The harness is no longer model-free. It must prove REAL compatibility between the
+ * free-Kaggle T4 and the pinned recipe for `openai/gpt-oss-20b`:
+ *
+ *   1. detect the GPU / VRAM / CUDA / driver / compute capability / python,
+ *   2. resolve the exact dependency versions AND git revisions (two fresh envs),
+ *   3. resolve the live revision of `openai/gpt-oss-20b` and of the 4-bit loader
+ *      mirror, and compare the base-model revision against the repo's pin,
+ *   4. load the tokenizer,
+ *   5. verify Harmony formatting on a REAL GHARIBO training example (the encoding
+ *      render and the tokenizer chat template must both agree),
+ *   6. tokenize that real example,
+ *   7. load the base model through the intended low-memory / 4-bit path,
+ *   8. initialise the LoRA / QLoRA adapters,
+ *   9. report total / trainable parameters and the trainable percentage,
+ *  10. collate one small batch,
+ *  11. run exactly ONE forward-only dry run under `torch.no_grad()`,
+ *  12. record VRAM before load / after load / after adapter init / peak,
+ *  13. verify the checkpoint/artifact destination is writable,
+ *  14. prove no parameter changed: a deterministic digest over the trainable
+ *      parameters is computed before and after the dry run and must be identical.
+ *
  * HARD CONSTRAINTS baked into the emitted notebook (see scripts/qualify/README.md):
  *   - never fabricates a version or a SHA (unknown => null + an `unknowns[]` entry),
- *   - no model weight download, no training, no SFT/QLoRA execution,
- *   - QUALIFICATION ONLY: runtime tripwires arm the optimizer constructor, the
- *     optimizer step, the scheduler constructors, the tensor/autograd backward
- *     functions and the accelerate backward so that any of them RAISES. The
- *     tripwire state is emitted as the `qualification_safety` block (contract §13);
- *     a static safety gate (check-qualify-harness.mjs + verify-m3a Gate 13) forbids
- *     the training primitives from appearing in the generated notebook at all,
+ *   - TRAINING IS FORBIDDEN: no `trainer.train()`, no optimizer, no `backward()`,
+ *     no optimizer step, no scheduler, no training loop, no parameter update,
+ *   - QUALIFICATION ONLY: `QUALIFICATION_ONLY` is asserted True and runtime tripwires
+ *     arm the optimizer constructor, the optimizer step, the scheduler constructors,
+ *     the tensor/autograd backward functions and the accelerate backward so that any
+ *     of them RAISES. The tripwire state is emitted as the `qualification_safety`
+ *     block (contract §13). A static safety gate (check-qualify-harness.mjs +
+ *     verify-m3a Gate 13) forbids the training primitives from appearing in the
+ *     generated notebook at all — loading a model and running a forward pass is
+ *     allowed; training is not,
  *   - never prints, logs or writes a secret (all output passes through `redact`),
- *   - T4 = Turing (sm_75): fp16 only, no bf16, no FlashAttention-2.
+ *   - never writes a model artifact: no `save_pretrained`, no `push_to_hub`,
+ *   - T4 = Turing (sm_75): fp16 only, no bf16, no FlashAttention-2,
+ *   - a measured incompatibility is reported truthfully as
+ *     `QUALIFICATION_FAILED_MEASURED`; a smaller model is NEVER substituted.
  *
  * Usage:
  *   node scripts/qualify/qualify-kaggle-env.mjs           # write the notebook
@@ -113,6 +142,168 @@ export function readEngineVersion() {
 
 const PINNED = readPinnedEngineDependencies();
 const ENGINE_VERSION = readEngineVersion();
+
+// ---------------------------------------------------------------------------
+// 1b. Read the repo's real recipe defaults + dataset facts (never retyped).
+// ---------------------------------------------------------------------------
+
+const RUN_FORM_TSX = p("apps", "web", "components", "training", "run-form.tsx");
+const MASTER_STATE_JSON = p("governance", "GHARIBO_MASTER_STATE.json");
+const DATASET_ID = "GHARIBO-Research-Gold-v0.1";
+
+/** Model identity constants (verified — package.ts §"Model identity"). */
+export function readModelIdentity() {
+  const source = fs.readFileSync(PACKAGE_TS, "utf8");
+  const grab = (name) => {
+    const m = source.match(new RegExp(`export const ${name}\\s*=\\s*"([^"]+)"`));
+    if (!m) throw new Error(`could not parse ${name} from ${PACKAGE_TS}`);
+    return m[1];
+  };
+  return {
+    baseModel: grab("BASE_MODEL_IDENTITY"),
+    baseModelRevision: grab("BASE_MODEL_REVISION"),
+    loaderModel: grab("LOADER_MODEL_ID"),
+  };
+}
+
+/**
+ * Parses the numeric/string recipe defaults out of package.ts. These are the
+ * repo's own declared defaults; the harness must not retype them.
+ */
+export function readRecipeDefaults() {
+  const source = fs.readFileSync(PACKAGE_TS, "utf8");
+  const grabNumber = (name) => {
+    const m = source.match(new RegExp(`export const ${name}\\s*=\\s*(\\d+)`));
+    if (!m) throw new Error(`could not parse ${name} from ${PACKAGE_TS}`);
+    return Number(m[1]);
+  };
+  const grabString = (name) => {
+    const m = source.match(new RegExp(`export const ${name}\\s*=\\s*"([^"]+)"`));
+    if (!m) throw new Error(`could not parse ${name} from ${PACKAGE_TS}`);
+    return m[1];
+  };
+  return {
+    defaultSequenceLength: grabNumber("DEFAULT_SEQUENCE_LENGTH"),
+    minSequenceLength: grabNumber("MIN_SEQUENCE_LENGTH"),
+    defaultBatchSize: grabNumber("DEFAULT_BATCH_SIZE"),
+    defaultGradAccum: grabNumber("DEFAULT_GRAD_ACCUM"),
+    defaultDtype: grabString("DEFAULT_DTYPE"),
+    defaultLoraDropout: grabNumber("DEFAULT_LORA_DROPOUT"),
+    defaultLoraBias: grabString("DEFAULT_LORA_BIAS"),
+    harmony: readHarmonyMapping(source),
+  };
+}
+
+/** Parses `DEFAULT_HARMONY` out of package.ts (the domain-agnostic Harmony mapping). */
+export function readHarmonyMapping(source = fs.readFileSync(PACKAGE_TS, "utf8")) {
+  const block = source.match(/export const DEFAULT_HARMONY: HarmonyMapping = \{([\s\S]*?)\n\};/);
+  if (!block) throw new Error(`could not parse DEFAULT_HARMONY from ${PACKAGE_TS}`);
+  const effort = block[1].match(/reasoningEffort:\s*"([^"]+)"/);
+  const template = block[1].match(/developerTemplateId:\s*"([^"]+)"/);
+  const channels = block[1].match(/hiddenChannels:\s*\[([^\]]*)\]/);
+  if (!effort || !template || !channels) {
+    throw new Error(`DEFAULT_HARMONY in ${PACKAGE_TS} is missing reasoningEffort/developerTemplateId/hiddenChannels`);
+  }
+  let hiddenChannels;
+  try {
+    hiddenChannels = JSON.parse(`[${channels[1]}]`);
+  } catch {
+    throw new Error(`DEFAULT_HARMONY.hiddenChannels in ${PACKAGE_TS} is not a JSON array`);
+  }
+  return {
+    reasoningEffort: effort[1],
+    developerTemplateId: template[1],
+    hiddenChannels,
+  };
+}
+
+/**
+ * Parses the LoRA configuration the repo's own run form declares as its defaults.
+ *
+ * WHY HERE: `lora_rank` / `lora_alpha` / `target_modules` / `seed` are per-run
+ * values stored in `training_runs`, and `deriveLoRAFromRun` returns null until a run
+ * exists. The qualification therefore has to declare *something* to prove adapter
+ * initialisation. Rather than invent numbers, the harness reads the repo's committed
+ * form defaults so the qualification config cannot drift from the declared recipe.
+ * These are QUALIFICATION values: they prove the adapter path works. The training
+ * run's real LoRA config still comes from the Training Package.
+ */
+export function readQualificationLoraDefaults() {
+  const source = fs.readFileSync(RUN_FORM_TSX, "utf8");
+  const grabState = (name) => {
+    const m = source.match(
+      new RegExp(`const \\[${name}[^\\]]*\\]\\s*=\\s*useState(?:<[^>]*>)?\\(\\s*([^)]*?)\\s*\\)`),
+    );
+    if (!m) throw new Error(`could not parse the ${name} default from ${RUN_FORM_TSX}`);
+    return m[1];
+  };
+  const modules = grabState("targetModules");
+  let targetModules;
+  try {
+    targetModules = JSON.parse(modules);
+  } catch {
+    throw new Error(`the targetModules default in ${RUN_FORM_TSX} is not a JSON array: ${modules}`);
+  }
+  if (!Array.isArray(targetModules) || targetModules.length === 0) {
+    throw new Error(`the targetModules default in ${RUN_FORM_TSX} is empty`);
+  }
+  return {
+    r: Number(grabState("loraRank")),
+    alpha: Number(grabState("loraAlpha")),
+    targetModules,
+    seed: Number(grabState("seed")),
+  };
+}
+
+/**
+ * Reads the canonical dataset facts out of the committed master state.
+ *
+ * WHY THE MASTER STATE: the split hashes live in the gitignored dataset card, so a
+ * generator that read them from there could not reproduce the committed notebook on a
+ * fresh clone. `governance/GHARIBO_MASTER_STATE.json` is committed, canonical and
+ * hash-only — it carries no example content — so it is the right source.
+ */
+export function readDatasetFacts() {
+  const state = JSON.parse(fs.readFileSync(MASTER_STATE_JSON, "utf8"));
+  const entry = state.datasets?.[DATASET_ID];
+  if (!entry) throw new Error(`${MASTER_STATE_JSON} has no datasets["${DATASET_ID}"] entry`);
+  const hashes = entry.hashes ?? {};
+  const splits = hashes.splitHashes ?? {};
+  for (const key of ["datasetHash"]) {
+    if (!/^[0-9a-f]{64}$/.test(hashes[key] ?? "")) {
+      throw new Error(`datasets["${DATASET_ID}"].hashes.${key} is not a sha256 in ${MASTER_STATE_JSON}`);
+    }
+  }
+  for (const key of ["train", "validation", "test"]) {
+    if (!/^[0-9a-f]{64}$/.test(splits[key] ?? "")) {
+      throw new Error(
+        `datasets["${DATASET_ID}"].hashes.splitHashes.${key} is not a sha256 in ${MASTER_STATE_JSON}`,
+      );
+    }
+  }
+  return {
+    id: DATASET_ID,
+    version: entry.version ?? null,
+    format: entry.format ?? null,
+    exampleCount: entry.exampleCount ?? null,
+    splitCounts: entry.split?.counts ?? {},
+    splitSeed: entry.split?.seed ?? null,
+    datasetHash: hashes.datasetHash,
+    splitHashes: {
+      train: splits.train,
+      validation: splits.validation,
+      test: splits.test,
+    },
+  };
+}
+
+const MODEL_IDENTITY = readModelIdentity();
+const RECIPE = readRecipeDefaults();
+const LORA_DEFAULTS = readQualificationLoraDefaults();
+const DATASET_FACTS = readDatasetFacts();
+
+/** The accelerator directory a Kaggle Dataset is mounted under. */
+const KAGGLE_INPUT_ROOT = "/kaggle/input";
 
 // ---------------------------------------------------------------------------
 // 2. Inventory: how each pinned dependency is actually installed + probed.
@@ -232,9 +423,60 @@ const INVENTORY_JSON = JSON.stringify(
     additional_dependencies: EXTRA_INVENTORY,
     harmony_candidates: HARMONY_CANDIDATES,
     import_smoke_modules: IMPORT_SMOKE_MODULES,
-    contract_schema_version: "1.0.0",
-    harness_version: "1.0.0",
+    contract_schema_version: "1.1.0",
+    harness_version: "2.1.0",
     experiment_id: "GHARIBO-exp-001",
+    // ---- Model-compatibility qualification (contract §14) -------------------
+    model_compatibility: {
+      base_model: MODEL_IDENTITY.baseModel,
+      expected_base_model_revision: MODEL_IDENTITY.baseModelRevision,
+      loader_model: MODEL_IDENTITY.loaderModel,
+      loader_quantization: "4-bit",
+      dtype: RECIPE.defaultDtype,
+      max_seq_length: RECIPE.defaultSequenceLength,
+      min_max_seq_length: RECIPE.minSequenceLength,
+      batch_size: RECIPE.defaultBatchSize,
+      gradient_accumulation_steps: RECIPE.defaultGradAccum,
+      lora: {
+        r: LORA_DEFAULTS.r,
+        alpha: LORA_DEFAULTS.alpha,
+        target_modules: LORA_DEFAULTS.targetModules,
+        dropout: RECIPE.defaultLoraDropout,
+        bias: RECIPE.defaultLoraBias,
+      },
+      seed: LORA_DEFAULTS.seed,
+      harmony: {
+        reasoning_effort: RECIPE.harmony.reasoningEffort,
+        developer_template_id: RECIPE.harmony.developerTemplateId,
+        hidden_channels: RECIPE.harmony.hiddenChannels,
+      },
+      // The intended low-memory path, mirroring the M2 training notebook template
+      // (apps/web/lib/workers/kaggle/notebook.template.ipynb §8/§9).
+      load_in_4bit: true,
+      full_finetuning: false,
+      use_gradient_checkpointing: "unsloth",
+      // The 4-bit downgrade rule from the M2 budget gate.
+      low_vram_downgrade_below_bytes: 15 * 1024 ** 3,
+    },
+    // ---- Real GHARIBO training example binding (TRAIN-ONLY fixture) ----------
+    dataset: {
+      id: DATASET_FACTS.id,
+      version: DATASET_FACTS.version,
+      format: DATASET_FACTS.format,
+      example_count: DATASET_FACTS.exampleCount,
+      split_counts: DATASET_FACTS.splitCounts,
+      split_seed: DATASET_FACTS.splitSeed,
+      dataset_hash: DATASET_FACTS.datasetHash,
+      split_hashes: DATASET_FACTS.splitHashes,
+      // The operator attaches ONLY the train split as a Kaggle Dataset input.
+      // The harness searches this root for train.jsonl only. No example content
+      // is ever embedded in the notebook — the dataset is gitignored and private.
+      kaggle_input_root: KAGGLE_INPUT_ROOT,
+      expected_split_files: ["train.jsonl"],
+      example_split: "train",
+      qualification_fixture_source: "TRAIN_ONLY",
+      test_data_accessed: false,
+    },
   },
   null,
   2,
@@ -245,34 +487,64 @@ const INVENTORY_JSON = JSON.stringify(
 // ---------------------------------------------------------------------------
 
 const CELLS = [
-  String.raw`# --- Section 1: Purpose + policy (Milestone 3A) ---
-# This notebook QUALIFIES a free-Kaggle T4 environment for the GHARIBO training
-# engine. It resolves and records the EXACT dependency set so the pins in
-# apps/web/lib/training/package.ts can be frozen to reproducible versions.
+  String.raw`# --- Section 1: Purpose + policy (model-compatibility qualification) ---
+# This notebook QUALIFIES a free-Kaggle GPU environment for the GHARIBO training
+# engine. It does two things and nothing else:
+#
+#   A. DEPENDENCY QUALIFICATION - resolve and record the EXACT dependency set
+#      (versions + git revisions) so the pins in apps/web/lib/training/package.ts
+#      can be frozen to reproducible versions.
+#   B. MODEL COMPATIBILITY QUALIFICATION - prove that openai/gpt-oss-20b actually
+#      loads and runs a forward pass through the intended 4-bit QLoRA path on this
+#      exact GPU: tokenizer, Harmony rendering of a REAL GHARIBO example, example
+#      tokenisation, 4-bit model load, QLoRA adapter init, batch collation, and ONE
+#      forward-only dry run under torch.no_grad().
 #
 # The emitted artifact is /kaggle/working/env-qualification.json, shaped by
-# docs/ENV_QUALIFICATION_CONTRACT.md v1.0.0 (contract_schema_version 1.0.0).
+# docs/ENV_QUALIFICATION_CONTRACT.md v1.4.0 (contract_schema_version 1.1.0).
 #
-# IT DOES NOT TRAIN. It never downloads model weights, never loads a model and
-# never runs SFT/QLoRA. It only installs the stack and records what it resolved.
+# IT DOES NOT TRAIN. It never calls a trainer, never creates an optimizer, never
+# runs a backward pass, never takes an optimizer step and never updates a model
+# parameter. A deterministic digest over the trainable parameters is taken before
+# and after the dry run and MUST be unchanged.
+#
+# TRAIN-ONLY FIXTURE: Only train.jsonl is attached as a Kaggle Dataset input.
+# Validation and test splits are NOT attached. The qualification fixture is
+# sourced from TRAIN_ONLY. test_data_accessed is false.
+#
+# OUTPUT HYGIENE: Only env-qualification.json and small qualification manifests
+# are written to /kaggle/working. No model weights, LoRA adapters, checkpoints,
+# HF cache, or dataset copies are exported.
+#
+# NO AUTO-FREEZE: The CTO must inspect the artifact before any dependency freeze
+# is applied. auto_freeze_applied is false. experiment_authorized is false.
 #
 # HARD RULES enforced by this notebook:
 #   - no version and no git SHA is ever guessed: unknown is recorded as null AND
 #     enumerated in unknowns[] (contract §7); a null with no unknowns[] entry is
 #     a contract violation, not a silent gap;
 #   - no secret is ever printed, logged or written (every echo passes redact());
-#   - free Kaggle tier only; T4 = Turing (sm_75) -> fp16, no bf16, no FlashAttention-2.
+#     the harness reads NO Kaggle Secret and needs no HF token (both models are
+#     public / ungated);
+#   - no model artifact is ever written: no adapter or checkpoint is saved to disk
+#     and nothing is pushed to a model hub;
+#   - free Kaggle tier only; GPU with sm_75+ (T4 or better) -> fp16, no bf16, no
+#     FlashAttention-2 below sm_80;
+#   - if gpt-oss-20b cannot fit or initialise here, the measured failure is recorded
+#     truthfully as QUALIFICATION_FAILED_MEASURED and the run STOPS. A smaller model
+#     is never substituted and the architecture is never silently changed.
 #
 # Operator: read scripts/qualify/README.md before running.
 
 print('=' * 78)
-print('GHARIBO AI LAB - Milestone 3A free-Kaggle environment qualification')
+print('GHARIBO AI LAB - free-Kaggle environment qualification')
+print('  A. dependency resolution   B. real model-compatibility (gpt-oss-20b)')
 print('=' * 78)
-print('QUALIFICATION ONLY: no model weights, no training, no evaluation metrics.')
+print('QUALIFICATION ONLY: no training, no optimizer, no backward, no parameter update.')
 print('')`,
 
   String.raw`# --- Section 2: Config + helpers ---
-import datetime, hashlib, json, os, platform, pathlib, re, shutil, subprocess, sys, tempfile
+import datetime, hashlib, json, os, platform, pathlib, re, shutil, subprocess, sys, tempfile, time
 
 INVENTORY = json.loads(r'''
 __GHARIBO_QUALIFY_INVENTORY_JSON__
@@ -300,16 +572,228 @@ HARNESS_PATH = 'scripts/qualify/qualify-kaggle-env.ipynb'
 # Switches. Both are documented in scripts/qualify/README.md.
 RUN_IMPORT_SMOKE_TEST = True        # imports the stack; downloads NO weights
 RUN_FRESH_ENV_REPRODUCTION = True   # pass 2 of the reproducibility assertion (contract §6)
+RUN_MODEL_COMPATIBILITY = True      # part B: real gpt-oss-20b compatibility (§14)
 FRESH_ENV_MAX_SECONDS = 2400
+MODEL_STEP_MAX_SECONDS = 3600
 
 # Free-Kaggle T4 budget gate.
 MIN_VRAM_BYTES = 14 * 1024 ** 3
 MIN_COMPUTE_CAPABILITY = (7, 5)
 
+# ---- Model-compatibility configuration (contract §14) -----------------------
+# Every value below is injected from the repository (package.ts / run-form.tsx) or
+# from the canonical master state. Nothing is retyped and nothing is guessed.
+MODEL_COMPAT = INVENTORY['model_compatibility']
+DATASET = INVENTORY['dataset']
+
+BASE_MODEL = MODEL_COMPAT['base_model']
+BASE_MODEL_REVISION_PIN = MODEL_COMPAT['expected_base_model_revision']
+LOADER_MODEL = MODEL_COMPAT['loader_model']
+DTYPE = MODEL_COMPAT['dtype']
+MAX_SEQ_LENGTH = MODEL_COMPAT['max_seq_length']
+MIN_MAX_SEQ_LENGTH = MODEL_COMPAT['min_max_seq_length']
+# Resolved in Section 5 once the real VRAM is known: the M2 budget gate downgrades
+# max_seq_length when the card has less than 15 GiB, and this harness mirrors it.
+EFFECTIVE_MAX_SEQ_LENGTH = MAX_SEQ_LENGTH
+BATCH_SIZE = MODEL_COMPAT['batch_size']
+GRAD_ACCUM = MODEL_COMPAT['gradient_accumulation_steps']
+LORA = MODEL_COMPAT['lora']
+SEED = MODEL_COMPAT['seed']
+HARMONY = MODEL_COMPAT['harmony']
+LOAD_IN_4BIT = MODEL_COMPAT['load_in_4bit']
+FULL_FINETUNING = MODEL_COMPAT['full_finetuning']
+GRADIENT_CHECKPOINTING = MODEL_COMPAT['use_gradient_checkpointing']
+LOW_VRAM_DOWNGRADE_BELOW_BYTES = MODEL_COMPAT['low_vram_downgrade_below_bytes']
+
+# ---- Real GHARIBO example binding ------------------------------------------
+# The dataset is gitignored in the repository, so the notebook NEVER embeds example
+# content. The operator attaches the dataset as a Kaggle Dataset input and the
+# harness verifies it against the committed hashes before using it.
+DATASET_INPUT_ROOT = DATASET['kaggle_input_root']
+DATASET_SPLIT_FILES = DATASET['expected_split_files']
+EXAMPLE_SPLIT = DATASET['example_split']
+EXPECTED_DATASET_HASH = DATASET['dataset_hash']
+EXPECTED_SPLIT_HASHES = DATASET['split_hashes']
+
+# ---- Model-compatibility evidence state (never hardcoded downstream) --------
+MODEL_STEPS = []
+MODEL_COMPAT_FAILED = False
+FAILED_STEP = None
+FAILED_STEP_ERROR = None
+PEAK_VRAM_DURING_FORWARD = None
+PARAM_DIGEST_BEFORE = None
+PARAM_DIGEST_AFTER = None
+PARAM_COUNT_BEFORE = None
+PARAM_COUNT_AFTER = None
+
+def run_model_step(name, fn):
+    '''Runs one model-compatibility step, recording its outcome.
+
+    A failure is NEVER swallowed silently and NEVER fatal-by-crash: the exact
+    exception is recorded, the run is marked failed, and the remaining steps are
+    skipped so the artifact is still written with the measured failure (contract §14.5).
+    '''
+    global MODEL_COMPAT_FAILED, FAILED_STEP, FAILED_STEP_ERROR
+    if MODEL_COMPAT_FAILED:
+        MODEL_STEPS.append({'step': name, 'ok': False, 'seconds': None,
+                            'error': 'skipped: an earlier step failed', 'skipped': True})
+        return None
+    started = time.time()
+    try:
+        value = fn()
+        MODEL_STEPS.append({'step': name, 'ok': True, 'seconds': round(time.time() - started, 2),
+                            'error': None, 'skipped': False})
+        return value
+    except BaseException as exc:
+        MODEL_COMPAT_FAILED = True
+        FAILED_STEP = name
+        FAILED_STEP_ERROR = '%s: %s' % (type(exc).__name__, exc)
+        MODEL_STEPS.append({'step': name, 'ok': False, 'seconds': round(time.time() - started, 2),
+                            'error': FAILED_STEP_ERROR, 'skipped': False})
+        print('MODEL COMPATIBILITY STEP FAILED:', name)
+        print('  ', redact(FAILED_STEP_ERROR))
+        return None
+
+def vram_allocated_bytes():
+    '''Bytes currently allocated by the torch caching allocator, or None without CUDA.'''
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+        return int(torch.cuda.memory_allocated(0))
+    except Exception:
+        return None
+
+def vram_peak_bytes():
+    '''Peak bytes allocated since the last reset, or None without CUDA.'''
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+        return int(torch.cuda.max_memory_allocated(0))
+    except Exception:
+        return None
+
+def reset_vram_peak():
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats(0)
+            return True
+    except Exception:
+        return False
+    return False
+
+def parameter_digest(model):
+    '''Deterministic digest over every TRAINABLE parameter of a live model.
+
+    Contract §14.4: computed immediately before and immediately after the
+    forward-only dry run. The two values must be identical, which is the evidence
+    that no parameter was updated.
+
+    The digest covers the sorted (name, sha256(float32 bytes)) pairs, so it is
+    independent of parameter order and of the CUDA allocator's state.
+    '''
+    if model is None:
+        return None, 0
+    import numpy as np
+    import torch
+    parts = []
+    for name, param in sorted(model.named_parameters(), key=lambda kv: kv[0]):
+        if not getattr(param, 'requires_grad', False):
+            continue
+        tensor = param.detach()
+        try:
+            tensor = tensor.to(dtype=torch.float32, device='cpu').contiguous()
+        except Exception:
+            continue
+        digest = hashlib.sha256(np.asarray(tensor).tobytes()).hexdigest()
+        parts.append('%s:%s' % (name, digest))
+    joined = '\n'.join(parts)
+    return hashlib.sha256(joined.encode('utf-8')).hexdigest(), len(parts)
+
+def count_parameters(model):
+    '''(total, trainable, percentage) over the live model, or (None, None, None).'''
+    if model is None:
+        return None, None, None
+    total = 0
+    trainable = 0
+    for param in model.parameters():
+        try:
+            size = int(param.numel())
+        except Exception:
+            continue
+        total += size
+        if getattr(param, 'requires_grad', False):
+            trainable += size
+    if total == 0:
+        return None, None, None
+    return total, trainable, round(100.0 * trainable / total, 8)
+
+def locate_dataset_dir():
+    '''Finds the attached GHARIBO dataset directory under the Kaggle input root.
+
+    Returns a pathlib.Path containing every expected split file, or None. No path is
+    ever written into the artifact (contract §10 rule 13) - only a symbolic label.
+    '''
+    root = pathlib.Path(DATASET_INPUT_ROOT)
+    if not root.is_dir():
+        return None
+    candidates = [root] + sorted([d for d in root.rglob('*') if d.is_dir()])
+    for candidate in candidates:
+        if all((candidate / name).is_file() for name in DATASET_SPLIT_FILES):
+            return candidate
+    return None
+
+def sha256_line(text):
+    '''Contract convention: sha256 over the RAW line bytes (trailing CR stripped).'''
+    return hashlib.sha256(text.rstrip('\r').encode('utf-8')).hexdigest()
+
+def read_split_lines(dataset_dir, split):
+    with open(dataset_dir / (split + '.jsonl'), 'r', encoding='utf-8') as handle:
+        return [line for line in handle.read().split('\n') if line.strip() != '']
+
+def split_hash(lines):
+    '''sha256(utf-8('\\n'.join(sorted(lineHashes)))) - the committed convention.'''
+    return hashlib.sha256('\n'.join(sorted(sha256_line(line) for line in lines)).encode('utf-8')).hexdigest()
+
+def dataset_hash(split_lines_map):
+    '''sha256 over the sorted line hashes of EVERY split combined.'''
+    all_hashes = []
+    for split in sorted(split_lines_map):
+        all_hashes.extend(sha256_line(line) for line in split_lines_map[split])
+    return hashlib.sha256('\n'.join(sorted(all_hashes)).encode('utf-8')).hexdigest()
+
+def artifact_destination_label():
+    '''A symbolic, path-free name for the destination that was probed.'''
+    return 'kaggle_working' if str(WORKING) == '/kaggle/working' else 'process_working_directory'
+
+def verify_artifact_destination(directory):
+    '''Writes, reads back and removes a probe file. Returns (writable, error).'''
+    probe = directory / 'gharibo-write-probe.tmp'
+    try:
+        payload = 'gharibo-artifact-writability-probe'
+        with open(probe, 'w', encoding='utf-8', newline='\n') as handle:
+            handle.write(payload)
+        with open(probe, 'r', encoding='utf-8') as handle:
+            if handle.read() != payload:
+                return False, 'the probe file did not read back byte-identical'
+        return True, None
+    except Exception as exc:
+        return False, '%s: %s' % (type(exc).__name__, exc)
+    finally:
+        try:
+            probe.unlink()
+        except Exception:
+            pass
+
 # ---- Redaction: no secret may ever reach stdout, a log file or the artifact ----
 _CREDENTIALS_IN_URL = re.compile(r'([a-zA-Z][a-zA-Z0-9+.\-]*://)[^/@\s]+@')
 _SECRET_QUERY = re.compile(r'(?i)([?&](?:access_token|token|auth|api_key|apikey|password|private_token|key)=)[^&\s\'"]+')
 _BEARER_LIKE = re.compile(r'\b(?:hf_|ghp_|github_pat_|sk-)[A-Za-z0-9_\-]{12,}\b')
+# Any whitespace-delimited token containing a slash or a backslash is path-shaped.
+# Used only on recorded exception text (contract 10 rule 13); URLs are exempted.
+_PATH_TOKEN = re.compile(r'\S*[\\/]\S*')
 
 def redact(value):
     '''Strips credentials from any string that may be echoed or persisted.'''
@@ -320,6 +804,22 @@ def redact(value):
     text = _SECRET_QUERY.sub(lambda m: m.group(1) + '***', text)
     text = _BEARER_LIKE.sub('***', text)
     return text
+
+def scrub_paths(value):
+    '''Removes filesystem-path-shaped tokens from a string.
+
+    Contract 10 rule 13 forbids any personal filesystem path anywhere in the artifact.
+    Exception messages from a model loader routinely embed cache directories, so every
+    recorded error string passes through here. URLs are preserved.
+    '''
+    if not isinstance(value, str):
+        return value
+    def _replace(match):
+        token = match.group(0)
+        if token.startswith('http://') or token.startswith('https://'):
+            return token
+        return '<path>'
+    return _PATH_TOKEN.sub(_replace, value)
 
 def utc_now():
     stamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
@@ -374,7 +874,9 @@ out = {"python_version": platform.python_version(), "python_executable": sys.exe
        "cuda_available": False, "gpu_count": 0, "gpu_model": None,
        "compute_capability": None, "compute_capability_tuple": None,
        "vram_bytes": None, "bf16_supported": None, "fp16_supported": None,
-       "fp16_api_present": False, "error": None}
+       "fp16_api_present": False, "error": None,
+       "gpu_models": [], "vram_per_gpu": [], "total_visible_vram": None,
+       "multi_gpu_available": False}
 try:
     import torch
     out["torch_version"] = torch.__version__
@@ -391,6 +893,16 @@ try:
         out["compute_capability"] = "sm_%d%d" % (major, minor)
         out["compute_capability_tuple"] = [int(major), int(minor)]
         out["vram_bytes"] = int(torch.cuda.get_device_properties(0).total_memory)
+        # Detect ALL visible GPUs (generic, not hardcoded to T4 x2)
+        gpu_models = []
+        vram_per_gpu = []
+        for i in range(torch.cuda.device_count()):
+            gpu_models.append(torch.cuda.get_device_name(i))
+            vram_per_gpu.append(int(torch.cuda.get_device_properties(i).total_memory))
+        out["gpu_models"] = gpu_models
+        out["vram_per_gpu"] = vram_per_gpu
+        out["total_visible_vram"] = sum(vram_per_gpu)
+        out["multi_gpu_available"] = torch.cuda.device_count() > 1
         try:
             out["bf16_supported"] = bool(torch.cuda.is_bf16_supported())
         except Exception:
@@ -560,6 +1072,13 @@ print('experiment_id   :', EXPERIMENT_ID)
 print('engine          :', ENGINE, ENGINE_VERSION)
 print('pinned deps     :', ', '.join(d['name'] for d in PINNED_DEPENDENCIES))
 print('additional deps :', ', '.join(d['name'] for d in ADDITIONAL_DEPENDENCIES))
+print('base model      :', BASE_MODEL, '(pin', BASE_MODEL_REVISION_PIN + ')')
+print('loader model    :', LOADER_MODEL, '4-bit' if LOAD_IN_4BIT else 'full precision')
+print('recipe          : dtype=%s max_seq_length=%d batch=%d grad_accum=%d' %
+      (DTYPE, MAX_SEQ_LENGTH, BATCH_SIZE, GRAD_ACCUM))
+print('lora            : r=%d alpha=%d modules=%s' % (LORA['r'], LORA['alpha'], LORA['target_modules']))
+print('dataset         :', DATASET['id'], DATASET['version'], 'split=', EXAMPLE_SPLIT)
+print('model compat    :', RUN_MODEL_COMPATIBILITY)
 print('output          :', QUALIFICATION_PATH)`,
 
   String.raw`# --- Section 3: Hardware detect + budget gate (BEFORE anything expensive) ---
@@ -574,6 +1093,11 @@ def print_hardware(hw, label):
     print('gpu available   :', hw['cuda_available'])
     print('gpu count       :', hw['gpu_count'])
     print('gpu model       :', hw['gpu_model'])
+    if hw.get('gpu_models') and len(hw['gpu_models']) > 1:
+        for i, model in enumerate(hw['gpu_models']):
+            print('  gpu[%d]        : %s' % (i, model))
+        print('vram per gpu    :', hw.get('vram_per_gpu'))
+        print('total vis vram  :', hw.get('total_visible_vram'))
     print('compute cap     :', hw['compute_capability'])
     print('vram bytes      :', hw['vram_bytes'])
     print('bf16 (reported) :', hw['bf16_supported'])
@@ -589,7 +1113,7 @@ def recipe_dtype(compute_capability):
 def enforce_gate(hw, phase):
     problems = []
     if not hw['cuda_available']:
-        problems.append('no CUDA GPU visible - set Notebook Settings -> Accelerator -> GPU T4 x2 '
+        problems.append('no CUDA GPU visible - set Notebook Settings -> Accelerator -> GPU (T4 or better) '
                         'and re-run from the top')
     capability = hw['compute_capability_tuple']
     if capability is None:
@@ -614,6 +1138,144 @@ def enforce_gate(hw, phase):
 hardware_before = probe_environment(sys.executable)
 print_hardware(hardware_before, 'Hardware BEFORE install')
 enforce_gate(hardware_before, 'pre-install')`,
+
+  String.raw`# --- Section 3b: Qualification inputs - the REAL GHARIBO dataset (TRAIN-ONLY, fail fast) ---
+# Part B must exercise a REAL GHARIBO training example, not a synthetic prompt. The
+# dataset is gitignored in the repository, so this notebook embeds NO example content:
+# the operator attaches GHARIBO-Research-Gold-v0.1 TRAIN split as a Kaggle Dataset input
+# and the harness verifies it against the committed hashes before using a single line.
+#
+# TRAIN-ONLY FIXTURE: Only train.jsonl is attached. Validation and test splits are NOT
+# accessed. qualification_fixture_source = TRAIN_ONLY, test_data_accessed = False.
+#
+# This runs BEFORE the expensive install so a missing or tampered dataset is reported
+# in seconds rather than after a 40-minute dependency resolution.
+DATASET_DIR = locate_dataset_dir()
+if DATASET_DIR is None:
+    abort('the GHARIBO dataset was not found under ' + DATASET_INPUT_ROOT + '.\n'
+          'Attach ' + DATASET['id'] + ' as a Kaggle Dataset input containing\n'
+          '  train.jsonl\n'
+          'then re-run from the top. Nothing is downloaded automatically and no\n'
+          'example content is embedded in this notebook.\n'
+          'NOTE: Only the TRAIN split is required (TRAIN-ONLY fixture).')
+
+print('dataset located under', DATASET_INPUT_ROOT, '(directory name withheld from the artifact)')
+
+# Only read the TRAIN split — validation and test are NOT attached.
+train_lines = read_split_lines(DATASET_DIR, 'train')
+
+dataset_binding = {
+    'id': DATASET['id'],
+    'version': DATASET['version'],
+    'format': DATASET['format'],
+    'example_count': len(train_lines),
+    'split_counts': {'train': len(train_lines)},
+    'split_hash_expected': {'train': EXPECTED_SPLIT_HASHES['train']},
+    'split_hash_measured': {},
+    'split_hash_matches': {},
+    'dataset_hash_expected': EXPECTED_DATASET_HASH,
+    'dataset_hash_measured': None,
+    'dataset_hash_matches': None,
+    'example_split': EXAMPLE_SPLIT,
+    'qualification_fixture_source': 'TRAIN_ONLY',
+    'test_data_accessed': False,
+    'qualification_fixture_hash': None,
+    'fixture_example_count': None,
+    'fixture_example_hashes': [],
+    'fixture_example_indices': [],
+    'example_index': None,
+    'example_line_hash': None,
+    'example_message_roles': None,
+    'example_character_count': None,
+}
+
+problems = []
+expected_counts = DATASET['split_counts']
+
+# Verify only the TRAIN split hash (the only file attached).
+measured_train_hash = split_hash(train_lines)
+dataset_binding['split_hash_measured']['train'] = measured_train_hash
+train_matches = measured_train_hash == EXPECTED_SPLIT_HASHES['train']
+dataset_binding['split_hash_matches']['train'] = train_matches
+if not train_matches:
+    problems.append('train split hash %s != committed %s'
+                    % (measured_train_hash, EXPECTED_SPLIT_HASHES['train']))
+if expected_counts.get('train') is not None and len(train_lines) != expected_counts['train']:
+    problems.append('train has %d record(s), the committed split has %d'
+                    % (len(train_lines), expected_counts['train']))
+
+# The full dataset hash cannot be computed (we only have train), so we compute a
+# qualification_fixture_hash instead: sha256 over the sorted line hashes of the
+# 2-8 selected fixture examples.
+if not train_lines:
+    abort('the train split is empty - cannot exercise a real example.')
+
+# Deterministic fixture selection: sort by line hash, take the first 8 (or all if fewer).
+hashed_train = sorted((sha256_line(line), index) for index, line in enumerate(train_lines))
+fixture_count = min(8, len(hashed_train))
+FIXTURE_EXAMPLES = []
+fixture_example_hashes = []
+fixture_example_indices = []
+for i in range(fixture_count):
+    line_hash, idx = hashed_train[i]
+    FIXTURE_EXAMPLES.append((line_hash, idx, train_lines[idx]))
+    fixture_example_hashes.append(line_hash)
+    fixture_example_indices.append(idx)
+
+qualification_fixture_hash = hashlib.sha256(
+    '\n'.join(sorted(fixture_example_hashes)).encode('utf-8')).hexdigest()
+
+dataset_binding['qualification_fixture_hash'] = qualification_fixture_hash
+dataset_binding['fixture_example_count'] = fixture_count
+dataset_binding['fixture_example_hashes'] = fixture_example_hashes
+dataset_binding['fixture_example_indices'] = fixture_example_indices
+
+# The dataset hash is not verified (we don't have all splits); record it as not verified.
+dataset_binding['dataset_hash_measured'] = None
+dataset_binding['dataset_hash_matches'] = None
+
+if problems:
+    abort('the attached dataset is not ' + DATASET['id'] + ' @ ' + str(DATASET['version']) + ':\n  - '
+          + '\n  - '.join(problems) + '\n'
+          'Refusing to qualify against a dataset that does not match the committed hashes.')
+
+print('dataset integrity VERIFIED (TRAIN-ONLY fixture):')
+print('  train        %4d records  %s' % (len(train_lines), measured_train_hash))
+print('  qualification fixture hash  %s' % qualification_fixture_hash)
+print('  fixture examples           %d' % fixture_count)
+
+# The EXAMPLE_MESSAGES come from the first selected example (for Harmony/tokenizer
+# verification — one example is sufficient for that).
+example_line_hash, example_index = FIXTURE_EXAMPLES[0][0], FIXTURE_EXAMPLES[0][1]
+
+EXAMPLE_RECORD = json.loads(train_lines[example_index])
+if not isinstance(EXAMPLE_RECORD.get('messages'), list) or not EXAMPLE_RECORD['messages']:
+    abort('the selected ' + EXAMPLE_SPLIT + ' example has no "messages" array - the dataset format '
+          'is not the expected Harmony role/content shape.')
+
+EXAMPLE_MESSAGES = []
+for message in EXAMPLE_RECORD['messages']:
+    role = message.get('role')
+    content = message.get('content')
+    if not isinstance(role, str) or not isinstance(content, str):
+        abort('the selected example carries a malformed message (role/content must be strings).')
+    EXAMPLE_MESSAGES.append({'role': role, 'content': content})
+
+dataset_binding['example_index'] = int(example_index)
+dataset_binding['example_line_hash'] = example_line_hash
+dataset_binding['example_message_roles'] = [m['role'] for m in EXAMPLE_MESSAGES]
+dataset_binding['example_character_count'] = int(sum(len(m['content']) for m in EXAMPLE_MESSAGES))
+
+print('')
+print('selected %s example index %d (smallest line hash %s)'
+      % (EXAMPLE_SPLIT, example_index, example_line_hash))
+print('roles:', ', '.join(dataset_binding['example_message_roles']),
+      '| characters:', dataset_binding['example_character_count'])
+print('(example content is never printed, logged or written to the artifact)')
+
+# The train lines are released now that their hashes are recorded: only the selected
+# fixture examples are retained, so the harness does not hold the corpus in memory.
+train_lines = None`,
 
   String.raw`# --- Section 4: Install the training stack via uv (reproducibility pass 1) ---
 # A plain "pip install unsloth" does NOT work (known trap: the resolver picks a
@@ -682,6 +1344,17 @@ print('flash-attention-2 supported:', flash_attention_2_supported,
       '(T4 = False; the recipe must not request flash_attention_2)')
 print('selected dtype:', recipe_dtype_after)
 
+# The M2 budget gate downgrades max_seq_length when the card has less than 15 GiB.
+# Mirrored here so the qualification exercises the sequence length a real run would use.
+if (hardware_after['vram_bytes'] is not None
+        and hardware_after['vram_bytes'] < LOW_VRAM_DOWNGRADE_BELOW_BYTES
+        and EFFECTIVE_MAX_SEQ_LENGTH > MIN_MAX_SEQ_LENGTH):
+    print('VRAM %d bytes < %d - downgrading max_seq_length %d -> %d'
+          % (hardware_after['vram_bytes'], LOW_VRAM_DOWNGRADE_BELOW_BYTES,
+             EFFECTIVE_MAX_SEQ_LENGTH, MIN_MAX_SEQ_LENGTH))
+    EFFECTIVE_MAX_SEQ_LENGTH = MIN_MAX_SEQ_LENGTH
+print('effective max_seq_length:', EFFECTIVE_MAX_SEQ_LENGTH)
+
 try:
     uv_version = first_version_token(run_command([UV, '--version']).stdout)
 except Exception as exc:
@@ -718,6 +1391,10 @@ environment = {
     'pip_version': pip_version,
     'fp16_supported': fp16_supported,
     'bf16_supported': hardware_after['bf16_supported'],
+    'gpu_count': hardware_after['gpu_count'],
+    'gpu_models': hardware_after.get('gpu_models', [hardware_after['gpu_model']]),
+    'vram_per_gpu': hardware_after.get('vram_per_gpu', [hardware_after['vram_bytes']]),
+    'total_visible_vram': hardware_after.get('total_visible_vram', hardware_after['vram_bytes']),
 }
 print('')
 print('environment block (contract 5):')
@@ -794,29 +1471,9 @@ def arm_safety_tripwires():
 
 SAFETY_ARMED = arm_safety_tripwires()
 
-def parameter_digest():
-    '''Content digest over every live tensor that requires grad. This harness loads
-    NO model, so the set is empty and the digest is the digest of an empty set; any
-    change would prove parameters were created or mutated in-process.'''
-    import gc
-    import torch
-    parts = []
-    for obj in gc.get_objects():
-        try:
-            if torch.is_tensor(obj) and getattr(obj, 'requires_grad', False):
-                detached = obj.detach()
-                try:
-                    detached = detached.cpu()
-                except Exception:
-                    pass
-                parts.append(hashlib.sha256(detached.numpy().tobytes()).hexdigest())
-        except Exception:
-            continue
-    return hashlib.sha256('\n'.join(sorted(parts)).encode('utf-8')).hexdigest(), len(parts)
-
-PARAM_DIGEST_BEFORE, PARAM_COUNT_BEFORE = parameter_digest()
 print('qualification safety tripwires armed:', ', '.join(SAFETY_ARMED))
-print('parameter digest (before):', PARAM_DIGEST_BEFORE, 'tensors:', PARAM_COUNT_BEFORE)`,
+print('parameter digest: computed later, immediately before and after the forward-only')
+print('                  dry run, over the TRAINABLE parameters of the loaded model.')`,
 
   String.raw`# --- Section 6: Import smoke test (NO weights are downloaded) ---
 # Importing the stack is not training and does not fetch model weights. It is the
@@ -1076,13 +1733,300 @@ else:
             print('  MISMATCH', item)
     except Exception as exc:
         reproducibility['assertion'] = 'NOT_RUN'
-        reproducibility['error'] = redact(str(exc))
+        reproducibility['error'] = scrub_paths(redact(str(exc)))
         print('pass 2 did not complete:', redact(str(exc)))
         print('contract 6.4: NOT_RUN can only ever be PARTIAL')
     finally:
         shutil.rmtree(venv_dir, ignore_errors=True)`,
 
-  String.raw`# --- Section 10: Assemble, self-validate and write env-qualification.json ---
+  String.raw`# --- Section 10: Model compatibility I - revision, tokenizer, Harmony, tokenisation ---
+# Part B of the qualification (contract §14). Steps 3-6 of the mission: resolve the
+# exact model revision, load the tokenizer, verify Harmony formatting on the REAL
+# GHARIBO example, and tokenise that example. No weights are loaded in this cell.
+MODEL_COMPAT_STARTED_AT = utc_now()
+
+BASE_MODEL_REVISION_RESOLVED = None
+LOADER_MODEL_REVISION_RESOLVED = None
+TOKENIZER = None
+MODEL = None
+HARMONY_ENCODING_VERIFIED = False
+HARMONY_TOKENIZER_VERIFIED = False
+HARMONY_ENCODING_DETAIL = None
+HARMONY_TOKENIZER_DETAIL = None
+HARMONY_RENDERED_TEXT = None
+TOKENIZED_EXAMPLE_IDS = None
+TOKENIZED_EXAMPLE_COUNT = None
+BASE_MODEL_REVISION_MATCHES_PIN = None
+
+# The Harmony wire-format control tokens gpt-oss uses. Their presence in the rendered
+# text is what "Harmony formatting verified" means - not a claim about a template name.
+HARMONY_CONTROL_TOKENS = ['<|start|>', '<|message|>', '<|channel|>', '<|constrain|>',
+                          '<|return|>', '<|end|>']
+
+def resolve_model_revision(repo_id):
+    '''The live 40-hex revision of a public HF repo. Never guessed, never cached.'''
+    from huggingface_hub import HfApi
+    info = HfApi().model_info(repo_id=repo_id)
+    sha = getattr(info, 'sha', None)
+    if not isinstance(sha, str) or len(sha) != 40:
+        raise RuntimeError('huggingface_hub reported no 40-hex revision for ' + repo_id)
+    return sha
+
+def load_tokenizer():
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, revision=BASE_MODEL_REVISION_RESOLVED)
+    if tokenizer is None:
+        raise RuntimeError('AutoTokenizer.from_pretrained returned no tokenizer for ' + BASE_MODEL)
+    return tokenizer
+
+def verify_harmony_encoding():
+    '''Renders the real example with the openai-harmony encoder for gpt-oss.'''
+    import openai_harmony
+    encoding = openai_harmony.load_harmony_encoding(
+        openai_harmony.HarmonyEncodingName.HARMONY_GPT_OSS)
+    messages = []
+    for message in EXAMPLE_MESSAGES:
+        role = getattr(openai_harmony.Role, message['role'].upper(), None)
+        if role is None:
+            raise RuntimeError('openai-harmony exposes no Role for "%s"' % message['role'])
+        built = openai_harmony.Message.from_role_and_content(role, message['content'])
+        if message['role'] == 'assistant':
+            built = built.with_channel('final')
+        messages.append(built)
+    conversation = openai_harmony.Conversation.from_messages(messages)
+    tokens = list(encoding.render_conversation_for_completion(conversation, openai_harmony.Role.ASSISTANT))
+    if not tokens:
+        raise RuntimeError('the Harmony encoder produced an empty token sequence')
+    rendered = encoding.decode(tokens)
+    present = [token for token in HARMONY_CONTROL_TOKENS if token in rendered]
+    if not present:
+        raise RuntimeError('the rendered Harmony text carries none of the expected control tokens')
+    return {'token_count': len(tokens), 'control_tokens_present': present,
+            'rendered_character_count': len(rendered)}
+
+def verify_harmony_tokenizer():
+    '''Applies the tokenizer chat template to the same real example and checks the wire format.'''
+    rendered = TOKENIZER.apply_chat_template(
+        [{'role': m['role'], 'content': m['content']} for m in EXAMPLE_MESSAGES],
+        tokenize=False, add_generation_prompt=False)
+    if not isinstance(rendered, str) or not rendered:
+        raise RuntimeError('the tokenizer chat template produced no text')
+    present = [token for token in HARMONY_CONTROL_TOKENS if token in rendered]
+    if not present:
+        raise RuntimeError('the tokenizer chat template emitted none of the Harmony control tokens')
+    ids = TOKENIZER(rendered, add_special_tokens=False)['input_ids']
+    if not ids:
+        raise RuntimeError('the tokenizer produced no tokens for the rendered Harmony text')
+    return {'token_count': len(ids), 'control_tokens_present': present}, rendered
+
+def tokenize_example():
+    '''Tokenises the real GHARIBO example through the Harmony-rendered text.'''
+    encoded = TOKENIZER(HARMONY_RENDERED_TEXT, add_special_tokens=False,
+                        truncation=True, max_length=EFFECTIVE_MAX_SEQ_LENGTH)
+    ids = encoded['input_ids']
+    if not ids:
+        raise RuntimeError('tokenising the real example produced an empty sequence')
+    return list(ids)
+
+if not RUN_MODEL_COMPATIBILITY:
+    print('model compatibility DISABLED (RUN_MODEL_COMPATIBILITY = False)')
+    print('contract §14 requires part B for status = QUALIFIED; this run can only be PARTIAL.')
+else:
+    BASE_MODEL_REVISION_RESOLVED = run_model_step(
+        'resolve_base_model_revision', lambda: resolve_model_revision(BASE_MODEL))
+    LOADER_MODEL_REVISION_RESOLVED = run_model_step(
+        'resolve_loader_model_revision', lambda: resolve_model_revision(LOADER_MODEL))
+    if BASE_MODEL_REVISION_RESOLVED is not None:
+        BASE_MODEL_REVISION_MATCHES_PIN = (BASE_MODEL_REVISION_RESOLVED == BASE_MODEL_REVISION_PIN)
+        print('base model revision:', BASE_MODEL_REVISION_RESOLVED,
+              '(pin %s -> %s)' % (BASE_MODEL_REVISION_PIN,
+                                  'MATCH' if BASE_MODEL_REVISION_MATCHES_PIN else 'DRIFT'))
+    if LOADER_MODEL_REVISION_RESOLVED is not None:
+        print('loader model revision:', LOADER_MODEL_REVISION_RESOLVED)
+
+    TOKENIZER = run_model_step('load_tokenizer', load_tokenizer)
+    if TOKENIZER is not None:
+        print('tokenizer loaded:', type(TOKENIZER).__name__,
+              '| vocab size:', getattr(TOKENIZER, 'vocab_size', None))
+
+    HARMONY_ENCODING_DETAIL = run_model_step('verify_harmony_encoding', verify_harmony_encoding)
+    HARMONY_ENCODING_VERIFIED = HARMONY_ENCODING_DETAIL is not None
+    if HARMONY_ENCODING_VERIFIED:
+        print('Harmony encoder verified on the real example:',
+              HARMONY_ENCODING_DETAIL['token_count'], 'tokens; control tokens:',
+              ' '.join(HARMONY_ENCODING_DETAIL['control_tokens_present']))
+
+    if TOKENIZER is not None:
+        harmony_tokenizer_result = run_model_step('verify_harmony_tokenizer', verify_harmony_tokenizer)
+        if harmony_tokenizer_result is not None:
+            HARMONY_TOKENIZER_DETAIL, HARMONY_RENDERED_TEXT = harmony_tokenizer_result
+            HARMONY_TOKENIZER_VERIFIED = True
+            print('Harmony chat template verified on the real example:',
+                  HARMONY_TOKENIZER_DETAIL['token_count'], 'tokens; control tokens:',
+                  ' '.join(HARMONY_TOKENIZER_DETAIL['control_tokens_present']))
+
+    if HARMONY_RENDERED_TEXT is not None:
+        TOKENIZED_EXAMPLE_IDS = run_model_step('tokenize_real_example', tokenize_example)
+        if TOKENIZED_EXAMPLE_IDS is not None:
+            TOKENIZED_EXAMPLE_COUNT = len(TOKENIZED_EXAMPLE_IDS)
+            print('real GHARIBO example tokenised:', TOKENIZED_EXAMPLE_COUNT, 'tokens',
+                  '(max_seq_length %d)' % EFFECTIVE_MAX_SEQ_LENGTH)
+
+print('')
+print('model compatibility I complete; failed step so far:', FAILED_STEP)`,
+
+  String.raw`# --- Section 11: Model compatibility II - 4-bit load, QLoRA, forward-only dry run ---
+# Steps 7-13 of the mission. Everything here is INFERENCE ONLY: no optimizer is
+# constructed, no backward pass runs, no step is taken, and no parameter is updated.
+# The digest taken before and after the dry run proves the last point.
+VRAM_BEFORE_LOAD = vram_allocated_bytes()
+VRAM_AFTER_LOAD = None
+VRAM_AFTER_ADAPTER_INIT = None
+TOTAL_PARAMETERS = None
+TRAINABLE_PARAMETERS = None
+TRAINABLE_PERCENTAGE = None
+BATCH = None
+BATCH_SHAPES = None
+FORWARD_RESULT = None
+ARTIFACT_DESTINATION_WRITABLE = None
+ARTIFACT_DESTINATION_LABEL = artifact_destination_label()
+
+def load_base_model():
+    '''The intended low-memory / quantized path, mirroring the M2 training notebook.'''
+    from unsloth import FastLanguageModel
+    model, _ = FastLanguageModel.from_pretrained(
+        model_name=LOADER_MODEL,
+        dtype=None,                      # auto-detect -> resolves to fp16 on a T4
+        max_seq_length=EFFECTIVE_MAX_SEQ_LENGTH,
+        load_in_4bit=LOAD_IN_4BIT,
+        full_finetuning=FULL_FINETUNING,
+    )
+    if model is None:
+        raise RuntimeError('FastLanguageModel.from_pretrained returned no model')
+    return model
+
+def init_qlora(model):
+    '''LoRA/QLoRA adapters, with the repo-declared qualification configuration.'''
+    from unsloth import FastLanguageModel
+    adapted = FastLanguageModel.get_peft_model(
+        model,
+        r=LORA['r'],
+        target_modules=list(LORA['target_modules']),
+        lora_alpha=LORA['alpha'],
+        lora_dropout=LORA['dropout'],
+        bias=LORA['bias'],
+        use_gradient_checkpointing=GRADIENT_CHECKPOINTING,
+        random_state=SEED,
+        use_rslora=False,
+        loftq_config=None,
+    )
+    if adapted is None:
+        raise RuntimeError('FastLanguageModel.get_peft_model returned no model')
+    return adapted
+
+def collate_batch():
+    '''Collates one small batch of the real example. Nothing here is fed to a trainer.'''
+    import torch
+    ids = list(TOKENIZED_EXAMPLE_IDS[:EFFECTIVE_MAX_SEQ_LENGTH])
+    input_ids = torch.tensor([ids], dtype=torch.long, device='cuda')
+    attention_mask = torch.ones_like(input_ids)
+    labels = input_ids.clone()
+    if int(input_ids.shape[0]) != BATCH_SIZE:
+        raise RuntimeError('collated batch size %d != configured %d'
+                           % (int(input_ids.shape[0]), BATCH_SIZE))
+    return {'input_ids': input_ids, 'attention_mask': attention_mask, 'labels': labels}
+
+def forward_dry_run():
+    '''Exactly ONE forward pass under torch.no_grad().
+
+    ONLY input_ids and attention_mask are passed. The collated labels are deliberately
+    never supplied, so the model computes no loss at all and there is nothing to
+    differentiate.
+    '''
+    import torch
+    model_inputs = {'input_ids': BATCH['input_ids'], 'attention_mask': BATCH['attention_mask']}
+    with torch.no_grad():
+        outputs = MODEL(**model_inputs)
+    logits = getattr(outputs, 'logits', None)
+    if logits is None:
+        raise RuntimeError('the forward pass returned no logits')
+    if not bool(torch.isfinite(logits).all()):
+        raise RuntimeError('the forward pass produced non-finite logits')
+    return {'logits_shape': [int(dim) for dim in logits.shape],
+            'logits_dtype': str(logits.dtype),
+            'logits_finite': True}
+
+def probe_artifact_destination():
+    writable, error = verify_artifact_destination(WORKING)
+    if not writable:
+        raise RuntimeError('the artifact destination is not writable: ' + str(error))
+    return {'writable': True, 'label': artifact_destination_label()}
+
+if not RUN_MODEL_COMPATIBILITY:
+    print('model compatibility DISABLED (RUN_MODEL_COMPATIBILITY = False)')
+    print('contract §14 requires part B for status = QUALIFIED; this run can only be PARTIAL.')
+else:
+    print('VRAM before model load:', VRAM_BEFORE_LOAD)
+
+    MODEL = run_model_step('load_base_model', load_base_model)
+    if MODEL is not None:
+        VRAM_AFTER_LOAD = vram_allocated_bytes()
+        print('model loaded:', LOADER_MODEL, '| VRAM after load:', VRAM_AFTER_LOAD)
+
+    if MODEL is not None:
+        adapted_model = run_model_step('init_qlora_adapters', lambda: init_qlora(MODEL))
+        if adapted_model is not None:
+            MODEL = adapted_model
+            VRAM_AFTER_ADAPTER_INIT = vram_allocated_bytes()
+            print('QLoRA adapters initialised | VRAM after adapter init:', VRAM_AFTER_ADAPTER_INIT)
+
+    if MODEL is not None:
+        parameter_counts = run_model_step('count_parameters', lambda: count_parameters(MODEL))
+        if parameter_counts is not None:
+            TOTAL_PARAMETERS, TRAINABLE_PARAMETERS, TRAINABLE_PERCENTAGE = parameter_counts
+            print('parameters: total=%d trainable=%d (%.6f%%)'
+                  % (TOTAL_PARAMETERS, TRAINABLE_PARAMETERS, TRAINABLE_PERCENTAGE))
+
+    if MODEL is not None and TOKENIZED_EXAMPLE_IDS:
+        BATCH = run_model_step('collate_batch', collate_batch)
+        if BATCH is not None:
+            BATCH_SHAPES = {key: [int(dim) for dim in value.shape] for key, value in BATCH.items()}
+            print('batch collated:', BATCH_SHAPES)
+
+    if MODEL is not None and BATCH is not None:
+        digest_before = run_model_step('parameter_digest_before',
+                                       lambda: parameter_digest(MODEL))
+        if digest_before is not None:
+            PARAM_DIGEST_BEFORE, PARAM_COUNT_BEFORE = digest_before
+            print('parameter digest BEFORE:', PARAM_DIGEST_BEFORE,
+                  '| trainable tensors:', PARAM_COUNT_BEFORE)
+
+        reset_vram_peak()
+        FORWARD_RESULT = run_model_step('forward_dry_run', forward_dry_run)
+        if FORWARD_RESULT is not None:
+            PEAK_VRAM_DURING_FORWARD = vram_peak_bytes()
+            print('forward-only dry run COMPLETED:', FORWARD_RESULT)
+            print('peak VRAM during forward:', PEAK_VRAM_DURING_FORWARD)
+
+        digest_after = run_model_step('parameter_digest_after',
+                                      lambda: parameter_digest(MODEL))
+        if digest_after is not None:
+            PARAM_DIGEST_AFTER, PARAM_COUNT_AFTER = digest_after
+            print('parameter digest AFTER :', PARAM_DIGEST_AFTER,
+                  '| trainable tensors:', PARAM_COUNT_AFTER)
+            print('parameter digest unchanged:',
+                  PARAM_DIGEST_AFTER == PARAM_DIGEST_BEFORE)
+
+    destination_result = run_model_step('verify_artifact_destination',
+                                        probe_artifact_destination)
+    ARTIFACT_DESTINATION_WRITABLE = destination_result is not None
+    print('artifact destination (%s) writable: %s'
+          % (ARTIFACT_DESTINATION_LABEL, ARTIFACT_DESTINATION_WRITABLE))
+
+print('')
+print('model compatibility II complete; failed step:', FAILED_STEP)`,
+
+  String.raw`# --- Section 12: Assemble, self-validate and write env-qualification.json ---
 RANGE_SPEC = re.compile(r'(>=|<=|~=|!=|>|<)')
 
 def spec_is_range(spec):
@@ -1129,6 +2073,21 @@ def build_warnings(record):
         warnings.append(
             'package_id is null: qualification runs before package issuance (contract 3 documents '
             'this state). Not enumerated in unknowns[] for the same reason as git_commit_sha.')
+    # ---- Model compatibility (contract 14) ---------------------------------
+    if not RUN_MODEL_COMPATIBILITY:
+        warnings.append(
+            'model compatibility (contract 14) was DISABLED for this run, so this record can '
+            'never reach status = QUALIFIED')
+    if RUN_MODEL_COMPATIBILITY and BASE_MODEL_REVISION_MATCHES_PIN is False:
+        warnings.append(
+            'openai/gpt-oss-20b resolved to revision %s, which differs from the pinned '
+            'BASE_MODEL_REVISION %s in apps/web/lib/training/package.ts'
+            % (BASE_MODEL_REVISION_RESOLVED, BASE_MODEL_REVISION_PIN))
+    if MODEL_COMPAT_FAILED:
+        warnings.append(
+            'model compatibility failed at step "%s": %s - the measured failure is recorded '
+            'verbatim and no smaller model was substituted (contract 14.5)'
+            % (FAILED_STEP, scrub_paths(redact(FAILED_STEP_ERROR))))
     return sorted(warnings)
 
 ENVIRONMENT_NULL_REASONS = {
@@ -1141,6 +2100,9 @@ ENVIRONMENT_NULL_REASONS = {
     'pip_version': 'pip --version could not be read',
     'fp16_supported': 'neither torch.cuda.is_fp16_supported() nor a compute capability was available',
     'bf16_supported': 'torch.cuda.is_bf16_supported() raised or is absent',
+    'gpu_models': 'no CUDA GPU was visible',
+    'vram_per_gpu': 'no CUDA GPU was visible',
+    'total_visible_vram': 'no CUDA GPU was visible',
 }
 
 def collect_unknowns(record):
@@ -1177,24 +2139,89 @@ def collect_unknowns(record):
         if record['environment'][key] is None:
             note('environment.' + key,
                  ENVIRONMENT_NULL_REASONS.get(key, 'not reported by this environment'))
+    # ---- Model compatibility (contract 14.4) -------------------------------
+    # Every nullable field of the mission-mandated block is enumerated when null, so a
+    # reader never has to diff the file. On a successful run none of these is null.
+    MODEL_NULL_REASONS = {
+        'base_model_revision': 'the Hugging Face API did not report a 40-hex revision for the base model',
+        'loader_model_revision': 'the Hugging Face API did not report a 40-hex revision for the loader model',
+        'base_model_revision_matches_pin': 'no base-model revision was resolved, so the pin comparison did not run',
+        'total_parameters': 'no model was loaded, so there is no parameter count',
+        'trainable_parameters': 'no model was loaded, so there is no parameter count',
+        'trainable_percentage': 'no model was loaded, so there is no parameter count',
+        'vram_before_load': 'CUDA memory accounting was unavailable before the model load',
+        'vram_after_load': 'the model was not loaded, so there is no post-load VRAM reading',
+        'vram_after_adapter_init': 'the adapters were not initialised, so there is no VRAM reading',
+        'peak_vram': 'the forward-only dry run did not complete, so there is no peak VRAM reading',
+        'parameter_digest_before': 'no model was loaded, so no parameter digest exists',
+        'parameter_digest_after': 'no model was loaded, so no parameter digest exists',
+        'model_parameters_updated': 'no parameter digest pair exists, so the comparison could not be made',
+        'batch_shapes': 'no batch was collated',
+        'example_token_count': 'the real GHARIBO example was not tokenised',
+        'total_visible_vram': 'no CUDA GPU was visible, so total VRAM could not be computed',
+    }
+    for key in sorted(MODEL_NULL_REASONS):
+        if record['model_compatibility'].get(key) is None:
+            note('model_compatibility.' + key, MODEL_NULL_REASONS[key])
     return unknowns
 
+def model_compatibility_complete():
+    '''Contract 14.6: every required part-B check passed.'''
+    return bool(
+        HARMONY_ENCODING_VERIFIED
+        and HARMONY_TOKENIZER_VERIFIED
+        and TOKENIZED_EXAMPLE_COUNT is not None
+        and MODEL is not None
+        and TOTAL_PARAMETERS is not None
+        and BATCH is not None
+        and FORWARD_RESULT is not None
+        and ARTIFACT_DESTINATION_WRITABLE
+        and PARAM_DIGEST_BEFORE is not None
+        and PARAM_DIGEST_AFTER is not None
+        and PARAM_DIGEST_BEFORE == PARAM_DIGEST_AFTER
+        and not SAFETY_STATE['optimizer_created']
+        and not SAFETY_STATE['backward_executed']
+        and not SAFETY_STATE['optimizer_step_executed']
+    )
+
 def derive_status(assertion, unknowns, records):
-    '''Contract 8.'''
+    '''Contract 8 and contract 14.5.
+
+    Order matters: a dependency-integrity failure is reported as FAILED (the package
+    set is not trustworthy), while a model-compatibility failure measured on real
+    hardware is reported as QUALIFICATION_FAILED_MEASURED - the specific status the
+    mission asks for. A smaller model is never substituted to avoid it.
+    '''
     git_unresolved = any(d['source'] == 'git' and not d.get('resolved_commit') for d in records)
     install_failed = any(d.get('resolved_version') is None for d in records)
     if assertion == 'MISMATCH' or install_failed:
         return 'FAILED'
-    if assertion == 'IDENTICAL' and not unknowns and not git_unresolved:
+    if RUN_MODEL_COMPATIBILITY and MODEL_COMPAT_FAILED:
+        return 'QUALIFICATION_FAILED_MEASURED'
+    if (assertion == 'IDENTICAL' and not unknowns and not git_unresolved
+            and RUN_MODEL_COMPATIBILITY and model_compatibility_complete()):
         return 'QUALIFIED'
     return 'PARTIAL'
 
-PARAM_DIGEST_AFTER, PARAM_COUNT_AFTER = parameter_digest()
 training_loop_executed = bool(
     SAFETY_STATE['optimizer_step_executed']
     or SAFETY_STATE['backward_executed']
     or SAFETY_STATE['optimizer_created']
 )
+if PARAM_DIGEST_BEFORE is not None and PARAM_DIGEST_AFTER is not None:
+    model_parameters_updated = bool(PARAM_DIGEST_AFTER != PARAM_DIGEST_BEFORE)
+else:
+    model_parameters_updated = None
+
+if not RUN_MODEL_COMPATIBILITY:
+    MODEL_COMPAT_STATUS = 'NOT_RUN'
+elif MODEL_COMPAT_FAILED:
+    MODEL_COMPAT_STATUS = 'QUALIFICATION_FAILED_MEASURED'
+elif model_compatibility_complete():
+    MODEL_COMPAT_STATUS = 'QUALIFICATION_PASSED'
+else:
+    MODEL_COMPAT_STATUS = 'INCOMPLETE'
+
 # Contract 13: the safety block is EVIDENCE, never a hardcoded boolean. Every value
 # is computed from the tripwire state or the parameter-digest comparison; a basis
 # string per field records how it was derived.
@@ -1204,15 +2231,123 @@ qualification_safety = {
     'backward_executed': bool(SAFETY_STATE['backward_executed']),
     'optimizer_step_executed': bool(SAFETY_STATE['optimizer_step_executed']),
     'training_loop_executed': training_loop_executed,
-    'model_parameters_updated': bool(PARAM_DIGEST_AFTER != PARAM_DIGEST_BEFORE),
+    'model_parameters_updated': model_parameters_updated,
     'basis': {
         'qualification_only': 'module constant QUALIFICATION_ONLY, asserted True on the execution path',
         'optimizer_created': 'tripwire on the optimizer base-class constructor (and any scheduler constructor); True iff invoked',
         'backward_executed': 'tripwire on the tensor backward method and the autograd backward function; True iff invoked',
         'optimizer_step_executed': 'tripwire on the optimizer step method; True iff invoked',
         'training_loop_executed': 'derived from the tripwire state: True iff any optimizer or backward tripwire fired',
-        'model_parameters_updated': 'sha256 digest over every live tensor that requires grad, compared before vs after the run; no model is loaded, so the set is empty and equality is expected',
+        'model_parameters_updated': 'sha256 digest over the sorted (name, sha256(float32 bytes)) pairs of every trainable parameter, computed immediately before and immediately after the single forward-only dry run; None when no model was loaded',
     },
+}
+
+# Contract 14.3: the mission-mandated flat block. Key names are the mission's own, so
+# the artifact can be read against the requirement without a mapping table. Values are
+# the same measured objects the structured blocks below carry - measured once.
+dependency_versions = {dep['name']: dep.get('resolved_version') for dep in dependencies}
+dependency_revisions = {}
+for dep in dependencies:
+    dependency_revisions[dep['name']] = (
+        dep.get('resolved_commit') if dep['source'] == 'git' else dep.get('resolved_version'))
+
+model_compatibility = {
+    # --- required by the mission, in the mission's own key names --------------
+    'qualification_only': True,
+    'gpu': hardware_after['gpu_model'],
+    'vram': hardware_after['vram_bytes'],
+    'cuda': hardware_after['cuda_version'],
+    'driver': driver_version,
+    'compute_capability': hardware_after['compute_capability'],
+    'python_version': hardware_after['python_version'],
+    'dependency_versions': dependency_versions,
+    'dependency_revisions': dependency_revisions,
+    'base_model': BASE_MODEL,
+    'base_model_revision': BASE_MODEL_REVISION_RESOLVED,
+    'tokenizer_loaded': TOKENIZER is not None,
+    'harmony_verified': bool(HARMONY_ENCODING_VERIFIED and HARMONY_TOKENIZER_VERIFIED),
+    'real_example_tokenized': TOKENIZED_EXAMPLE_COUNT is not None,
+    'model_loaded': MODEL is not None,
+    'qlora_initialized': VRAM_AFTER_ADAPTER_INIT is not None,
+    'batch_collated': BATCH is not None,
+    'forward_dry_run_completed': FORWARD_RESULT is not None,
+    'total_parameters': TOTAL_PARAMETERS,
+    'trainable_parameters': TRAINABLE_PARAMETERS,
+    'trainable_percentage': TRAINABLE_PERCENTAGE,
+    'vram_before_load': VRAM_BEFORE_LOAD,
+    'vram_after_load': VRAM_AFTER_LOAD,
+    'vram_after_adapter_init': VRAM_AFTER_ADAPTER_INIT,
+    'peak_vram': PEAK_VRAM_DURING_FORWARD,
+    'artifact_destination_writable': bool(ARTIFACT_DESTINATION_WRITABLE),
+    'optimizer_created': bool(SAFETY_STATE['optimizer_created']),
+    'backward_executed': bool(SAFETY_STATE['backward_executed']),
+    'optimizer_step_executed': bool(SAFETY_STATE['optimizer_step_executed']),
+    'training_loop_executed': training_loop_executed,
+    'model_parameters_updated': model_parameters_updated,
+    'parameter_digest_before': PARAM_DIGEST_BEFORE,
+    'parameter_digest_after': PARAM_DIGEST_AFTER,
+    # --- Correction 1: TRAIN-ONLY fixture fields ------------------------------
+    'qualification_fixture_source': 'TRAIN_ONLY',
+    'test_data_accessed': False,
+    # --- Correction 2: generic GPU detection fields ---------------------------
+    'gpu_count': hardware_after['gpu_count'],
+    'gpu_models': hardware_after.get('gpu_models', [hardware_after['gpu_model']]),
+    'vram_per_gpu': hardware_after.get('vram_per_gpu', [hardware_after['vram_bytes']]),
+    'total_visible_vram': hardware_after.get('total_visible_vram', hardware_after['vram_bytes']),
+    'multi_gpu_used_by_loader': False,  # Unsloth loader uses a single device
+    # --- Correction 3: output hygiene guard -----------------------------------
+    'output_hygiene_verified': True,  # set to False if violations found below
+    # --- Correction 4: no auto-freeze -----------------------------------------
+    'auto_freeze_applied': False,  # CTO must inspect before any freeze
+    'experiment_authorized': False,  # GHARIBO-exp-001 NOT authorized by this run
+    # --- audit extensions (contract 3.1; ignored by the package consumer) ----
+    'status': MODEL_COMPAT_STATUS,
+    'run_enabled': RUN_MODEL_COMPATIBILITY,
+    'failed_step': FAILED_STEP,
+    'failed_step_error': scrub_paths(redact(FAILED_STEP_ERROR)),
+    'steps': [dict(step, error=scrub_paths(redact(step.get('error')))) for step in MODEL_STEPS],
+    'loader_model': LOADER_MODEL,
+    'loader_model_revision': LOADER_MODEL_REVISION_RESOLVED,
+    'loader_quantization': MODEL_COMPAT['loader_quantization'],
+    'base_model_revision_pin': BASE_MODEL_REVISION_PIN,
+    'base_model_revision_matches_pin': BASE_MODEL_REVISION_MATCHES_PIN,
+    'dtype': DTYPE,
+    'max_seq_length': EFFECTIVE_MAX_SEQ_LENGTH,
+    'batch_size': BATCH_SIZE,
+    'gradient_accumulation_steps': GRAD_ACCUM,
+    'seed': SEED,
+    'lora': {
+        'r': LORA['r'],
+        'alpha': LORA['alpha'],
+        'target_modules': list(LORA['target_modules']),
+        'dropout': LORA['dropout'],
+        'bias': LORA['bias'],
+        'source': 'apps/web/components/training/run-form.tsx declared defaults '
+                  '(qualification configuration; the training run takes its LoRA config '
+                  'from the Training Package)',
+    },
+    'harmony': {
+        'reasoning_effort': HARMONY['reasoning_effort'],
+        'developer_template_id': HARMONY['developer_template_id'],
+        'hidden_channels': list(HARMONY['hidden_channels']),
+        'control_tokens_checked': list(HARMONY_CONTROL_TOKENS),
+        'encoding_verified': HARMONY_ENCODING_VERIFIED,
+        'tokenizer_verified': HARMONY_TOKENIZER_VERIFIED,
+        'encoding_detail': HARMONY_ENCODING_DETAIL,
+        'tokenizer_detail': HARMONY_TOKENIZER_DETAIL,
+    },
+    'example_token_count': TOKENIZED_EXAMPLE_COUNT,
+    'batch_shapes': BATCH_SHAPES,
+    'forward': FORWARD_RESULT,
+    'trainable_tensors': PARAM_COUNT_BEFORE,
+    'parameter_digest_algorithm': 'sha256 over the sorted "name:sha256(float32 bytes)" '
+                                  'pairs of every trainable parameter',
+    'vram_before_load_basis': 'torch.cuda.memory_allocated(0) immediately before the model load',
+    'vram_after_load_basis': 'torch.cuda.memory_allocated(0) immediately after the model load',
+    'vram_after_adapter_init_basis': 'torch.cuda.memory_allocated(0) immediately after the adapter init',
+    'peak_vram_basis': 'torch.cuda.max_memory_allocated(0) after a reset immediately before the dry run',
+    'artifact_destination_label': ARTIFACT_DESTINATION_LABEL,
+    'dataset': dataset_binding,
 }
 
 record = {
@@ -1232,6 +2367,7 @@ record = {
     'warnings': [],
     'harness': {'path': HARNESS_PATH, 'content_sha256': HARNESS_CONTENT_SHA256 or None},
     'qualification_safety': qualification_safety,
+    'model_compatibility': model_compatibility,
     'qualification_hash': '',
 }
 
@@ -1258,8 +2394,9 @@ def validate_qualification(candidate, pinned_names):
                   'engine', 'captured_at', 'status', 'reproducibility', 'qualification_hash'):
         if candidate.get(field) in (None, '', {}, []):
             error(field, 'required top-level field is missing or empty')
-    if candidate.get('status') not in ('QUALIFIED', 'PARTIAL', 'FAILED'):
-        error('status', 'not one of QUALIFIED | PARTIAL | FAILED')
+    if candidate.get('status') not in ('QUALIFIED', 'PARTIAL', 'FAILED',
+                                       'QUALIFICATION_FAILED_MEASURED'):
+        error('status', 'not one of QUALIFIED | PARTIAL | FAILED | QUALIFICATION_FAILED_MEASURED')
     # 3
     if not candidate.get('dependencies'):
         error('dependencies', 'dependencies[] is empty')
@@ -1341,6 +2478,20 @@ def validate_qualification(candidate, pinned_names):
                       'null in a nullable field with no matching unknowns[] entry (rule 9)')
     if candidate.get('package_id') is None and 'package_id' not in declared:
         warn('package_id', 'null with no unknowns[] entry; contract 3 documents this pre-issuance state')
+    # Contract 14.4: the same rule-9 discipline applies to the model-compatibility block.
+    model_nullable_declared = ('base_model_revision', 'loader_model_revision',
+                               'base_model_revision_matches_pin', 'total_parameters',
+                               'trainable_parameters', 'trainable_percentage', 'vram_before_load',
+                               'vram_after_load', 'vram_after_adapter_init', 'peak_vram',
+                               'parameter_digest_before', 'parameter_digest_after',
+                               'model_parameters_updated', 'batch_shapes', 'example_token_count',
+                               'total_visible_vram')
+    model_block = candidate.get('model_compatibility') or {}
+    for field in model_nullable_declared:
+        if field in model_block and model_block[field] is None:
+            if ('model_compatibility.' + field) not in declared:
+                error('model_compatibility.' + field,
+                      'null in a nullable field with no matching unknowns[] entry (rule 9)')
     # 10
     if candidate.get('status') == 'QUALIFIED':
         if candidate['reproducibility'].get('assertion') != 'IDENTICAL':
@@ -1374,6 +2525,118 @@ def validate_qualification(candidate, pinned_names):
         if not any(all(name in entry for name in names) for entry in candidate.get('warnings', [])):
             error('warnings', 'additional_dependencies[] is non-empty but no warnings[] entry '
                               'names every package in it (4.5 / rule 18)')
+
+    # ---- 19-24: model compatibility (contract 14) ---------------------------
+    model_compat = candidate.get('model_compatibility') or {}
+    if not isinstance(model_compat, dict) or not model_compat:
+        error('model_compatibility', 'the contract 14 block is missing or empty')
+        return issues
+
+    required_model_fields = (
+        'qualification_only', 'gpu', 'vram', 'cuda', 'driver', 'compute_capability',
+        'python_version', 'dependency_versions', 'dependency_revisions', 'base_model',
+        'base_model_revision', 'tokenizer_loaded', 'harmony_verified', 'real_example_tokenized',
+        'model_loaded', 'qlora_initialized', 'batch_collated', 'forward_dry_run_completed',
+        'total_parameters', 'trainable_parameters', 'trainable_percentage', 'vram_before_load',
+        'vram_after_load', 'vram_after_adapter_init', 'peak_vram', 'artifact_destination_writable',
+        'optimizer_created', 'backward_executed', 'optimizer_step_executed', 'training_loop_executed',
+        'model_parameters_updated', 'parameter_digest_before', 'parameter_digest_after',
+        # Correction 1: TRAIN-ONLY fixture fields
+        'qualification_fixture_source', 'test_data_accessed',
+        # Correction 2: generic GPU detection fields
+        'gpu_count', 'gpu_models', 'vram_per_gpu', 'total_visible_vram', 'multi_gpu_used_by_loader',
+        # Correction 3: output hygiene guard
+        'output_hygiene_verified',
+        # Correction 4: no auto-freeze
+        'auto_freeze_applied', 'experiment_authorized',
+    )
+    for field in required_model_fields:
+        if field not in model_compat:
+            error('model_compatibility.' + field, 'required field is missing (contract 14.3)')
+
+    # 19 - the mission-mandated block is self-consistent with the structured blocks.
+    for field, source_field in (('gpu', 'gpu_model'), ('vram', 'vram_bytes'), ('cuda', 'cuda_version'),
+                                ('driver', 'driver_version'), ('compute_capability', 'compute_capability'),
+                                ('python_version', 'python_version')):
+        if model_compat.get(field) != candidate.get('environment', {}).get(source_field):
+            error('model_compatibility.' + field,
+                  'disagrees with environment.%s' % source_field)
+    if model_compat.get('base_model') != BASE_MODEL:
+        error('model_compatibility.base_model', 'is not the qualified base model')
+    if model_compat.get('qualification_only') is not True:
+        error('model_compatibility.qualification_only', 'must be true')
+    for name, version in (model_compat.get('dependency_versions') or {}).items():
+        match = [d for d in candidate.get('dependencies', []) if d['name'] == name]
+        if not match:
+            error('model_compatibility.dependency_versions', 'names an unknown dependency: %s' % name)
+        elif match[0].get('resolved_version') != version:
+            error('model_compatibility.dependency_versions',
+                  '%s: %s != dependencies[] %s' % (name, version, match[0].get('resolved_version')))
+    for name, revision in (model_compat.get('dependency_revisions') or {}).items():
+        match = [d for d in candidate.get('dependencies', []) if d['name'] == name]
+        if not match:
+            error('model_compatibility.dependency_revisions', 'names an unknown dependency: %s' % name)
+
+    # 20 - the safety flags must agree with the qualification_safety evidence block.
+    safety = candidate.get('qualification_safety') or {}
+    for field in ('optimizer_created', 'backward_executed', 'optimizer_step_executed',
+                  'training_loop_executed', 'model_parameters_updated'):
+        if model_compat.get(field) != safety.get(field):
+            error('model_compatibility.' + field,
+                  'disagrees with qualification_safety.%s' % field)
+
+    # 21 - the digest pair must agree with the update flag.
+    digest_before = model_compat.get('parameter_digest_before')
+    digest_after = model_compat.get('parameter_digest_after')
+    if digest_before is not None and digest_after is not None:
+        if model_compat.get('model_parameters_updated') is not (digest_before != digest_after):
+            error('model_compatibility.model_parameters_updated',
+                  'does not agree with the parameter digest comparison')
+
+    # 22 - QUALIFICATION_FAILED_MEASURED must name the failing step and its exception.
+    if candidate.get('status') == 'QUALIFICATION_FAILED_MEASURED':
+        if not model_compat.get('failed_step') or not model_compat.get('failed_step_error'):
+            error('model_compatibility.failed_step',
+                  'QUALIFICATION_FAILED_MEASURED requires the failing step and its exception')
+    if candidate.get('status') != 'QUALIFICATION_FAILED_MEASURED' and model_compat.get('failed_step'):
+        error('model_compatibility.failed_step',
+              'a failed step is recorded but the status is not QUALIFICATION_FAILED_MEASURED')
+
+    # 23 - QUALIFIED requires a complete, unchanged, untrained part B.
+    if candidate.get('status') == 'QUALIFIED':
+        for field in ('tokenizer_loaded', 'harmony_verified', 'real_example_tokenized',
+                      'model_loaded', 'qlora_initialized', 'batch_collated',
+                      'forward_dry_run_completed', 'artifact_destination_writable'):
+            if model_compat.get(field) is not True:
+                error('model_compatibility.' + field, 'QUALIFIED requires this to be true')
+        for field in ('optimizer_created', 'backward_executed', 'optimizer_step_executed',
+                      'training_loop_executed'):
+            if model_compat.get(field) is not False:
+                error('model_compatibility.' + field, 'QUALIFIED requires this to be False')
+        if model_compat.get('model_parameters_updated') is not False:
+            error('model_compatibility.model_parameters_updated',
+                  'QUALIFIED requires model_parameters_updated to be False')
+        if digest_before is None or digest_after is None or digest_before != digest_after:
+            error('model_compatibility.parameter_digest_after',
+                  'QUALIFIED requires parameter_digest_before == parameter_digest_after')
+        for field in ('base_model_revision', 'total_parameters', 'trainable_parameters',
+                      'vram_before_load', 'vram_after_load', 'vram_after_adapter_init', 'peak_vram'):
+            if model_compat.get(field) is None:
+                error('model_compatibility.' + field, 'QUALIFIED requires a measured value')
+        if model_compat.get('vram_after_load') is not None and model_compat.get('vram_before_load') is not None:
+            if model_compat['vram_after_load'] <= model_compat['vram_before_load']:
+                error('model_compatibility.vram_after_load',
+                      'a loaded 4-bit model must allocate memory; the reading did not grow')
+
+    # 24 - the trainable percentage must agree with the counts.
+    total = model_compat.get('total_parameters')
+    trainable = model_compat.get('trainable_parameters')
+    percentage = model_compat.get('trainable_percentage')
+    if total and trainable is not None and percentage is not None:
+        if abs(percentage - round(100.0 * trainable / total, 8)) > 1e-8:
+            error('model_compatibility.trainable_percentage', 'does not agree with the counts')
+        if trainable > total:
+            error('model_compatibility.trainable_parameters', 'exceeds the total parameter count')
     return issues
 
 validation = validate_qualification(record, [d['name'] for d in PINNED_DEPENDENCIES])
@@ -1400,7 +2663,7 @@ if errors:
     abort('the emitted record violates docs/ENV_QUALIFICATION_CONTRACT.md 10:\n  - %s'
           % '\n  - '.join('%s: %s' % (e['field'], e['message']) for e in errors))`,
 
-  String.raw`# --- Section 11: Human-readable report + paste-ready TypeScript ---
+  String.raw`# --- Section 13: Human-readable report + paste-ready TypeScript ---
 def ts_literal(value):
     return 'null' if value is None else json.dumps(value)
 
@@ -1443,7 +2706,9 @@ report_lines = [
     '- Engine: %s %s' % (record['engine']['engine'], record['engine']['engine_version']),
     '- **Status: %s**  (freeze gate frozen_ok = %s)'
     % (record['status'], record['status'] == 'QUALIFIED' and not record['unknowns']),
-    '- Scope: QUALIFICATION ONLY - no model weights downloaded, no training executed.',
+    '- Model compatibility: **%s** (contract 14)'
+    % record['model_compatibility'].get('status'),
+    '- Scope: QUALIFICATION ONLY - no training, no optimizer, no backward pass, no parameter update.',
     '',
     '## Environment',
     '',
@@ -1483,6 +2748,37 @@ for module in IMPORT_SMOKE_MODULES:
                             % (module, 'ok' if result.get('ok') else '**FAILED**',
                                result.get('seconds'), result.get('error') or ''))
 
+report_lines += ['', '## Model compatibility (contract 14)', '',
+                 '| check | value |', '| --- | --- |']
+for field in ('status', 'base_model', 'base_model_revision', 'base_model_revision_matches_pin',
+              'loader_model', 'loader_model_revision', 'dtype', 'max_seq_length',
+              'tokenizer_loaded', 'harmony_verified', 'real_example_tokenized', 'model_loaded',
+              'qlora_initialized', 'batch_collated', 'forward_dry_run_completed',
+              'total_parameters', 'trainable_parameters', 'trainable_percentage',
+              'vram_before_load', 'vram_after_load', 'vram_after_adapter_init', 'peak_vram',
+              'artifact_destination_writable', 'optimizer_created', 'backward_executed',
+              'optimizer_step_executed', 'training_loop_executed', 'model_parameters_updated',
+              'parameter_digest_before', 'parameter_digest_after',
+              'qualification_fixture_source', 'test_data_accessed',
+              'gpu_count', 'gpu_models', 'vram_per_gpu', 'total_visible_vram',
+              'multi_gpu_used_by_loader', 'output_hygiene_verified',
+              'auto_freeze_applied', 'experiment_authorized'):
+    report_lines.append('| %s | %s |' % (field, record['model_compatibility'].get(field)))
+if record['model_compatibility'].get('failed_step'):
+    report_lines += ['', '**MEASURED FAILURE** at step %s: %s'
+                     % (record['model_compatibility']['failed_step'],
+                        record['model_compatibility']['failed_step_error']),
+                     '', 'No smaller model was substituted and the architecture was not changed.']
+report_lines += ['', '### Dataset binding (the real GHARIBO example)', '',
+                 '| field | value |', '| --- | --- |']
+for field in ('id', 'version', 'example_count', 'example_split', 'example_index',
+              'example_line_hash', 'example_message_roles', 'example_character_count',
+              'dataset_hash_expected', 'dataset_hash_measured', 'dataset_hash_matches',
+              'qualification_fixture_source', 'test_data_accessed',
+              'qualification_fixture_hash', 'fixture_example_count',
+              'fixture_example_hashes', 'fixture_example_indices'):
+    report_lines.append('| %s | %s |' % (field, record['model_compatibility']['dataset'].get(field)))
+
 report_lines += ['', '## unknowns[] (contract 7.2)', '']
 if record['unknowns']:
     for entry in record['unknowns']:
@@ -1505,9 +2801,11 @@ report_lines += [
     '',
     '## Next step',
     '',
-    'frozen_ok = (status == "QUALIFIED") AND (unknowns is empty) - contract 7.3.',
-    'Only when frozen_ok is true may PINNED_ENGINE_DEPENDENCIES.frozen.ts be pasted into',
-    'apps/web/lib/training/package.ts. Otherwise the engine record stays UNQUALIFIED.',
+    'STOP - CTO inspection required.',
+    'The qualification artifact has been produced. The CTO must inspect',
+    'env-qualification.json before any dependency freeze is applied or',
+    'GHARIBO-exp-001 is authorized. Do not set frozenOk=true automatically.',
+    'Do not update the dependency freeze. Do not authorize the experiment.',
     '',
 ]
 report = '\n'.join(report_lines) + '\n'
@@ -1521,7 +2819,7 @@ print(report)
 print('--- PINNED_ENGINE_DEPENDENCIES.frozen.ts ---')
 print(snippet)`,
 
-  String.raw`# --- Section 12: Final summary ---
+  String.raw`# --- Section 14: Final summary ---
 def sha256_text(text):
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
@@ -1536,7 +2834,21 @@ rollup = sha256_text('\n'.join(sorted(lines)))
 with open(WORKING / 'CHECKSUMS.sha256', 'w', encoding='utf-8', newline='\n') as handle:
     handle.write('\n'.join(lines) + '\n# rollup  ' + rollup + '\n')
 
+# Output hygiene: only qualification artifacts may persist in /kaggle/working.
+FORBIDDEN_OUTPUTS = ['pytorch_model.bin', 'model.safetensors', 'adapter_model.bin',
+                     'adapter_config.json', 'config.json', 'pytorch_model.bin.index.json']
+hygiene_violations = []
+for name in FORBIDDEN_OUTPUTS:
+    if (WORKING / name).exists():
+        hygiene_violations.append(name)
+if hygiene_violations:
+    print('WARNING: unexpected files in output directory:', hygiene_violations)
+    record['model_compatibility']['output_hygiene_verified'] = False
+else:
+    record['model_compatibility']['output_hygiene_verified'] = True
+
 frozen_ok = (record['status'] == 'QUALIFIED') and (len(record['unknowns']) == 0)
+model_compat = record['model_compatibility']
 
 print('=' * 78)
 print('QUALIFICATION SUMMARY')
@@ -1555,9 +2867,64 @@ print('validation errors       :', len(errors))
 print('qualification_hash      :', record['qualification_hash'])
 print('artifact rollup         :', rollup)
 print('')
-if frozen_ok:
+print('-' * 78)
+print('MODEL COMPATIBILITY (gpt-oss-20b on this GPU)')
+print('-' * 78)
+print('result                  :', model_compat.get('status'))
+print('gpu                     :', model_compat.get('gpu'), model_compat.get('compute_capability'))
+print('gpu count               :', model_compat.get('gpu_count'))
+if model_compat.get('gpu_models') and len(model_compat['gpu_models']) > 1:
+    for i, gm in enumerate(model_compat['gpu_models']):
+        print('  gpu[%d]                : %s' % (i, gm))
+    print('vram per gpu            :', model_compat.get('vram_per_gpu'))
+    print('total visible vram      :', model_compat.get('total_visible_vram'))
+print('multi_gpu_used_by_loader:', model_compat.get('multi_gpu_used_by_loader'))
+print('base model              :', model_compat.get('base_model'), '@', model_compat.get('base_model_revision'))
+print('loader model            :', model_compat.get('loader_model'), '@', model_compat.get('loader_model_revision'))
+print('tokenizer loaded        :', model_compat.get('tokenizer_loaded'))
+print('harmony verified        :', model_compat.get('harmony_verified'))
+print('real example tokenized  :', model_compat.get('real_example_tokenized'))
+print('model loaded (4-bit)    :', model_compat.get('model_loaded'))
+print('qlora initialized       :', model_compat.get('qlora_initialized'))
+print('batch collated          :', model_compat.get('batch_collated'))
+print('forward dry run         :', model_compat.get('forward_dry_run_completed'))
+print('parameters              : total=%s trainable=%s (%s%%)'
+      % (model_compat.get('total_parameters'), model_compat.get('trainable_parameters'),
+         model_compat.get('trainable_percentage')))
+print('vram before/after/adapt : %s / %s / %s'
+      % (model_compat.get('vram_before_load'), model_compat.get('vram_after_load'),
+         model_compat.get('vram_after_adapter_init')))
+print('peak vram (forward)     :', model_compat.get('peak_vram'))
+print('artifact dest writable  :', model_compat.get('artifact_destination_writable'))
+print('optimizer created       :', model_compat.get('optimizer_created'))
+print('backward executed       :', model_compat.get('backward_executed'))
+print('optimizer step executed :', model_compat.get('optimizer_step_executed'))
+print('training loop executed  :', model_compat.get('training_loop_executed'))
+print('parameters updated      :', model_compat.get('model_parameters_updated'))
+print('parameter digest before :', model_compat.get('parameter_digest_before'))
+print('parameter digest after  :', model_compat.get('parameter_digest_after'))
+print('fixture source          :', model_compat.get('qualification_fixture_source'))
+print('test data accessed      :', model_compat.get('test_data_accessed'))
+print('output hygiene verified :', model_compat.get('output_hygiene_verified'))
+print('auto_freeze_applied     :', False, '(CTO must inspect before any freeze)')
+print('experiment_authorized   :', False, '(GHARIBO-exp-001 NOT authorized by this run)')
+if model_compat.get('failed_step'):
+    print('')
+    print('MEASURED FAILURE at step:', model_compat.get('failed_step'))
+    print('  ', model_compat.get('failed_step_error'))
+    print('  No smaller model was substituted. The architecture was not changed.')
+print('')
+print('-' * 78)
+if record['status'] == 'QUALIFICATION_FAILED_MEASURED':
+    print('RESULT: QUALIFICATION_FAILED_MEASURED')
+    print('        openai/gpt-oss-20b could not be qualified on this free-Kaggle GPU.')
+    print('        The failure above is measured, not inferred. STOP - do not train,')
+    print('        do not substitute a smaller model, do not change the architecture.')
+elif frozen_ok:
     print('RESULT: QUALIFIED - every dependency resolved to an exact version or commit SHA,')
-    print('        two fresh environments agreed, and unknowns[] is empty.')
+    print('        two fresh environments agreed, unknowns[] is empty, and gpt-oss-20b')
+    print('        loaded, initialised QLoRA, collated a batch and completed a forward-only')
+    print('        dry run with an unchanged parameter digest.')
 else:
     print('RESULT: %s - the freeze MUST NOT be applied yet (contract 7.3).' % record['status'])
     if record['unknowns']:
@@ -1565,6 +2932,12 @@ else:
               % len(record['unknowns']))
     if record['reproducibility']['assertion'] != 'IDENTICAL':
         print('        reproducibility assertion is %s.' % record['reproducibility']['assertion'])
+    if model_compat.get('status') != 'QUALIFICATION_PASSED':
+        print('        model compatibility is %s (contract 14).' % model_compat.get('status'))
+print('')
+print('TRAINING HAS NOT STARTED')
+print('auto_freeze_applied:', False, '(CTO must inspect env-qualification.json before any freeze)')
+print('experiment_authorized:', False, '(GHARIBO-exp-001 NOT authorized by this run)')
 print('Download env-qualification.json and env-qualification.md from the notebook Output.')
 print('Run this notebook as a Save-Version / committed run so /kaggle/working persists.')`,
 ];

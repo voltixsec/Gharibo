@@ -1271,6 +1271,11 @@ function gateKaggleDependent(): Gate {
  * 'back' + 'ward', 'lr_' + 'scheduler'), so the forbidden invocation shapes never
  * appear in the notebook text. A match is therefore always a real primitive, never
  * a false positive on prose.
+ *
+ * SCOPE (v2.0.0): model LOADING is no longer forbidden — the qualification must
+ * prove real gpt-oss-20b compatibility, so the loader, the tokenizer and the forward
+ * pass are required. Everything that would TRAIN, enable gradients, or write a model
+ * artifact stays forbidden.
  */
 const TRAINING_PRIMITIVES = [
   "trainer.train(",
@@ -1278,12 +1283,78 @@ const TRAINING_PRIMITIVES = [
   "optimizer.step(",
   ".step()",
   "loss.backward(",
+  ".backward()",
   "torch.autograd.backward(",
+  "autograd.grad(",
   "accelerator.backward(",
   "torch.optim.",
+  "torch.optim.Optimizer(",
+  "optim.AdamW",
   "lr_scheduler",
   "get_scheduler",
-  "torch.optim.Optimizer(",
+  "SFTTrainer",
+  "SFTConfig",
+  "Trainer(",
+  "TrainingArguments(",
+  "requires_grad_(",
+  "enable_grad",
+  "save_pretrained",
+  "push_to_hub",
+];
+
+/** The model-compatibility sequence the harness must perform (contract §14.2/§14.3). */
+const MISSION_STEPS = [
+  "resolve_base_model_revision",
+  "resolve_loader_model_revision",
+  "load_tokenizer",
+  "verify_harmony_encoding",
+  "verify_harmony_tokenizer",
+  "tokenize_real_example",
+  "load_base_model",
+  "init_qlora_adapters",
+  "count_parameters",
+  "collate_batch",
+  "parameter_digest_before",
+  "forward_dry_run",
+  "parameter_digest_after",
+  "verify_artifact_destination",
+];
+
+/** The artifact keys the mission requires inside `model_compatibility` (contract §14.3). */
+const REQUIRED_MODEL_KEYS = [
+  "qualification_only",
+  "gpu",
+  "vram",
+  "cuda",
+  "driver",
+  "compute_capability",
+  "python_version",
+  "dependency_versions",
+  "dependency_revisions",
+  "base_model",
+  "base_model_revision",
+  "tokenizer_loaded",
+  "harmony_verified",
+  "real_example_tokenized",
+  "model_loaded",
+  "qlora_initialized",
+  "batch_collated",
+  "forward_dry_run_completed",
+  "total_parameters",
+  "trainable_parameters",
+  "trainable_percentage",
+  "vram_before_load",
+  "vram_after_load",
+  "vram_after_adapter_init",
+  "peak_vram",
+  "artifact_destination_writable",
+  "optimizer_created",
+  "backward_executed",
+  "optimizer_step_executed",
+  "training_loop_executed",
+  "model_parameters_updated",
+  "parameter_digest_before",
+  "parameter_digest_after",
 ];
 
 function gateQualificationSafety(): Gate {
@@ -1332,6 +1403,68 @@ function gateQualificationSafety(): Gate {
       /'qualification_safety': qualification_safety/.test(notebookSource) &&
         /PARAM_DIGEST_AFTER != PARAM_DIGEST_BEFORE/.test(notebookSource),
       "qualification_safety is attached to the record and is not a hardcoded boolean",
+    ),
+  );
+
+  // ---- Real model-compatibility qualification (contract §14) --------------
+  const missingSteps = MISSION_STEPS.filter((step) => !notebookSource.includes(`'${step}'`));
+  checks.push(
+    expect(
+      "the harness performs the full real model-compatibility sequence",
+      missingSteps.length === 0,
+      missingSteps.length === 0
+        ? `${MISSION_STEPS.length} named model-compatibility steps present (resolve revision → tokenizer → Harmony → tokenize → 4-bit load → QLoRA → collate → forward-only dry run → digest)`
+        : `missing step(s): ${missingSteps.join(" | ")}`,
+    ),
+  );
+
+  const missingKeys = REQUIRED_MODEL_KEYS.filter((key) => !notebookSource.includes(`'${key}':`));
+  checks.push(
+    expect(
+      "the artifact carries every mission-mandated model_compatibility key",
+      missingKeys.length === 0,
+      missingKeys.length === 0
+        ? `${REQUIRED_MODEL_KEYS.length} mandated keys assembled onto the record`
+        : `missing key(s): ${missingKeys.join(" | ")}`,
+    ),
+  );
+
+  checks.push(
+    expect(
+      "the harness proves no parameter was updated (digest before == after, no optimizer, no backward)",
+      /def parameter_digest\(model\):/.test(notebookSource) &&
+        /run_model_step\('parameter_digest_before'/.test(notebookSource) &&
+        /run_model_step\('parameter_digest_after'/.test(notebookSource) &&
+        /model_parameters_updated = bool\(PARAM_DIGEST_AFTER != PARAM_DIGEST_BEFORE\)/.test(notebookSource),
+      "a deterministic digest over the trainable parameters is taken before and after the single forward-only dry run",
+    ),
+  );
+
+  checks.push(
+    expect(
+      "the forward-only dry run runs under no_grad and receives no labels",
+      /with torch\.no_grad\(\):/.test(notebookSource) &&
+        /model_inputs = \{'input_ids': BATCH\['input_ids'\], 'attention_mask': BATCH\['attention_mask'\]\}/.test(notebookSource),
+      "exactly one forward pass, in an inference-safe context, with no labels supplied so no loss is computed",
+    ),
+  );
+
+  checks.push(
+    expect(
+      "a measured incompatibility is reported as QUALIFICATION_FAILED_MEASURED and never substituted",
+      /QUALIFICATION_FAILED_MEASURED/.test(notebookSource) &&
+        /No smaller model was substituted/.test(notebookSource),
+      "the measured-failure status exists and the harness refuses to swap in a smaller model",
+    ),
+  );
+
+  checks.push(
+    expect(
+      "the real GHARIBO dataset is required and hash-verified before use",
+      /def locate_dataset_dir\(\):/.test(notebookSource) &&
+        /EXPECTED_DATASET_HASH = DATASET\['dataset_hash'\]/.test(notebookSource) &&
+        /def dataset_hash\(split_lines_map\):/.test(notebookSource),
+      "the harness locates the attached dataset, recomputes the committed split/dataset hashes and aborts on any mismatch",
     ),
   );
 

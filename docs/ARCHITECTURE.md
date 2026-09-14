@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Architecture |
 | **Status** | Frozen |
-| **Version** | 1.1.2 |
+| **Version** | 1.1.3 |
 | **Last Updated** | 2026-09-14 |
 | **Project Name** | `gharibo_ai_lab` |
 | **Based On** | `docs/PRD.md` (v1.0.0) |
@@ -16,6 +16,12 @@
 > From this point, changing it requires an ADR and a version bump per
 > `docs/DOCUMENTATION_GOVERNANCE.md` §5. The countable claims in §2.7 are machine-checked by
 > `npm run docs:validate` — update that block whenever the code changes.
+
+> **v1.1.3 — ADR count moved to 18 (2026-09-14).** ADR-0018 (real model-compatibility qualification
+> before the engine freeze) was accepted. It extends the qualification contract to a second part that
+> loads `openai/gpt-oss-20b` and proves by parameter digest that no parameter is updated; the §15
+> **O3** freeze is now gated on it. The only change to this frozen baseline is the machine-checked
+> `adrs` fact in §2.7 (17 → 18); nothing else in the frozen baseline changed.
 
 > **v1.1.2 — ADR count moved to 17 (2026-09-14).** Three ADRs were accepted — ADR-0015
 > (Universal Commercial + Procurement Knowledge Graph), ADR-0016 (VOKA ↔ GHARIBO integration
@@ -323,7 +329,7 @@ change with it** — that is what keeps the frozen baseline honest.
 | api_handlers | 53 |
 | sqlite_tables | 17 |
 | dashboard_pages | 11 |
-| adrs | 17 |
+| adrs | 18 |
 <!-- /docs:facts -->
 
 | Metric | Meaning |

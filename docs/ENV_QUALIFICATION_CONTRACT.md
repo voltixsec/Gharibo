@@ -5,8 +5,40 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Draft |
-| **Version** | 1.2.0 |
+| **Version** | 1.4.0 |
 | **Last Updated** | 2026-09-14 |
+
+> **v1.4.0 — CTO governance corrections (TRAIN-ONLY fixture, generic GPU, output hygiene, no auto-freeze).**
+> Four corrections to the M3C qualification harness:
+> 1. **TRAIN-ONLY fixture:** The harness now attaches only `train.jsonl` as a Kaggle Dataset input
+>    (not all three splits). `expected_split_files` is `["train.jsonl"]`. The dataset verification
+>    only checks the train split hash. A `qualification_fixture_hash` replaces the full dataset hash.
+>    `qualification_fixture_source = "TRAIN_ONLY"` and `test_data_accessed = false` are recorded.
+> 2. **Generic GPU detection:** The hardcoded "T4 x2" accelerator reference is replaced with
+>    "GPU (T4 or better)". The probe detects all visible GPUs and records `gpu_count`, `gpu_models`,
+>    `vram_per_gpu`, `total_visible_vram`, and `multi_gpu_used_by_loader`.
+> 3. **Output hygiene:** A guard checks that no forbidden output files (model weights, adapters,
+>    configs) persist in `/kaggle/working`. `output_hygiene_verified` is recorded.
+> 4. **No auto-freeze:** `auto_freeze_applied = false` and `experiment_authorized = false` are
+>    recorded. The CTO must inspect the artifact before any freeze is applied.
+
+> **v1.3.0 — Milestone 3C: REAL model-compatibility qualification (§14).** Supersedes the
+> model-free constraint of §13.4. The harness must now prove that `openai/gpt-oss-20b`
+> actually loads and runs a forward pass through the intended 4-bit QLoRA path on the free
+> Kaggle T4: resolve the live model revision, load the tokenizer, verify Harmony formatting
+> on a **real GHARIBO training example**, tokenize that example, load the 4-bit base model,
+> initialise the QLoRA adapters, report total/trainable parameters, collate one small batch,
+> run **exactly one** forward-only dry run under `torch.no_grad()`, record four VRAM
+> readings, verify the artifact destination is writable, and prove no parameter changed via
+> a deterministic parameter digest taken before and after the dry run. The mission-mandated
+> flat block `model_compatibility` (§14.3) carries those values under the mission's own key
+> names. `contract_schema_version` moves `1.0.0 → 1.1.0`: the change is additive for the
+> package consumer (it reads only `dependencies[]` and `environment`), but the §8 status
+> vocabulary gains a fourth value, `QUALIFICATION_FAILED_MEASURED`. The **major stays 1**, so
+> §10 rule 1 and the paste transform (§11) are unaffected. §13 is **retained and
+> strengthened**: the harness may now load a model and run a forward pass, but it still may
+> not construct an optimizer, run a backward pass, take a step, create a scheduler, run a
+> training loop, enable gradients, update a parameter, or write a model artifact.
 
 > **v1.2.0 — Milestone 3B: Qualification Safety (§13).** Adds a normative
 > **Qualification Safety** section. The harness must be structurally training-free: it
@@ -65,16 +97,25 @@ real install resolves. Today `PINNED_ENGINE_DEPENDENCIES` carries `resolvedVersi
 entry, and the `unsloth` / `unsloth_zoo` / `transformers` git specs track upstream default branches
 with no commit SHA. **Exact versions cannot be known without performing a real install.**
 
-This contract closes that gap honestly:
+This contract closes that gap honestly, in **two parts**:
+
+| Part | Question it answers | Sections |
+|---|---|---|
+| **A — dependencies** | Is the engine pin-set resolvable, exact, and reproducible? | §4–§12 |
+| **B — model compatibility** | Does `openai/gpt-oss-20b` actually load, initialise and run a forward pass on this real GPU — without training? | §13–§14 |
 
 1. the harness runs on the real worker (Kaggle, NVIDIA T4) and records what it actually installed;
 2. it runs the resolution in **two fresh environments** and asserts the sets are identical;
-3. it emits `env-qualification.json` in the shape defined here;
-4. that file is transformed (§5) into the package's engine + environment records with **no manual
+3. it **loads the qualified base model** and proves by parameter digest that no parameter is
+   updated (part B);
+4. it emits `env-qualification.json` in the shape defined here;
+5. that file is transformed (§11) into the package's engine + environment records with **no manual
    editing and no guessing**.
 
 A dependency set that has not been through this harness is `UNQUALIFIED`, and the package that
-carries it is not a frozen pin (§7).
+carries it is not a frozen pin (§7). A set that has been resolved but whose base model could not be
+loaded on the target hardware is `QUALIFICATION_FAILED_MEASURED` (§8, §14.5) — a measurement, not a
+freeze.
 
 ---
 
@@ -106,7 +147,7 @@ The file is **immutable once written**. A re-run produces a new file with a new 
     "engine_version": "<freeze label, e.g. unsloth-freeze-YYYY.MM.DD>"
   },
   "captured_at": "<ISO 8601 UTC>",
-  "status": "QUALIFIED | PARTIAL | FAILED",
+  "status": "QUALIFIED | PARTIAL | FAILED | QUALIFICATION_FAILED_MEASURED",
 
   "dependencies": [ /* §4 — one record per pinned dependency */ ],
   "additional_dependencies": [ /* §4.5 — recipe-required, not pinned in package.ts */ ],
@@ -114,6 +155,9 @@ The file is **immutable once written**. A re-run produces a new file with a new 
   "reproducibility": { /* §6 */ },
   "unknowns": [ /* §7 — explicit list of every unresolved value */ ],
   "warnings": [ /* optional: non-fatal notes, e.g. "spec is a range, not an exact pin" */ ],
+
+  "qualification_safety": { /* §13 — training-free evidence */ },
+  "model_compatibility": { /* §14 — real gpt-oss-20b compatibility evidence */ },
 
   "qualification_hash": "<sha256 of this object with qualification_hash = \"\">"
 }
@@ -137,13 +181,14 @@ The file is **immutable once written**. A re-run produces a new file with a new 
 The required keys above must all be present. **Extra top-level keys are allowed and are ignored by
 the consumer** — the same forward-compatibility rule as §4.2 and M2 §3.4. This lets the harness
 carry its own audit blocks (e.g. `harness`, `provenance`, `import_smoke`, `requested_specs`) without
-a contract change.
+a contract change. Two such blocks are **normative** rather than merely permitted:
+`qualification_safety` (§13.2) and `model_compatibility` (§14.3).
 
 | Rule | Value |
 |---|---|
 | Extras allowed? | **Yes**, at any level |
 | May an extra shadow a required key? | **No** — a name collision with a required key is a violation |
-| Must the five required blocks still be present? | **Yes** — an extra is never a substitute. In particular a bespoke `verification{}` block does **not** replace `reproducibility{}` |
+| Must the five required blocks still be present? | **Yes** — an extra is never a substitute. In particular a bespoke `verification{}` block does **not** replace `reproducibility{}`, and `model_compatibility` does **not** replace `dependencies[]` or `environment` |
 | Secrets / paths in extras | Forbidden — §10 rule 13 scans the whole document, extras included |
 
 ---
@@ -517,11 +562,20 @@ range (`>=2.8.0` does **not** imply `2.8.0`).
 
 | Status | Meaning | Preconditions |
 |---|---|---|
-| `QUALIFIED` | A real install resolved every dependency and two fresh environments agreed | `assertion = IDENTICAL`, `unknowns = []`, all `source: "git"` records have `resolved_commit` |
-| `PARTIAL` | A real install produced values, but the set is not assertable or not fully resolved | `assertion ∈ {NOT_RUN, IDENTICAL}` with `unknowns ≠ []`, or `P = 1` |
+| `QUALIFIED` | A real install resolved every dependency, two fresh environments agreed, **and** the real model-compatibility sequence completed with an unchanged parameter digest | `assertion = IDENTICAL`, `unknowns = []`, all `source: "git"` records have `resolved_commit`, and §14.6 is satisfied in full |
+| `PARTIAL` | A real install produced values, but the set is not assertable, not fully resolved, or the model-compatibility sequence did not complete | `assertion ∈ {NOT_RUN, IDENTICAL}` with `unknowns ≠ []`, `P = 1`, or §14 not fully satisfied |
 | `FAILED` | The environments disagreed, or installation failed | `assertion = MISMATCH`, or a required dependency could not be installed |
+| `QUALIFICATION_FAILED_MEASURED` | The dependency set was resolved, but `openai/gpt-oss-20b` could not be loaded or initialised on this real GPU | a model-compatibility step failed; `model_compatibility.failed_step` and `.failed_step_error` are both populated |
 
 `QUALIFIED` is the only status that authorises a frozen pin (§7.3).
+
+**`QUALIFICATION_FAILED_MEASURED` is a measurement, not a gap.** It is set only when a step actually
+ran on real hardware and raised. It is the honest outcome the failure policy requires: the exact GPU,
+VRAM, failing step, peak memory, exception and dependency versions are all recorded (§14.5), a smaller
+model is **never** substituted, and the architecture is **never** silently changed. Ordering in
+`derive_status` is deliberate: a dependency-integrity failure is reported as `FAILED` (the package set
+is not trustworthy), while a model-compatibility failure measured on hardware is
+`QUALIFICATION_FAILED_MEASURED`.
 
 ---
 
@@ -566,6 +620,36 @@ Computed exactly as `computePackageId` computes `package_id`
 17. Any record whose `spec` differs from `requested_spec` while `resolved_version` is `null`
     (an unfrozen spec must fall back verbatim — §4.0).
 18. `additional_dependencies[]` present and non-empty without a matching `warnings[]` entry (§4.5).
+
+Rules 19–24 apply to the **model-compatibility block** (§14.3). They are additive: a record that
+violates one of them is invalid exactly as in rules 1–18. Rules 9 and 23 are the two that a
+model-compatibility failure is allowed to bend, and only in the specific, declared way described in
+§14.5 — never silently.
+
+19. `model_compatibility` missing, empty, or not an object; any of the 33 §14.3 keys absent;
+    `qualification_only` not `true`; `base_model` ≠ the qualified base model; any environment mirror
+    key (`gpu`, `vram`, `cuda`, `driver`, `compute_capability`, `python_version`) disagreeing with the
+    `environment` block; or a `dependency_versions` / `dependency_revisions` entry naming a package
+    that is not in `dependencies[]`, or whose value disagrees with the `dependencies[]` record.
+20. Any of `optimizer_created`, `backward_executed`, `optimizer_step_executed`,
+    `training_loop_executed`, `model_parameters_updated` in the block disagreeing with the same field
+    in `qualification_safety` (§13.2). The two blocks are independent evidence; they must agree.
+21. `parameter_digest_before` and `parameter_digest_after` both present while
+    `model_parameters_updated` ≠ `(parameter_digest_before != parameter_digest_after)`.
+22. `status = "QUALIFICATION_FAILED_MEASURED"` without both `failed_step` and `failed_step_error`; or
+    a populated `failed_step` while the status is **not** `QUALIFICATION_FAILED_MEASURED`.
+23. `status = "QUALIFIED"` while the block is incomplete or the run was not inert. Specifically:
+    any of `tokenizer_loaded`, `harmony_verified`, `real_example_tokenized`, `model_loaded`,
+    `qlora_initialized`, `batch_collated`, `forward_dry_run_completed`,
+    `artifact_destination_writable` is not `true`; any of `optimizer_created`, `backward_executed`,
+    `optimizer_step_executed`, `training_loop_executed` is not `false`;
+    `model_parameters_updated` is not `false`; the digest pair is absent or unequal; any of
+    `base_model_revision`, `total_parameters`, `trainable_parameters`, `vram_before_load`,
+    `vram_after_load`, `vram_after_adapter_init`, `peak_vram` is `null`; or `vram_after_load` did not
+    grow above `vram_before_load` (a loaded 4-bit model must allocate memory — a non-growing reading
+    means the load did not happen).
+24. `trainable_percentage` ≠ `round(100.0 * trainable_parameters / total_parameters, 8)`, or
+    `trainable_parameters > total_parameters`.
 
 ---
 
@@ -692,22 +776,35 @@ values and non-null `resolvedVersion` values.
 | §7 unknown handling | M2 §3.2 ("may be `\"unknown\"`/`null` if the upstream does not expose one, but the field must exist") |
 | §9 content address | `computePackageId` (`apps/web/lib/training/package.ts:306`); M2 §5 |
 | §11 paste transform | `apps/web/lib/training/package.ts` (the only writer) |
-| §13 qualification safety | `scripts/qualify/qualify-kaggle-env.mjs` (§5b tripwires); `scripts/qualify/check-qualify-harness.mjs`; `verify-m3a` Gate 13 |
+| §13 qualification safety | `scripts/qualify/qualify-kaggle-env.mjs` (§6 tripwires); `scripts/qualify/check-qualify-harness.mjs`; `verify-m3a` Gate 13 |
+| §14 model compatibility | `BASE_MODEL_IDENTITY` / `BASE_MODEL_REVISION` / `LOADER_MODEL_ID` (`apps/web/lib/training/package.ts`); `unsloth.FastLanguageModel.from_pretrained` + `get_peft_model` (`apps/web/lib/workers/kaggle/notebook.template.ipynb` §8–§9); `openai_harmony` (`DEFAULT_HARMONY`, `apps/web/lib/training/package.ts`); the LoRA defaults in `apps/web/components/training/run-form.tsx`; `datasets["GHARIBO-Research-Gold-v0.1"].hashes` (`governance/GHARIBO_MASTER_STATE.json`) |
+| §14.4 parameter digest | `scripts/qualify/qualify-kaggle-env.mjs` (`parameter_digest`); the `qualification_safety.model_parameters_updated` basis (§13.2) |
 
 ---
 
 ## 13. Qualification Safety (training-free guarantee)
 
-The qualification harness installs and inspects the training stack; it must **never**
-train. The zero-cost / no-weight-download policy makes this binding: a qualification
-run must be structurally incapable of constructing an optimizer, running a backward
-pass, taking an optimizer step, running a training loop, or updating model parameters.
+The qualification harness installs, loads, and inspects the training stack; it must **never**
+train. The zero-cost policy makes this binding: a qualification run must be structurally
+incapable of constructing an optimizer, running a backward pass, taking an optimizer step,
+running a training loop, or updating model parameters — even though §14 requires the harness to
+load the base model and initialise QLoRA adapters.
+
+The safety property is therefore stated as an **invariant over the whole run**, not as an
+absence of capability:
+
+```
+QUALIFICATION_ONLY = True
+assert QUALIFICATION_ONLY is True
+```
+
+Loading weights is permitted; changing them is not. §14.4 proves the difference.
 
 ### 13.1 Runtime tripwires (normative)
 
-The harness arms tripwires **before any optional work** (before the import smoke test
-and before the reproducibility pass). Invoking any of the guarded primitives records a
-violation and raises immediately:
+The harness arms tripwires **before any optional work** (before the import smoke test,
+before the model-compatibility sequence, and before the reproducibility pass). Invoking any
+of the guarded primitives records a violation and raises immediately:
 
 | Guarded primitive | Violation flag |
 |---|---|
@@ -719,7 +816,9 @@ violation and raises immediately:
 | accelerate `Accelerator.backward` | `backward_executed` |
 
 The harness also asserts the module constant `QUALIFICATION_ONLY is True` on the
-execution path.
+execution path. Because the tripwires stay armed across the model-compatibility sequence,
+a training primitive invoked *after* the model is loaded is caught exactly like one invoked
+before — the guard is not scoped to a phase.
 
 ### 13.2 The emitted `qualification_safety` block
 
@@ -748,10 +847,12 @@ comparison — never hardcoded:
 | `backward_executed` | tripwire on the tensor backward method and the autograd backward function; `true` iff invoked |
 | `optimizer_step_executed` | tripwire on the optimizer step method; `true` iff invoked |
 | `training_loop_executed` | derived from the tripwire state: `true` iff any optimizer or backward tripwire fired |
-| `model_parameters_updated` | sha256 digest over every live tensor that requires grad, compared before vs after the run; no model is loaded, so the set is empty and equality is expected |
+| `model_parameters_updated` | sha256 digest over the trainable parameters of the loaded model (§14.4), compared before vs after the forward-only dry run; `true` iff the digests differ. When no model was loaded the digest pair is absent and the value is `null` (§14.5), never `false` by assumption |
 
 `basis` is a `field → string` map disclosing how each value was derived. The block is
-part of the hashed record (§9), so it cannot be altered after the fact.
+part of the hashed record (§9), so it cannot be altered after the fact. Rule 20 (§10) requires
+the five safety flags in `model_compatibility` (§14.3) to agree with this block: the two are
+independent recordings of the same facts, and disagreement invalidates the record.
 
 ### 13.3 Static safety gate (normative)
 
@@ -762,9 +863,11 @@ gates enforce this on the committed `.ipynb`:
 - `verify-m3a` **Gate 13** (`npm run verify:m3a`).
 
 Forbidden shapes: `trainer.train(`, `.train(`, `optimizer.step(`, `.step()`,
-`loss.backward(`, `torch.autograd.backward(`, `accelerator.backward(`, `torch.optim.`
-(optimizer creation), `lr_scheduler` / `get_scheduler` (scheduler creation),
-`torch.optim.Optimizer(`.
+`loss.backward(`, `.backward()`, `torch.autograd.backward(`, `autograd.grad(`,
+`accelerator.backward(`, `torch.optim.` (optimizer creation), `lr_scheduler` /
+`get_scheduler` (scheduler creation), `torch.optim.Optimizer(`, `optim.AdamW`,
+`SFTTrainer`, `SFTConfig`, `Trainer(`, `TrainingArguments(`, `requires_grad_(`,
+`enable_grad`, `save_pretrained`, `push_to_hub`.
 
 **Matching rule.** The scan is a conservative raw-substring match over the
 concatenated cell sources (comments and string literals included). It is safe to be
@@ -773,12 +876,272 @@ literal forms: the tripwire code assembles the same names from concatenated frag
 (e.g. `'back' + 'ward'`, `'lr_' + 'scheduler'`). A match is therefore always a genuine
 training primitive, never a false positive on a comment or a doc string.
 
+**The gate is not weakened by §14.** Model loading is required by the mission, so the
+model-loading tokens (`from_pretrained`, `FastLanguageModel`, `AutoTokenizer`,
+`AutoModelForCausalLM`) are deliberately **not** forbidden — they appear in the harness by
+design. What remains forbidden is every primitive that *writes* to a parameter, *creates* an
+optimizer or scheduler, or *persists* a checkpoint. Gate 13 additionally asserts the positive
+side of §14: the full 14-step model-compatibility sequence is present, all 33 mandated artifact
+keys are assembled, the forward dry run is under `no_grad` with no labels, and the
+no-parameter-update proof exists.
+
 ### 13.4 Constraint
 
-The notebook remains **model-free**: no model weight download, no model load. The
-mission's "allowed" list (base-model loading, tokenization, QLoRA init, forward dry
-run) is permissive, not mandatory; the binding zero-cost / no-weight-download policy
-is honoured by keeping the harness model-free.
+The notebook is **model-free only in the sense that it never trains**. It *does* download the
+base model's weights and load them (§14.1–§14.2) — that is the whole point of Milestone 3C.
+What it never does is construct an optimizer, run a backward pass, take an optimizer step, run a
+training loop, or update a model parameter; and it never saves an adapter or checkpoint to disk
+and never pushes anything to a model hub (§13.3).
+
+The earlier model-free constraint (v1.2.0 §13.4) is **superseded** by §14. It was the correct
+reading of the zero-cost policy while the harness was dependency-only; it is no longer the
+correct reading now that the mission requires *measured* proof that `openai/gpt-oss-20b` loads
+and initialises on a free Kaggle T4. Loading weights costs no money; training would. The two
+are separated by the invariant in §13.1 and proved apart by §14.4.
+
+---
+
+## 14. Model compatibility (real qualification, Milestone 3C)
+
+§4–§13 qualify the *dependency set*. §14 qualifies the *model*. Together they are the two parts
+of a single qualification run:
+
+| Part | Question | Evidence |
+|---|---|---|
+| **A — dependencies** (§4–§12) | Is the engine pin-set resolvable, exact, and reproducible? | `dependencies[]`, `environment`, `reproducibility`, `qualification_hash` |
+| **B — model compatibility** (§14) | Does `openai/gpt-oss-20b` actually load, initialise, and run a forward pass on *this* real GPU, without training? | `model_compatibility` |
+
+Part A alone can be satisfied by a machine with no GPU. Part B cannot: it requires a real
+accelerator, and its whole purpose is to replace "we believe this fits" with "we measured it
+fitting". A record is only `QUALIFIED` (§8) when **both** parts pass.
+
+### 14.0 The 14-step sequence (normative)
+
+The harness performs exactly these steps, in this order, recording each one's
+`ok` / `seconds` / `error` into `model_compatibility.steps[]`:
+
+| # | Step | What it proves |
+|---|---|---|
+| 1 | `resolve_base_model_revision` | the exact revision of `openai/gpt-oss-20b` in use |
+| 2 | `resolve_loader_model_revision` | the exact revision of the loader model (`unsloth/gpt-oss-20b`) |
+| 3 | `load_tokenizer` | the tokenizer loads at the pinned revision |
+| 4 | `verify_harmony_encoding` | `openai_harmony` exposes the gpt-oss encoding |
+| 5 | `verify_harmony_tokenizer` | the tokenizer round-trips a Harmony-encoded conversation |
+| 6 | `tokenize_real_example` | a **real GHARIBO example** tokenizes (not a synthetic string) |
+| 7 | `load_base_model` | the base model loads 4-bit on this GPU |
+| 8 | `init_qlora_adapters` | LoRA/QLoRA adapters attach and the trainable set exists |
+| 9 | `count_parameters` | total / trainable / percentage |
+| 10 | `collate_batch` | one small batch collates with the declared shape |
+| 11 | `parameter_digest_before` | the pre-forward fingerprint of the trainable parameters |
+| 12 | `forward_dry_run` | one forward pass under `no_grad`, forward-only |
+| 13 | `parameter_digest_after` | the post-forward fingerprint — must equal step 11 |
+| 14 | `verify_artifact_destination` | the checkpoint/artifact destination is writable |
+
+Steps 11 and 13 bracket step 12 deliberately: the digest is the proof that the forward pass was
+inert (§14.4). A failure at any step is recorded and the remaining steps are **skipped**, not
+retried with a different configuration (§14.5).
+
+### 14.1 Revision and tokenizer (steps 1–3)
+
+Nothing in this section may be guessed. Every value is read at render time from the repository:
+
+| Value | Source of truth |
+|---|---|
+| `base_model` | `BASE_MODEL_IDENTITY` (`apps/web/lib/training/package.ts`) |
+| `base_model_revision_pin` | `BASE_MODEL_REVISION` (same file) |
+| `loader_model` | `LOADER_MODEL_ID` (same file) |
+| `loader_quantization` | the intended low-memory path: `4-bit` |
+
+The harness resolves the **live** revision via `huggingface_hub.HfApi().model_info(repo_id=...)`
+and records it as `base_model_revision` / `loader_model_revision`. It also records
+`base_model_revision_matches_pin` — the boolean comparison against the repository pin. A
+divergence is a `WARNING`-class fact, surfaced in `warnings[]`, **never** silently reconciled: if
+upstream moved, the operator must decide, not the harness.
+
+The tokenizer is loaded at the resolved revision so that the tokenizer and the weights are
+guaranteed to be the same revision.
+
+### 14.2 Harmony and the real example (steps 4–6)
+
+gpt-oss does not use a plain chat template; it uses OpenAI **Harmony**. The harness verifies this
+in two independent ways, because "the encoding imported" and "the encoding works" are different
+claims:
+
+1. `verify_harmony_encoding` — `openai_harmony.load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)`
+   resolves, and the returned encoding exposes the expected control tokens
+   (`<|start|>`, `<|message|>`, `<|channel|>`, `<|constrain|>`, `<|return|>`, `<|end|>`).
+2. `verify_harmony_tokenizer` — `tokenizer.apply_chat_template(...)` round-trips a
+   Harmony-shaped conversation, and the encoded control tokens are present in the result.
+
+`harmony_verified` is `true` only when **both** hold; the two individual booleans and their detail
+strings are retained in `model_compatibility.harmony` for audit. `reasoning_effort`,
+`developer_template_id`, and `hidden_channels` come from `DEFAULT_HARMONY` in
+`apps/web/lib/training/package.ts` — again read, never retyped.
+
+**The example must be real.** Step 6 tokenizes an actual record from
+`GHARIBO-Research-Gold-v0.1`, selected **deterministically** as the TRAIN record whose
+`sha256(line bytes)` sorts first — so re-executing the notebook picks the same record and the same
+`example_token_count`. Before any of this, and *before* the install, the harness recomputes the
+dataset's content address from the raw line bytes and aborts on mismatch:
+
+| Recomputed | Committed value |
+|---|---|
+| `splitHash(train)` | `84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2` |
+| `splitHash(validation)` | `063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787` |
+| `splitHash(test)` | `55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b` |
+| `datasetHash` | `84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5` |
+
+The hashes are read from `governance/GHARIBO_MASTER_STATE.json`; the dataset itself is **not**
+committed to the repository and is **not** embedded in the notebook. The operator attaches it as a
+Kaggle Dataset; the harness locates it under `/kaggle/input` and verifies it. A mismatch aborts
+with `Refusing to qualify against a dataset that does not match the committed hashes.` — a
+qualification run against the wrong data would be worthless, so it must fail loudly and early.
+
+### 14.3 The `model_compatibility` block (normative)
+
+The record MUST carry a `model_compatibility` top-level block (permitted by §3.1). All 33 keys
+below are **required**; rule 19 (§10) invalidates a record that omits any of them. The flat,
+duplicated key names are intentional: this block is the machine-readable answer to the mission's
+artifact checklist, and it must be readable without understanding the rest of the schema.
+
+| Key | Type | Meaning |
+|---|---|---|
+| `qualification_only` | `true` | the invariant of §13.1, mirrored here |
+| `gpu` | string | GPU model (mirrors `environment.gpu_model`) |
+| `vram` | int | VRAM in bytes (mirrors `environment.vram_bytes`) |
+| `cuda` | string | CUDA version (mirrors `environment.cuda_version`) |
+| `driver` | string | NVIDIA driver version (mirrors `environment.driver_version`) |
+| `compute_capability` | string | compute capability (mirrors `environment.compute_capability`) |
+| `python_version` | string | Python version (mirrors `environment.python_version`) |
+| `dependency_versions` | object | `name → resolved_version` for the model-relevant packages |
+| `dependency_revisions` | object | `name → resolved_commit` for the git-sourced packages |
+| `base_model` | string | `openai/gpt-oss-20b` |
+| `base_model_revision` | string \| null | the **resolved** revision (step 1) |
+| `tokenizer_loaded` | bool | step 3 |
+| `harmony_verified` | bool | steps 4 **and** 5 |
+| `real_example_tokenized` | bool | step 6 (a real GHARIBO example) |
+| `model_loaded` | bool | step 7 |
+| `qlora_initialized` | bool | step 8 |
+| `batch_collated` | bool | step 10 |
+| `forward_dry_run_completed` | bool | step 12 |
+| `total_parameters` | int \| null | step 9 |
+| `trainable_parameters` | int \| null | step 9 |
+| `trainable_percentage` | float \| null | step 9 |
+| `vram_before_load` | int \| null | `memory_allocated(0)` immediately before step 7 |
+| `vram_after_load` | int \| null | `memory_allocated(0)` immediately after step 7 |
+| `vram_after_adapter_init` | int \| null | `memory_allocated(0)` immediately after step 8 |
+| `peak_vram` | int \| null | `max_memory_allocated(0)` after a reset immediately before step 12 |
+| `artifact_destination_writable` | bool | step 14 |
+| `optimizer_created` | bool | tripwire (§13.2) |
+| `backward_executed` | bool | tripwire (§13.2) |
+| `optimizer_step_executed` | bool | tripwire (§13.2) |
+| `training_loop_executed` | bool | tripwire-derived (§13.2) |
+| `model_parameters_updated` | bool \| null | digest comparison (§14.4) |
+| `parameter_digest_before` | string \| null | step 11 |
+| `parameter_digest_after` | string \| null | step 13 |
+
+The block also carries **audit extensions** (permitted by §3.1, ignored by the package consumer):
+`status`, `run_enabled`, `failed_step`, `failed_step_error`, `steps[]`, `loader_model`,
+`loader_model_revision`, `loader_quantization`, `base_model_revision_pin`,
+`base_model_revision_matches_pin`, `dtype`, `max_seq_length`, `batch_size`,
+`gradient_accumulation_steps`, `seed`, `lora{...}`, `harmony{...}`, `example_token_count`,
+`batch_shapes`, `forward`, `trainable_tensors`, the `*_basis` strings, and `dataset`.
+
+The qualification **configuration** (dtype `fp16`, `max_seq_length` with its low-VRAM downgrade,
+`batch_size`, `gradient_accumulation_steps`, LoRA `r`/`alpha`/`target_modules`/`dropout`/`bias`,
+`seed`, `use_gradient_checkpointing`) is read from `run-form.tsx` and `package.ts` and recorded so
+the qualification is reproducible. It is *not* authoritative for training: the training run takes
+its recipe from the Training Package (M2). The recorded values exist so that "the configuration we
+qualified" is a fact, not a memory.
+
+`failed_step_error` is passed through the §10 rule 13 scrubber: secrets are redacted and
+filesystem paths are replaced, while URLs and exception types survive. The artifact is
+publishable, so it must not leak a Kaggle working directory.
+
+### 14.4 Parameter-update proof (normative)
+
+Step 12 is a forward pass and nothing else:
+
+- it runs under `with torch.no_grad():`;
+- it passes **only** `input_ids` and `attention_mask` — deliberately **no `labels`**, so no loss
+  is computed and there is nothing to differentiate;
+- it calls neither backward nor step; no optimizer exists at that point in the process.
+
+The proof that the pass was inert is a **digest**, not an assertion:
+
+```
+parameter_digest(model) = sha256(
+    "\n".join(f"{name}:{sha256(param.detach().float().cpu().numpy().tobytes())}"
+              for name, param in sorted(model.named_parameters()) if param.requires_grad)
+)
+```
+
+The digest is computed over the trainable parameters only — those are the ones training would
+change, so they are the ones worth fingerprinting. It is taken before (step 11) and after
+(step 13) the dry run, and:
+
+```
+model_parameters_updated = (parameter_digest_after != parameter_digest_before)
+```
+
+A `QUALIFIED` record requires this to be `false` **and** the two digests to be present and equal
+(rule 23). This value is never fabricated: if no model was loaded there is no digest pair, and
+the field is `null` with a matching `unknowns[]` entry (§7) rather than a comforting `false`.
+Rule 21 additionally requires the flag to agree with the digest comparison, and rule 20 requires
+it to agree with `qualification_safety.model_parameters_updated`.
+
+### 14.5 Failure policy (normative)
+
+If `openai/gpt-oss-20b` cannot fit or cannot initialise on the real GPU, the harness records the
+**measured** failure and stops. It must not substitute a smaller model, must not fall back to a
+different quantization, and must not alter the architecture to make the run pass.
+
+On failure the record is still written — a measurement is a result, not an error — with:
+
+- `status = "QUALIFICATION_FAILED_MEASURED"` (§8);
+- `model_compatibility.failed_step` naming the first failing step;
+- `model_compatibility.failed_step_error` carrying the exact exception (redacted and
+  path-scrubbed);
+- every subsequent step recorded as skipped;
+- the VRAM readings taken so far, and the exact dependency versions and revisions resolved;
+- `failed_step` **and** `failed_step_error` both populated (rule 22 requires it).
+
+The status ordering in `derive_status` is deliberate. A **dependency-integrity** failure is
+`FAILED`: the package set itself is not trustworthy, so nothing downstream can be. A
+**model-compatibility** failure measured on hardware is `QUALIFICATION_FAILED_MEASURED`: the
+engine pin-set is fine, and we now know something true and useful about the hardware. Collapsing
+the second into the first would throw away the measurement.
+
+### 14.6 Success criteria (normative)
+
+Part B passes, and a record may be `QUALIFIED`, only if **all** of the following hold. These are
+enforced by rule 23 (§10) and, statically, by Gate 13 (§13.3).
+
+| # | Criterion | Field |
+|---|---|---|
+| 1 | the tokenizer loads | `tokenizer_loaded is true` |
+| 2 | Harmony works | `harmony_verified is true` |
+| 3 | a real GHARIBO example tokenizes | `real_example_tokenized is true` |
+| 4 | the base model loads | `model_loaded is true` |
+| 5 | QLoRA adapters initialise | `qlora_initialized is true` |
+| 6 | a small batch collates | `batch_collated is true` |
+| 7 | the forward-only dry run succeeds | `forward_dry_run_completed is true` |
+| 8 | the parameter digest is unchanged | `parameter_digest_before == parameter_digest_after`, `model_parameters_updated is false` |
+| 9 | no optimizer exists | `optimizer_created is false` |
+| 10 | no backward occurs | `backward_executed is false` |
+| 11 | no optimizer step occurs | `optimizer_step_executed is false` |
+| 12 | no training loop runs | `training_loop_executed is false` |
+| 13 | the artifact destination is writable | `artifact_destination_writable is true` |
+| 14 | the exact versions and revisions are captured | `base_model_revision`, `dependency_versions`, `dependency_revisions` all populated |
+| 15 | memory really moved | `vram_after_load > vram_before_load` |
+
+Criterion 15 deserves emphasis: a 4-bit model load that allocates no additional VRAM did not
+happen. Requiring the reading to grow is what makes `model_loaded: true` an observation instead
+of a claim.
+
+Only after all fifteen hold — and part A is also `QUALIFIED` — may
+`PINNED_ENGINE_DEPENDENCIES` in `apps/web/lib/training/package.ts` be updated via the §11 paste
+transform and the architecture §15 **O3** freeze be declared.
 
 ---
 
