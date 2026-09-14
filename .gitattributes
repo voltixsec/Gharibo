@@ -1,0 +1,17 @@
+# Normalize line endings: LF in the repository, native on checkout.
+* text=auto eol=lf
+
+# Explicitly mark binary-ish asset types (never diff/normalize these).
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.safetensors binary
+*.bin  binary
+*.ckpt binary
+*.pt   binary
+*.gguf binary
+*.onnx binary
+*.db   binary

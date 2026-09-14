@@ -1,0 +1,29 @@
+{
+  "name": "gharibo-ai-lab",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/web",
+    "lint": "npm run lint --workspace apps/web",
+    "typecheck": "npm run typecheck --workspace apps/web",
+    "test": "vitest run --root apps/web",
+    "dev:services": "concurrently \"npm run dev:trainer\" \"npm run dev:inference\" \"npm run dev:research\"",
+    "dev:trainer": "cd services/trainer && python -m uvicorn main:app --port 8100 --reload",
+    "dev:inference": "cd services/inference && python -m uvicorn main:app --port 8101 --reload",
+    "dev:research": "cd services/research && python -m uvicorn main:app --port 8102 --reload"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "concurrently": "^9.0.1",
+    "next": "^14.2.5",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "lucide-react": "^0.417.0"
+  }
+}

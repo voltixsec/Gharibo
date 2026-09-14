@@ -1,0 +1,105 @@
+# ==========================================================================
+# GHARIBO AI LAB — .gitignore
+# This repository is PUBLIC. Never commit secrets, runtime data, or artifacts.
+# Rule: ignore everything sensitive/generated; keep only source, docs, config.
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+# Environment files
+# Ignore every .env variant; keep ONLY name-only example files (no real values)
+# --------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# --------------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+
+# --------------------------------------------------------------------------
+# Build output
+# --------------------------------------------------------------------------
+.next/
+out/
+dist/
+build/
+
+# --------------------------------------------------------------------------
+# Python
+# --------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+
+# --------------------------------------------------------------------------
+# Databases (SQLite) — runtime data, never versioned
+# --------------------------------------------------------------------------
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+apps/web/data/
+
+# --------------------------------------------------------------------------
+# Local data pipeline — keep directory structure, ignore contents
+# --------------------------------------------------------------------------
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/datasets/*
+!data/datasets/.gitkeep
+data/exports/*
+!data/exports/.gitkeep
+
+# --------------------------------------------------------------------------
+# Model artifacts — weights, checkpoints, adapters are never versioned
+# --------------------------------------------------------------------------
+models/checkpoints/*
+!models/checkpoints/.gitkeep
+models/adapters/*
+!models/adapters/.gitkeep
+models/weights/*
+!models/weights/.gitkeep
+models/registry/*
+!models/registry/.gitkeep
+
+# --------------------------------------------------------------------------
+# Logs & temporary files
+# --------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp
+*.temp
+*.tsbuildinfo
+
+# --------------------------------------------------------------------------
+# Local tooling / editor state (machine-specific — never public)
+# --------------------------------------------------------------------------
+.workbuddy-ai/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --------------------------------------------------------------------------
+# OS files
+# --------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# --------------------------------------------------------------------------
+# Next.js generated
+# --------------------------------------------------------------------------
+next-env.d.ts

@@ -1,0 +1,85 @@
+%% GHARIBO AI LAB — End-to-End Vertical Slice Sequence
+%% Covers the closed-loop data-to-train pipeline (PRD Goal G1) + the real pre-flight check (G3).
+
+sequenceDiagram
+    autonumber
+    participant U as User (Browser)
+    participant PG as Playground Page
+    participant ChatAPI as /api/conversations/[id]/messages
+    participant Prov as ModelProvider
+    participant TEAPI as /api/training-examples
+    participant DFRepo as DataFactoryRepository
+    participant Val as ValidationEngine
+    participant DFPage as Data Factory Page
+    participant DSAPI as /api/datasets
+    participant PF as /api/preflight
+    participant TR as /api/training-runs
+    participant PyT as services/trainer (Python)
+    participant DB as SQLite (gharibo.db)
+
+    %% --- 1. Playground chat (streaming) ---
+    U->>PG: New conversation + send message
+    PG->>ChatAPI: POST {content}
+    ChatAPI->>DB: persist user message
+    ChatAPI->>Prov: getProvider(config).chat(messages, opts)
+    Prov-->>ChatAPI: AsyncIterable<ChatChunk> (stream)
+    ChatAPI-->>PG: text/event-stream
+    PG-->>U: render streaming tokens
+    Note over Prov: Provider key resolved via SecretsResolver (server-side only)
+
+    %% --- 2. Save as training example ---
+    U->>PG: Click [Add to Dataset] on assistant response
+    PG->>TEAPI: POST {prompt, systemPrompt, response, modelId, providerId, tags}
+    TEAPI->>DB: INSERT training_examples (approval_state=pending)
+    TEAPI->>DFRepo: create() → INSERT data_factory_records (verification_status=RAW)
+    DFRepo->>Val: validateRecord(record)
+    Val-->>DFRepo: ValidationResult[] (PASS/WARNING/FAIL)
+    DFRepo->>DB: UPDATE validation_results
+    TEAPI-->>PG: { trainingExample, dataFactoryRecord }
+    PG-->>U: toast "Saved to Data Factory (RAW)"
+
+    %% --- 3. Data Factory review & approve ---
+    U->>DFPage: Open Data Factory, filter status=RAW
+    DFPage->>DB: SELECT data_factory_records WHERE status=RAW
+    DB-->>DFPage: records + validation results
+    U->>DFPage: Edit chosen_output, click Approve
+    DFPage->>DFRepo: update(id, {chosenOutput, verificationStatus: REVIEW_REQUIRED})
+    DFRepo->>Val: validateRecord(updated)
+    Val-->>DFRepo: ValidationResult[]
+    DFRepo->>DB: UPDATE (status=NORMALIZED → REVIEW_REQUIRED)
+    U->>DFPage: Bulk approve selected → APPROVED
+    DFPage->>DFRepo: bulk(ids, "approve")
+    DFRepo->>DB: UPDATE verification_status=APPROVED
+
+    %% --- 4. Build dataset + export JSONL ---
+    U->>DSAPI: POST {name, recordIds[]} (approved records)
+    DSAPI->>DB: INSERT datasets (version=v1) + dataset_records
+    DSAPI->>DB: UPDATE approved records → TRAINING_READY
+    DSAPI-->>U: { dataset }
+    U->>DSAPI: GET /datasets/[id]/export
+    DSAPI->>DB: SELECT records joined
+    DSAPI-->>U: JSONL file (data/exports/*.jsonl)
+
+    %% --- 5. Pre-flight check (REAL — calls Python) ---
+    U->>TR: Open Training, click "Run Pre-Flight"
+    TR->>PF: GET /preflight?baseModel=...&datasetId=...
+    PF->>PyT: HTTP GET http://127.0.0.1:8100/preflight
+    PyT->>PyT: checkPython() → version
+    PyT->>PyT: checkTorch() → import torch, torch.__version__
+    PyT->>PyT: checkCuda() → torch.cuda.is_available()
+    PyT->>PyT: checkGpu() → torch.cuda.get_device_name(0) or nvidia-smi
+    PyT->>PyT: checkVram() → torch.cuda.get_device_properties(0).total_memory
+    PyT->>PyT: checkTransformers/Peft/Trl() → import attempts
+    PyT->>PyT: checkDisk() → psutil.disk_usage(./data)
+    PyT->>PyT: checkDataset(path) → file exists + JSONL parseable
+    PyT->>PyT: checkBaseModel(name) → HF hub reachable / local path
+    PyT-->>PF: PreflightResult { overallReady: false, items: [...] }
+    Note over PyT: On this machine: no GPU → overallReady=false,<br/>GPU/VRAM items = NOT_READY
+    PF-->>TR: PreflightResult
+    TR-->>U: Render "ENVIRONMENT NOT READY" + per-item READY/NOT_READY (P0-13)
+
+    %% --- 6. Persist training run (DRAFT, launch-ready) ---
+    U->>TR: Fill config form, click "Save Run (Launch-Ready)"
+    TR->>DB: INSERT training_runs (status=DRAFT, preflight_result=...)
+    TR-->>U: { run } status=DRAFT
+    Note over U,DB: Actual training execution = P1-01.<br/>P0 persists the run + shows pre-flight.

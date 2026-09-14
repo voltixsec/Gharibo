@@ -1,0 +1,326 @@
+%% GHARIBO AI LAB — Class Diagram
+%% Source of truth for data models, repositories, provider abstraction, and services.
+
+classDiagram
+    direction TB
+
+    %% ===== Shared Domain Types =====
+    class ProviderConfig {
+        +string id
+        +ProviderType provider
+        +string modelId
+        +string baseUrl
+        +string? apiKeyRef
+        +number contextWindow
+        +boolean supportsVision
+        +boolean supportsTools
+        +boolean supportsStructuredOutput
+        +boolean supportsReasoning
+        +boolean isActive
+        +string createdAt
+        +string updatedAt
+    }
+
+    class Conversation {
+        +string id
+        +string title
+        +string? providerId
+        +string? modelId
+        +string? systemPrompt
+        +number temperature
+        +number maxTokens
+        +boolean toolsEnabled
+        +string createdAt
+        +string updatedAt
+    }
+
+    class ConversationMessage {
+        +string id
+        +string conversationId
+        +Role role
+        +string content
+        +string? modelId
+        +string? providerId
+        +QualitySignal? qualitySignal
+        +string createdAt
+    }
+
+    class TrainingExample {
+        +string id
+        +string prompt
+        +string? systemPrompt
+        +string response
+        +string? approvedResponse
+        +string modelId
+        +string providerId
+        +string[] tags
+        +string? domain
+        +string? language
+        +number? qualityScore
+        +ApprovalState approvalState
+        +string createdAt
+        +string updatedAt
+    }
+
+    class DataFactoryRecord {
+        +string id
+        +string taskType
+        +string domain
+        +string language
+        +string input
+        +string? context
+        +string? expectedOutput
+        +string? chosenOutput
+        +string? rejectedOutput
+        +string? source
+        +string? sourceUrl
+        +string? license
+        +VerificationStatus verificationStatus
+        +number? qualityScore
+        +string? difficulty
+        +string[] tags
+        +ValidationResult[] validationResults
+        +string createdAt
+        +string updatedAt
+    }
+
+    class Dataset {
+        +string id
+        +string name
+        +string version
+        +number recordCount
+        +string createdAt
+    }
+
+    class TrainingRun {
+        +string runId
+        +string baseModel
+        +TrainingMethod method
+        +string? datasetId
+        +string? datasetVersion
+        +number? epochs
+        +number? learningRate
+        +number? batchSize
+        +number? gradientAccumulation
+        +number? loraRank
+        +number? loraAlpha
+        +string[] targetModules
+        +string? quantization
+        +number? seed
+        +string? device
+        +RunStatus status
+        +string? checkpointPath
+        +PreflightResult? preflightResult
+        +string createdAt
+        +string updatedAt
+    }
+
+    class ModelRegistryEntry {
+        +string id
+        +string modelName
+        +string version
+        +string baseModel
+        +string? trainingRunId
+        +string? datasetVersion
+        +string trainingMethod
+        +string? checkpointLocation
+        +string? adapterLocation
+        +object evaluationScore
+        +ModelStatus status
+        +string? notes
+        +string createdDate
+    }
+
+    class ResearchRecord {
+        +string id
+        +string task
+        +string? instructions
+        +string? input
+        +object[] sourcesConsidered
+        +object[] candidateEntities
+        +object[] generatedRecords
+        +object[] validationFailures
+        +object[] finalApprovedRecords
+        +number? rewardScore
+        +string? modelUsed
+        +number? duration
+        +string createdAt
+    }
+
+    class Experiment {
+        +string id
+        +string? codeVersion
+        +string? modelId
+        +string? datasetVersion
+        +object configuration
+        +number? seed
+        +object results
+        +string? notes
+        +string createdAt
+    }
+
+    class EvaluationResult {
+        +string id
+        +string modelId
+        +BenchmarkCategory benchmarkCategory
+        +number? score
+        +number? baseModelScore
+        +object[] regressions
+        +string createdAt
+    }
+
+    %% ===== Provider Abstraction =====
+    class ModelProvider {
+        <<interface>>
+        +ProviderConfig config
+        +chat(messages: Message[], options: ChatOptions) AsyncIterable~ChatChunk~
+    }
+
+    class OpenAICompatibleProvider {
+        +chat(messages, options) AsyncIterable~ChatChunk~
+    }
+
+    class OllamaProvider {
+        +chat(messages, options) AsyncIterable~ChatChunk~
+    }
+
+    class VllmProvider {
+        +chat(messages, options) AsyncIterable~ChatChunk~
+    }
+
+    class HuggingFaceProvider {
+        +chat(messages, options) AsyncIterable~ChatChunk~
+    }
+
+    class ProviderFactory {
+        +getProvider(config: ProviderConfig) ModelProvider
+    }
+
+    %% ===== Repository Layer =====
+    class DataFactoryRepository {
+        <<interface>>
+        +list(opts) Paginated~DataFactoryRecord~
+        +get(id) DataFactoryRecord?
+        +create(input) DataFactoryRecord
+        +update(id, patch) DataFactoryRecord
+        +bulk(ids, action, value?) number
+        +setValidation(id, results) void
+    }
+
+    class TrainingRunRepository {
+        <<interface>>
+        +list() TrainingRun[]
+        +get(id) TrainingRun?
+        +create(input) TrainingRun
+        +update(id, patch) TrainingRun
+    }
+
+    class ModelRegistryRepository {
+        <<interface>>
+        +list() ModelRegistryEntry[]
+        +get(id) ModelRegistryEntry?
+        +create(input) ModelRegistryEntry
+        +promote(id, newStatus) ModelRegistryEntry
+    }
+
+    class DatasetRepository {
+        <<interface>>
+        +list() Dataset[]
+        +create(name, recordIds) Dataset
+        +get(id) Dataset?
+        +exportJsonl(id) string
+    }
+
+    %% ===== Service Layer =====
+    class ValidationEngine {
+        +validateRecord(record) ValidationResult[]
+        -schemaValidator(record) ValidationResult?
+        -requiredFieldsValidator(record) ValidationResult?
+        -duplicateValidator(record) ValidationResult?
+        -urlSourceValidator(record) ValidationResult?
+        -fieldTypeValidator(record) ValidationResult?
+    }
+
+    class PreflightClient {
+        +runPreflight(opts) PreflightResult
+    }
+
+    class JsonlIO {
+        +toJsonl(rows) string
+        +parseJsonl(text) object[]
+    }
+
+    class SecretsResolver {
+        +resolveKeyRef(ref) string?
+    }
+
+    %% ===== Python Services =====
+    class TrainerService {
+        +GET /preflight PreflightResult
+        +POST /train 501_stub
+    }
+
+    class PreflightChecks {
+        -checkPython() PreflightCheckItem
+        -checkTorch() PreflightCheckItem
+        -checkCuda() PreflightCheckItem
+        -checkGpu() PreflightCheckItem
+        -checkVram() PreflightCheckItem
+        -checkTransformers() PreflightCheckItem
+        -checkPeft() PreflightCheckItem
+        -checkTrl() PreflightCheckItem
+        -checkDisk() PreflightCheckItem
+        -checkDataset(path) PreflightCheckItem
+        -checkBaseModel(name) PreflightCheckItem
+    }
+
+    class InferenceService {
+        +POST /chat 501_stub
+        +GET /health ok
+    }
+
+    class ResearchService {
+        +POST /run ResearchRecord
+        +GET /records/:id ResearchRecord
+    }
+
+    class ResearchTask {
+        -schemaSteps string[]
+        +run(task, input) ResearchRecord
+        -discoverTaxonomy(input) object[]
+        -generateRecords(entities) object[]
+        -validate(records) object[]
+    }
+
+    %% ===== Relationships =====
+    ProviderConfig "1" --> "0..*" Conversation : configuredBy
+    Conversation "1" --> "0..*" ConversationMessage : has
+    ConversationMessage "0..1" --> "0..1" TrainingExample : savesAs
+    TrainingExample "1" --> "0..1" DataFactoryRecord : promotesTo
+    DataFactoryRecord "0..*" --> "0..*" Dataset : includedIn
+    Dataset "1" --> "0..*" TrainingRun : referencedBy
+    TrainingRun "1" --> "0..1" ModelRegistryEntry : produces
+    ModelRegistryEntry "1" --> "0..*" EvaluationResult : scoredBy
+    ModelRegistryEntry "1" --> "0..*" Experiment : hasLineage
+    TrainingRun "1" --> "0..*" Experiment : recordsAs
+
+    ModelProvider <|.. OpenAICompatibleProvider
+    ModelProvider <|.. OllamaProvider
+    ModelProvider <|.. VllmProvider
+    ModelProvider <|.. HuggingFaceProvider
+    ProviderFactory ..> ModelProvider : creates
+    ProviderFactory ..> ProviderConfig : reads
+    OpenAICompatibleProvider ..> SecretsResolver : resolves key
+
+    DataFactoryRepository ..> DataFactoryRecord : manages
+    TrainingRunRepository ..> TrainingRun : manages
+    ModelRegistryRepository ..> ModelRegistryEntry : manages
+    DatasetRepository ..> Dataset : manages
+
+    ValidationEngine ..> DataFactoryRecord : validates
+    PreflightClient ..> TrainerService : calls
+    TrainerService *-- PreflightChecks : uses
+    ResearchService *-- ResearchTask : runs
+
+    JsonlIO ..> DataFactoryRecord : exports
+    JsonlIO ..> Dataset : exports

@@ -1,0 +1,2 @@
+# Placeholder to keep the weights/ directory in version control.
+# Actual model weights are NEVER committed (see .gitignore).
