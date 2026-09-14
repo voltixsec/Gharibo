@@ -12,6 +12,7 @@
     "lint": "npm run lint --workspace apps/web",
     "typecheck": "npm run typecheck --workspace apps/web",
     "test": "vitest run --root apps/web",
+    "docs:validate": "node scripts/validate-docs.mjs",
     "dev:services": "concurrently \"npm run dev:trainer\" \"npm run dev:inference\" \"npm run dev:research\"",
     "dev:trainer": "cd services/trainer && python -m uvicorn main:app --port 8100 --reload",
     "dev:inference": "cd services/inference && python -m uvicorn main:app --port 8101 --reload",

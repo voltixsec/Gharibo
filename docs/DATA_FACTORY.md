@@ -1,5 +1,16 @@
 # GHARIBO Data Factory
 
+| Field | Value |
+|-------|-------|
+| **Document Owner** | Architecture (GHARIBO AI LAB) |
+| **Type** | Domain spec |
+| **Status** | Frozen |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
+
+> Part of the Milestone 1 architecture baseline. The pipeline state machine below is a frozen
+> decision — see `docs/adr/ADR-0007-data-factory-pipeline-state-machine.md`.
+
 ## Overview
 
 The Data Factory is the data pipeline and curation workspace. It manages the full lifecycle of training data from raw collection to training-ready datasets.

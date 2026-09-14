@@ -2,9 +2,13 @@
 
 | Field | Value |
 |-------|-------|
-| **Document Owner** | 许清楚 (Xu), Product Manager |
+| **Document Owner** | Product (GHARIBO AI LAB) — 许清楚 (Xu), Product Manager |
+| **Type** | PRD |
+| **Status** | Approved |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
 | **Project Name** | `gharibo_ai_lab` |
-| **Status** | Draft — Milestone 1 (Vertical Slice) |
+| **Milestone** | 1 — Vertical Slice |
 | **Programming Language / Stack** | Next.js + TypeScript + Tailwind CSS + shadcn/ui (frontend); Python + FastAPI + PyTorch + Transformers + PEFT + TRL + datasets (ML services); SQLite (switchable to PostgreSQL) |
 | **Original Request** | Build GHARIBO AI LAB — the control center for chatting with base models, collecting training data, reviewing/approving examples, building datasets, launching LoRA/QLoRA/SFT experiments, evaluating checkpoints, comparing GHARIBO versions, maintaining a model registry, running Research Gym tasks, and inspecting training history. |
 

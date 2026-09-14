@@ -1,16 +1,29 @@
 # GHARIBO AI LAB — Delivery Overview
 
+| Field | Value |
+|-------|-------|
+| **Document Owner** | Delivery (GHARIBO AI LAB) |
+| **Type** | Delivery note |
+| **Status** | Superseded |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
+
+> **Superseded.** This is a point-in-time delivery note for Milestone 1. Its counts have been
+> reconciled with the frozen baseline, but it is **not** an authoritative specification. The
+> authoritative sources are [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (Frozen v1.0.0) and
+> [`docs/DOCUMENT_REGISTER.md`](docs/DOCUMENT_REGISTER.md).
+
 ## TL;DR
-GHARIBO AI LAB vertical slice is built, tested, and running locally at http://localhost:3000. All 10 sections functional, 30 API endpoints working, SQLite database persisting, REAL pre-flight check operational, 47 tests passing.
+GHARIBO AI LAB vertical slice is built, tested, and running locally at http://localhost:3000. All 10 sections functional, 28 API route files (44 HTTP handlers) working, SQLite database persisting, REAL pre-flight check operational, 47 tests passing.
 
 ## What Was Built
 
-### Monorepo Structure (184 files)
+### Monorepo Structure (194 files at the initial checkpoint)
 ```
 GHARIBO/
 ├── apps/web/              # Next.js 14.2 full-stack app (frontend + API)
 │   ├── app/(dashboard)/   # 10 feature pages
-│   ├── app/api/           # 30 API route handlers
+│   ├── app/api/           # 28 API route files (44 HTTP method handlers)
 │   ├── components/        # 35+ React components + 18 shadcn/ui primitives
 │   ├── lib/db/            # SQLite schema + 11 repositories
 │   ├── lib/providers/     # 4 provider backends (OpenAI, Ollama, vLLM, HF)
@@ -21,9 +34,9 @@ GHARIBO/
 │   ├── trainer/           # FastAPI — REAL pre-flight (torch/CUDA/GPU/VRAM)
 │   ├── inference/         # FastAPI — stub (P1)
 │   └── research/          # FastAPI — Research Gym task runner
-├── data/                  # SQLite DB, datasets, exports
-├── models/                # Adapters, checkpoints, registry
-└── docs/                  # 10 documentation files
+├── data/                  # Dataset pipeline dirs (raw/, processed/, datasets/, exports/)
+├── models/                # Adapters, checkpoints, weights, registry
+└── docs/                  # Specs, ADRs, governance, diagrams
 ```
 
 ### 10 Sidebar Sections (all working)
@@ -42,7 +55,7 @@ GHARIBO/
 
 - ✅ App launches at http://localhost:3000
 - ✅ All 10 pages render (HTTP 200)
-- ✅ All 30 API endpoints return correct `{code:0, data, message:"ok"}` responses
+- ✅ All 28 API route files (44 HTTP method handlers) return correct `{code:0, data, message:"ok"}` responses
 - ✅ SQLite database persists data across requests (13 tables)
 - ✅ Provider creation, listing, and retrieval verified
 - ✅ Data Factory record creation with automatic validation

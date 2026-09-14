@@ -2,10 +2,19 @@
 
 | Field | Value |
 |-------|-------|
-| **Document Owner** | 高见远 (Gao), Software Architect |
+| **Document Owner** | Architecture (GHARIBO AI LAB) |
+| **Type** | Architecture |
+| **Status** | Frozen |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
 | **Project Name** | `gharibo_ai_lab` |
-| **Status** | Final — Milestone 1 (Vertical Slice) |
-| **Based On** | `docs/PRD.md` (by Xu, PM) |
+| **Based On** | `docs/PRD.md` (v1.0.0) |
+
+> **Baseline freeze — 2026-09-14.** This document is the frozen architecture baseline for
+> Milestone 1 (the vertical slice). It reflects what was actually built, not what was planned.
+> From this point, changing it requires an ADR and a version bump per
+> `docs/DOCUMENTATION_GOVERNANCE.md` §5. The countable claims in §2.7 are machine-checked by
+> `npm run docs:validate` — update that block whenever the code changes.
 
 ---
 
@@ -42,7 +51,7 @@ Next.js Route Handler (controller)
         ↓ calls
 Repository (lib/db/repositories/*)  ← interface: row<->domain object mapping
         ↓ uses
-better-sqlite3 connection (lib/db/index.ts)  ← singleton, WAL mode, persists to ./data/gharibo.db
+better-sqlite3 connection (lib/db/index.ts)  ← singleton, WAL mode, persists to apps/web/data/gharibo.db
 ```
 
 - The repository layer maps SQLite rows (JSON columns for arrays/objects) ↔ TypeScript domain objects from `@gharibo/shared`.
@@ -60,8 +69,9 @@ better-sqlite3 connection (lib/db/index.ts)  ← singleton, WAL mode, persists t
 |------|---------|
 | `package.json` | Root workspace config (`"workspaces": ["apps/web", "packages/shared"]`), scripts (`dev`, `build`, `lint`, `typecheck`, `dev:services`) |
 | `tsconfig.base.json` | Shared TS compiler options (strict, `target ES2022`, `moduleResolution bundler`) |
-| `.gitignore` | Ignore `node_modules`, `.next`, `*.db`, `.env*`, `data/exports/*`, `models/checkpoints/*`, Python `__pycache__`/`venv` |
-| `.env.example` | Documents `DATABASE_PATH`, `TRAINER_URL`, `INFERENCE_URL`, `RESEARCH_URL`, and notes that provider API keys are by-ref |
+| `.gitignore` | Excludes secrets and generated/runtime state from a **public** repository: `.env` / `.env.*` (while keeping `!.env.example` and `!.env.local.example`), `node_modules/`, build output (`.next/`, `dist/`, `build/`), Python caches and virtualenvs, SQLite databases (`*.db`, `*.db-wal`, `*.db-shm`, `apps/web/data/`), pipeline data (`data/{raw,processed,datasets,exports}/*`, structure preserved with `.gitkeep`), model artifacts (`models/{checkpoints,adapters,weights,registry}/*`), logs, and machine-local tooling state (`.workbuddy-ai/`, `.vscode/`, `.idea/`) |
+| `.gitattributes` | Normalises text to LF (`* text=auto eol=lf`) and marks binary artifact types so they are never diffed or normalised |
+| `.env.example` | Documents `DATABASE_PATH`, `TRAINER_URL`, `INFERENCE_URL`, `RESEARCH_URL`, `CORS_ALLOWED_ORIGINS`, and states that provider API keys are referenced by name only |
 | `README.md` | Quickstart: install, migrate, run web + services |
 | `data/.gitkeep` | Keeps the data tree in git |
 | `data/datasets/.gitkeep` | Exported dataset JSONL lands here |
@@ -276,7 +286,38 @@ better-sqlite3 connection (lib/db/index.ts)  ← singleton, WAL mode, persists t
 | `services/trainer` | 7 |
 | `services/inference` | 5 |
 | `services/research` | 7 |
-| **Total** | **~147 files** |
+| **Total (planned)** | **~147 files** |
+
+> **Planned vs delivered.** The table above is the *design-time* inventory from the original
+> task decomposition. The **delivered** baseline is **209 tracked files** (`git ls-files` at the
+> freeze commit). The difference is accounted for by documentation added after the design (this
+> document's ADRs, the governance baseline, the document register), the `.gitkeep` placeholders
+> that preserve the `data/` and `models/` directory structure, and files added during
+> pre-checkpoint remediation. Do not treat the planned total as a fact about the repository.
+
+### 2.7 Verified Baseline Facts
+
+These are the countable claims of this architecture, machine-checked by
+`scripts/validate-docs.mjs` (`npm run docs:validate`). **If the code changes, this block must
+change with it** — that is what keeps the frozen baseline honest.
+
+<!-- docs:facts -->
+| Metric | Value |
+|--------|-------|
+| api_route_files | 28 |
+| api_handlers | 44 |
+| sqlite_tables | 13 |
+| dashboard_pages | 10 |
+| adrs | 10 |
+<!-- /docs:facts -->
+
+| Metric | Meaning |
+|--------|---------|
+| `api_route_files` | Files matching `apps/web/app/api/**/route.ts` |
+| `api_handlers` | Exported HTTP method handlers across those files (GET/POST/PUT/PATCH/DELETE) |
+| `sqlite_tables` | Table definitions in `apps/web/lib/db/schema.ts` (`CREATE TABLE IF NOT EXISTS <name> (`), i.e. real DDL, not prose mentions |
+| `dashboard_pages` | `page.tsx` files under `apps/web/app/(dashboard)/` |
+| `adrs` | Architecture decision records in `docs/adr/` |
 
 ---
 
@@ -652,12 +693,12 @@ CREATE TABLE IF NOT EXISTS settings (
 
 ## 5. Task Decomposition (ordered implementation list)
 
-> Constraints honored: **5 tasks max**, min 3 files each, grouped by module/layer, T01 = project infrastructure. See `docs/system_design.md` Mermaid graph for the dependency visualization.
+> Constraints honored: **5 tasks max**, min 3 files each, grouped by module/layer, T01 = project infrastructure. The **Task Dependency Graph** immediately below visualizes the dependencies.
 
 | Order | Task ID | Description | Key Files | Depends On |
 |-------|---------|-------------|----------|------------|
 | 1 | **T01** | **Project infrastructure & data foundation**: monorepo workspace, all root config, `packages/shared` types, `apps/web` config + Tailwind/shadcn setup, full DB layer (connection + schema + migrations + all 13 repositories), `lib/utils/config/secrets`, `data/` + `models/` skeleton, root `.env.example`/README/.gitignore | `package.json`, `tsconfig.base.json`, `.gitignore`, `.env.example`, `README.md`, `data/**/.gitkeep`, `models/**/.gitkeep`, `packages/shared/**`, `apps/web/package.json`, `apps/web/tsconfig.json`, `apps/web/next.config.mjs`, `apps/web/tailwind.config.ts`, `apps/web/postcss.config.mjs`, `apps/web/components.json`, `apps/web/.env.local.example`, `apps/web/next-env.d.ts`, `apps/web/lib/db/**` (16 files), `apps/web/lib/{config,secrets,utils}.ts` | — |
-| 2 | **T02** | **API layer + provider abstraction + Python services**: all 30 Next.js API route handlers, provider abstraction (4 backends), validation engine, JSONL I/O, pre-flight proxy, and the 3 Python FastAPI services (trainer = real pre-flight, inference = stub, research = minimal task) | `apps/web/app/api/**` (30 route files), `apps/web/lib/providers/**` (5 files), `apps/web/lib/validation/**` (2), `apps/web/lib/{jsonl,preflight}.ts`, `services/trainer/**` (7), `services/inference/**` (5), `services/research/**` (7) | T01 |
+| 2 | **T02** | **API layer + provider abstraction + Python services**: all 28 Next.js API route files (44 HTTP method handlers), provider abstraction (4 backends), validation engine, JSONL I/O, pre-flight proxy, and the 3 Python FastAPI services (trainer = real pre-flight, inference = stub, research = minimal task) | `apps/web/app/api/**` (28 route files), `apps/web/lib/providers/**` (5 files), `apps/web/lib/validation/**` (2), `apps/web/lib/{jsonl,preflight}.ts`, `services/trainer/**` (7), `services/inference/**` (5), `services/research/**` (7) | T01 |
 | 3 | **T03** | **App shell, layout & shadcn/ui component library**: root layout, dashboard layout with sidebar, theme provider/toggle, all shadcn/ui base components, globals.css, root page redirect, toast hook | `apps/web/app/layout.tsx`, `apps/web/app/page.tsx`, `apps/web/app/globals.css`, `apps/web/app/(dashboard)/layout.tsx`, `apps/web/components/sidebar.tsx`, `apps/web/components/theme-provider.tsx`, `apps/web/components/theme-toggle.tsx`, `apps/web/components/ui/*` (~18 files), `apps/web/hooks/use-toast.ts` | T01 |
 | 4 | **T04** | **Core feature pages & components — data pipeline half**: Playground, Research Gym, Data Factory, Datasets, Training (the closed-loop pipeline: chat → save → review → dataset → pre-flight) | `apps/web/app/(dashboard)/{playground,research-gym,data-factory,datasets,training}/page.tsx` (5 pages), `apps/web/components/{playground,research-gym,data-factory,datasets,training}/**` (~17 components), `apps/web/hooks/{use-providers,use-conversations}.ts` | T01, T02, T03 |
 | 5 | **T05** | **Supporting feature pages & components — registry & oversight half**: Evaluations, Models, Experiments, System, Settings (model registry gates, eval scaffold, experiment lineage, diagnostics, provider config UI) | `apps/web/app/(dashboard)/{evaluations,models,experiments,system,settings}/page.tsx` (5 pages), `apps/web/components/{evaluations,models,experiments,system,providers}/**` (~12 components) | T01, T02, T03 |
@@ -780,7 +821,7 @@ type ApiResponse<T> = { code: 0; data: T; message: "ok" }
 - **No global store** (Redux/Zustand) for the vertical slice — unnecessary complexity. If cross-page state is needed later, add TanStack Query (P1).
 
 ### 7.6 Database Lifecycle
-- `runMigrations()` called once at module load of `lib/db/index.ts` (idempotent `CREATE TABLE IF NOT EXISTS`). SQLite file at `DATABASE_PATH` (default `./data/gharibo.db`) persists across restarts.
+- `runMigrations()` called once at module load of `lib/db/index.ts` (idempotent `CREATE TABLE IF NOT EXISTS`). The SQLite file lives at `DATABASE_PATH`, resolved relative to the Next.js workspace root (`apps/web`), so the default `./data/gharibo.db` resolves to `apps/web/data/gharibo.db` and persists across restarts.
 - WAL mode for concurrent reads during streaming.
 - All writes use prepared statements (better-sqlite3 `.prepare()` + `.run()`).
 

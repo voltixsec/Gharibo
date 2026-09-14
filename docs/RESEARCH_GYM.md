@@ -1,5 +1,16 @@
 # GHARIBO Research Gym
 
+| Field | Value |
+|-------|-------|
+| **Document Owner** | Architecture (GHARIBO AI LAB) |
+| **Type** | Domain spec |
+| **Status** | Frozen |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
+
+> Part of the Milestone 1 architecture baseline. See `docs/DOCUMENTATION_GOVERNANCE.md` §5 for
+> change control.
+
 ## Overview
 
 Research Gym is the first "training school" for GHARIBO. It teaches the model how to build high-quality structured knowledge libraries through a systematic research workflow.

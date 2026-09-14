@@ -1,5 +1,16 @@
 # GHARIBO Training Strategy
 
+| Field | Value |
+|-------|-------|
+| **Document Owner** | Architecture (GHARIBO AI LAB) |
+| **Type** | Domain spec |
+| **Status** | Frozen |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
+
+> Part of the Milestone 1 architecture baseline. See `docs/DOCUMENTATION_GOVERNANCE.md` §5 for
+> change control and `docs/ARCHITECTURE.md` §1.3 for how this subsystem is wired.
+
 ## Philosophy
 
 GHARIBO follows a disciplined training philosophy:

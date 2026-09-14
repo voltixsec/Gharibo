@@ -1,5 +1,16 @@
 # GHARIBO Roadmap
 
+| Field | Value |
+|-------|-------|
+| **Document Owner** | Product (GHARIBO AI LAB) |
+| **Type** | Roadmap |
+| **Status** | Approved |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
+
+> The milestone progression below is a planning document, not a frozen baseline. It may change as
+> milestones complete; the frozen architecture baseline is `docs/ARCHITECTURE.md`.
+
 ## Overview
 
 GHARIBO's progression from infrastructure to a full AI model family. Each milestone builds on the previous one.

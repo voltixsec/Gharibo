@@ -1,5 +1,16 @@
 # GHARIBO Model Registry
 
+| Field | Value |
+|-------|-------|
+| **Document Owner** | Architecture (GHARIBO AI LAB) |
+| **Type** | Domain spec |
+| **Status** | Frozen |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
+
+> Part of the Milestone 1 architecture baseline. The promotion gates below are a frozen decision —
+> see `docs/adr/ADR-0008-model-registry-status-gates.md`.
+
 ## Overview
 
 The Model Registry is the single source of truth for every model version in the GHARIBO ecosystem. It gates promotion from experiment to production, ensuring no model is called "GHARIBO-V1" until it has earned it.

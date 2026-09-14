@@ -1,5 +1,13 @@
 # GHARIBO AI LAB
 
+| Field | Value |
+|-------|-------|
+| **Document Owner** | Architecture (GHARIBO AI LAB) |
+| **Type** | Runbook |
+| **Status** | Living |
+| **Version** | 1.0.0 |
+| **Last Updated** | 2026-09-14 |
+
 **Build. Train. Evaluate. Evolve.**
 
 Professional AI laboratory infrastructure for the GHARIBO model family.
@@ -26,7 +34,9 @@ cp .env.example apps/web/.env.local
 
 ### 3. Run Database Migrations
 
-Migrations run automatically on first server start. The SQLite database is created at `data/gharibo.db`.
+Migrations run automatically on first server start. The SQLite database is created at
+`apps/web/data/gharibo.db` (the `DATABASE_PATH` default, resolved relative to the `apps/web`
+workspace root).
 
 ### 4. Start the Web App
 
@@ -57,16 +67,20 @@ Or start individually:
 
 ```
 gharibo/
-├── apps/web/           # Next.js 14 (App Router) — frontend + API
+├── apps/web/           # Next.js 14 (App Router) — frontend + API (route handlers)
+│   └── data/           # SQLite runtime DB (apps/web/data/gharibo.db) — gitignored
 ├── packages/shared/    # Shared TypeScript types
 ├── services/
 │   ├── trainer/        # FastAPI — ML pre-flight check (REAL torch/CUDA inspection)
 │   ├── inference/      # FastAPI — inference service (stub for P0)
 │   └── research/       # FastAPI — Research Gym task runner
-├── data/               # SQLite DB, datasets, exports
-├── models/             # Model artifacts (adapters, checkpoints, registry)
-└── docs/               # PRD + Architecture documents
+├── data/               # Dataset pipeline dirs (raw/, processed/, datasets/, exports/)
+├── models/             # Model artifacts (adapters, checkpoints, weights, registry)
+└── docs/               # Specs, ADRs, governance, diagrams
 ```
+
+The authoritative system design is [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (Frozen v1.0.0).
+Decisions and their rationale are recorded in [`docs/adr/`](docs/adr/README.md).
 
 ## Key Features (Milestone 1 — Vertical Slice)
 
@@ -108,6 +122,27 @@ This is expected on machines without a GPU. The pre-flight check correctly detec
 - No CUDA → `torch.cuda.is_available()` returns `False`
 - No GPU → GPU name/VRAM items show NOT_READY
 - Training execution is P1; the pre-flight is REAL but training launch returns 501
+
+## Documentation
+
+The document set is governed — every doc declares an owner, type, status, and version, and a
+validator keeps it honest.
+
+```bash
+npm run docs:validate
+```
+
+This checks metadata headers, ADR numbering/index parity, register consistency, and recomputes
+the countable facts in `docs/ARCHITECTURE.md` §2.7 from the code. **Run it before any commit that
+changes docs, routes, schema, or page counts.**
+
+| Document | Purpose |
+|----------|---------|
+| [`docs/PRD.md`](docs/PRD.md) | Product requirements (Approved) |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture baseline (Frozen v1.0.0) |
+| [`docs/DOCUMENTATION_GOVERNANCE.md`](docs/DOCUMENTATION_GOVERNANCE.md) | How docs are owned/versioned |
+| [`docs/DOCUMENT_REGISTER.md`](docs/DOCUMENT_REGISTER.md) | Index of every governed document |
+| [`docs/adr/README.md`](docs/adr/README.md) | Architecture decision records |
 
 ## Security
 
