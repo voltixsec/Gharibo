@@ -5,7 +5,7 @@
 | **Document Owner** | Delivery (GHARIBO AI LAB) |
 | **Type** | Delivery note |
 | **Status** | Living |
-| **Version** | 1.1.0 |
+| **Version** | 1.2.0 |
 | **Last Updated** | 2026-09-15 |
 
 All notable changes to GHARIBO AI LAB are recorded here.
@@ -88,6 +88,9 @@ never been read. The terminal state is `EVALUATION_READY_AWAITING_AUTHORIZATION`
   lifecycle transitions and the no-promotion / no-evaluation boundary.
 - `NON_ARTIFACT_PREFIXES` in `apps/web/lib/db/repositories/training-artifacts.ts` — engine build
   output (`unsloth_compiled_cache/`) can no longer be registered as a model artifact.
+- `docs/EVALUATION_AUTHORIZATION_REQUEST.md` — a **request**, not a permission: the explicit,
+  signable ask to run the governed benchmark against the held-out TEST split. It ships with an
+  empty decision block by design (`BLK-0003` stays `OPEN`).
 - Roadmap `STAGE-1` ↔ `training.status` consistency invariant in `master:validate`.
 
 #### Training (real, executed once)
