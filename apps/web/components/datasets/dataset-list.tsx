@@ -3,29 +3,33 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { DatasetForm } from "./dataset-form";
 import { Download, FolderGit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Dataset } from "@gharibo/shared";
 import { formatDate } from "@/lib/utils";
+import { EmptyState, ErrorState } from "@/components/status";
 
 export function DatasetList() {
   const { toast } = useToast();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchDatasets = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/datasets");
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const json = await res.json();
-      if (json.code === 0) {
-        setDatasets(json.data);
-      }
-    } catch {
-      // ignore
+      if (json.code !== 0) throw new Error(json.message || "Request failed");
+      setDatasets(json.data);
+    } catch (err) {
+      setDatasets([]);
+      setError(err instanceof Error ? err.message : "Failed to load datasets");
     } finally {
       setLoading(false);
     }
@@ -42,7 +46,7 @@ export function DatasetList() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Datasets</h2>
         <Button onClick={() => setShowForm(!showForm)}>
           {showForm ? "Cancel" : "New Dataset"}
@@ -59,24 +63,25 @@ export function DatasetList() {
       )}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading datasets...</p>
+        <p className="py-6 text-sm text-muted-foreground">Loading datasets…</p>
+      ) : error ? (
+        <ErrorState title="Could not load datasets" message={error} />
       ) : datasets.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-2 py-12">
-            <FolderGit2 className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">No datasets yet</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<FolderGit2 className="h-8 w-8" />}
+          title="No assembled datasets yet"
+          message="Create a dataset to freeze approved Data Factory records into a versioned training artifact."
+        />
       ) : (
         <div className="flex flex-col gap-2">
           {datasets.map((ds) => (
             <Card key={ds.id}>
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <FolderGit2 className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{ds.name}</p>
-                    <div className="flex items-center gap-2">
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <FolderGit2 className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{ds.name}</p>
+                    <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="text-xs">{ds.version}</Badge>
                       <span className="text-xs text-muted-foreground">
                         {ds.recordCount} records

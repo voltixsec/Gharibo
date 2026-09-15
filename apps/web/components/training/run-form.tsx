@@ -102,7 +102,7 @@ export function RunForm({ onSaved }: RunFormProps) {
         <CardTitle>Training Run Configuration</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="base-model">Base Model</Label>
             <Input

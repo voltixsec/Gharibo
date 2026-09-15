@@ -20,6 +20,23 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
 import { Loader2, Upload } from "lucide-react";
 import type { TrainingPackage, TrainingRun } from "@gharibo/shared";
+import { StatusBadge, HashDisplay, ErrorState } from "@/components/status";
+import type { StatusVariant } from "@/components/status";
+
+/**
+ * Run lifecycle states on the shared vocabulary — identical mapping to the
+ * run list, so a colour means the same thing on both surfaces.
+ */
+const RUN_STATUS_VARIANT: Record<string, StatusVariant> = {
+  DRAFT: "not-started",
+  QUEUED: "queued",
+  RUNNING: "running",
+  COMPLETED: "success",
+  FAILED: "failed",
+  CANCELLED: "neutral",
+  INTERRUPTED: "warning",
+  RESUMABLE: "warning",
+};
 
 interface RunDetailProps {
   runId: string;
@@ -44,6 +61,7 @@ export function RunDetail({ runId }: RunDetailProps) {
   const [packages, setPackages] = useState<PackageSummary[]>([]);
   const [pkg, setPkg] = useState<TrainingPackage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Import form state
   const [manifest, setManifest] = useState("");
@@ -55,10 +73,16 @@ export function RunDetail({ runId }: RunDetailProps) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/training-runs/${runId}`);
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const json = await res.json();
-      if (json.code === 0) setRun(json.data as TrainingRun);
+      if (json.code === 0) {
+        setRun(json.data as TrainingRun);
+      } else {
+        throw new Error(json.message || "Request failed");
+      }
 
       const res2 = await fetch("/api/training-packages");
       const json2 = await res2.json();
@@ -71,8 +95,9 @@ export function RunDetail({ runId }: RunDetailProps) {
           if (json3.code === 0) setPkg(json3.data.package as TrainingPackage);
         }
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      setRun(null);
+      setError(e instanceof Error ? e.message : "Failed to load training run");
     } finally {
       setLoading(false);
     }
@@ -139,6 +164,16 @@ export function RunDetail({ runId }: RunDetailProps) {
     );
   }
 
+  if (error) {
+    return (
+      <ErrorState
+        title="Could not load this training run"
+        message={error}
+        onRetry={load}
+      />
+    );
+  }
+
   if (!run) {
     return <p className="py-12 text-sm text-muted-foreground">Training run not found.</p>;
   }
@@ -146,16 +181,33 @@ export function RunDetail({ runId }: RunDetailProps) {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{run.baseModel}</CardTitle>
-          <Badge variant="outline" className="text-xs">
-            {run.method}
-          </Badge>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardTitle className="min-w-0 truncate">{run.baseModel}</CardTitle>
+          <div className="flex shrink-0 items-center gap-2">
+            <StatusBadge
+              variant={RUN_STATUS_VARIANT[run.status] || "neutral"}
+              label={run.status}
+            />
+            <Badge variant="outline" className="text-xs">
+              {run.method}
+            </Badge>
+          </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-1">
-          <p className="text-xs text-muted-foreground">
-            run_id <span className="font-mono">{run.runId}</span>
-          </p>
+        <CardContent className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              run_id
+              <HashDisplay value={run.runId} head={12} tail={6} />
+            </span>
+            <span className="flex items-center gap-1.5">
+              package_id
+              {run.packageId ? (
+                <HashDisplay value={run.packageId} head={12} tail={6} />
+              ) : (
+                <span className="font-mono">—</span>
+              )}
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground">
             Created {formatDate(run.createdAt)} · {run.epochs ?? "—"} epochs · LR{" "}
             {run.learningRate ?? "—"} · seq {run.maxSeqLength ?? "—"} · {run.dtype ?? "—"}
@@ -163,10 +215,6 @@ export function RunDetail({ runId }: RunDetailProps) {
           <p className="text-xs text-muted-foreground">
             LoRA r {run.loraRank ?? "—"} / alpha {run.loraAlpha ?? "—"} ·{" "}
             {(run.targetModules ?? []).join(", ") || "—"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            package_id{" "}
-            <span className="font-mono">{run.packageId ? run.packageId.slice(0, 20) + "…" : "—"}</span>
           </p>
         </CardContent>
       </Card>
@@ -217,7 +265,7 @@ export function RunDetail({ runId }: RunDetailProps) {
               rows={3}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label>Outcome (explicit)</Label>
               <Select value={outcome} onValueChange={(v) => setOutcome(v as typeof outcome)}>

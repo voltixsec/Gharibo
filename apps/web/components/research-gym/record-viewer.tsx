@@ -27,7 +27,7 @@ export function RecordViewer({ record, onClose }: RecordViewerProps) {
         <ScrollArea className="max-h-[60vh] pr-4">
           <div className="flex flex-col gap-4">
             {/* Summary */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-muted-foreground">Task</p>
                 <p className="text-sm font-medium">{record.task}</p>

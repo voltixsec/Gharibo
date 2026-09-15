@@ -1,16 +1,16 @@
-import { Sidebar } from "@/components/sidebar";
+import { AppShell } from "@/components/app-shell";
+import { getProjectStateForTopbar } from "@/lib/dashboard";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const projectState = getProjectStateForTopbar();
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-background">
-        {children}
-      </main>
-    </div>
+    <AppShell projectState={projectState}>
+      {children}
+    </AppShell>
   );
 }

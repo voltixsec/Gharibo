@@ -96,7 +96,7 @@ export function ProviderForm({ onSaved }: ProviderFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label>Provider Type</Label>
               <Select value={provider} onValueChange={(v) => setProvider(v as ProviderType)}>
@@ -124,7 +124,7 @@ export function ProviderForm({ onSaved }: ProviderFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="base-url">Base URL</Label>
               <Input
@@ -149,7 +149,7 @@ export function ProviderForm({ onSaved }: ProviderFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="context-window">Context Window</Label>
               <Input
@@ -171,7 +171,7 @@ export function ProviderForm({ onSaved }: ProviderFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex items-center gap-2">
               <Checkbox
                 checked={supportsVision}

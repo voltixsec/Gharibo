@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ModelSelector } from "./model-selector";
+import { ModelSelector, type ProviderSelection } from "./model-selector";
+import { StatusBadge, TruthNotice } from "@/components/status";
 import { Plus } from "lucide-react";
 
 interface ChatControlsProps {
@@ -25,17 +26,29 @@ interface ChatControlsProps {
 export function ChatControls({ onNewConversation }: ChatControlsProps) {
   const [title, setTitle] = useState("");
   const [providerId, setProviderId] = useState<string | null>(null);
+  const [modelId, setModelId] = useState<string | null>(null);
   const [systemPrompt, setSystemPrompt] = useState("");
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(2048);
   const [toolsEnabled, setToolsEnabled] = useState(false);
+
+  /*
+   * The provider selection carries BOTH the provider id and the concrete model
+   * id. Keeping them together is what guarantees a selected model can never be
+   * silently dropped on the way to the API.
+   */
+  const handleSelect = (selection: ProviderSelection) => {
+    setProviderId(selection.providerId);
+    setModelId(selection.modelId);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onNewConversation({
       title: title || "New Conversation",
       providerId,
-      modelId: null,
+      // Pass the real selection through untouched.
+      modelId,
       systemPrompt: systemPrompt || null,
       temperature,
       maxTokens,
@@ -56,7 +69,20 @@ export function ChatControls({ onNewConversation }: ChatControlsProps) {
         />
       </div>
 
-      <ModelSelector value={providerId} onChange={setProviderId} />
+      <ModelSelector value={providerId} onSelect={handleSelect} />
+
+      {modelId ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Resolved model</span>
+          <StatusBadge variant="neutral" label={modelId} />
+        </div>
+      ) : (
+        <TruthNotice
+          variant="info"
+          title="No model selected"
+          message="The conversation will be created without a model. Choose a model above to record one with it."
+        />
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="system-prompt">System Prompt</Label>
@@ -64,7 +90,7 @@ export function ChatControls({ onNewConversation }: ChatControlsProps) {
           id="system-prompt"
           value={systemPrompt}
           onChange={(e) => setSystemPrompt(e.target.value)}
-          placeholder="You are a helpful assistant..."
+          placeholder="You are a helpful assistant…"
           className="min-h-[60px]"
         />
       </div>

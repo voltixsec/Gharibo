@@ -149,7 +149,7 @@ export function ResiliencePanel({ run, onChanged }: ResiliencePanelProps) {
         {resumable && (
           <div className="flex flex-col gap-3 rounded-md border p-3">
             <p className="text-sm font-medium">Resume from checkpoint</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="checkpoint-ref">Re-attached output / dataset path</Label>
                 <Input

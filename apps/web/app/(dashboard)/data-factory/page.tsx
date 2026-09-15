@@ -1,17 +1,19 @@
 "use client";
 
+import { PageHeader } from "@/components/page-header";
+import { PageContent } from "@/components/page-content";
 import { RecordTable } from "@/components/data-factory/record-table";
 
 export default function DataFactoryPage() {
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Data Factory</h1>
-        <p className="text-sm text-muted-foreground">
-          Data pipeline with validation, bulk actions, and JSONL I/O.
-        </p>
-      </div>
-      <RecordTable />
-    </div>
+    <>
+      <PageHeader
+        title="Data Factory"
+        description="Ingest, validate, tag and approve records, with JSONL import and export."
+      />
+      <PageContent width="full">
+        <RecordTable />
+      </PageContent>
+    </>
   );
 }

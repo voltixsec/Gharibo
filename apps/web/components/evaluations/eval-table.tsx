@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import type { EvaluationResult, BenchmarkCategory } from "@gharibo/shared";
+import { ErrorState, TruthNotice, EmptyState } from "@/components/status";
 
 const BENCHMARK_CATEGORIES: BenchmarkCategory[] = [
   "Reasoning",
@@ -32,19 +33,22 @@ const BENCHMARK_CATEGORIES: BenchmarkCategory[] = [
 export function EvalTable() {
   const [evals, setEvals] = useState<EvaluationResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [modelFilter, setModelFilter] = useState("");
 
   const fetchEvals = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = modelFilter ? `?modelId=${modelFilter}` : "";
       const res = await fetch(`/api/evaluations${params}`);
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const json = await res.json();
-      if (json.code === 0) {
-        setEvals(json.data);
-      }
-    } catch {
-      // ignore
+      if (json.code !== 0) throw new Error(json.message || "Request failed");
+      setEvals(json.data);
+    } catch (err) {
+      setEvals([]);
+      setError(err instanceof Error ? err.message : "Failed to load evaluations");
     } finally {
       setLoading(false);
     }
@@ -65,21 +69,31 @@ export function EvalTable() {
       <CardHeader>
         <CardTitle>Benchmark Results</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="mb-4 flex items-center gap-2">
+      <CardContent className="space-y-4">
+        <TruthNotice
+          variant="info"
+          title="Scores come from recorded runs only"
+          message="A category with no recorded benchmark run shows as not run. Scores are never estimated or filled in."
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="text"
             value={modelFilter}
             onChange={(e) => setModelFilter(e.target.value)}
-            placeholder="Filter by model ID..."
-            className="h-9 flex-1 rounded-md border px-3 text-sm"
+            placeholder="Filter by model ID…"
+            aria-label="Filter evaluations by model ID"
+            className="h-9 min-w-[12rem] flex-1 rounded-md border px-3 text-sm"
           />
           <Button size="sm" variant="outline" onClick={fetchEvals}>
             Refresh
           </Button>
         </div>
 
-        <div className="rounded-md border">
+        {error ? (
+          <ErrorState title="Could not load evaluations" message={error} />
+        ) : (
+        <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -95,7 +109,7 @@ export function EvalTable() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    Loading...
+                    Loading…
                   </TableCell>
                 </TableRow>
               ) : byCategory.length === 0 ? (
@@ -109,8 +123,8 @@ export function EvalTable() {
                   results.length === 0 ? (
                     <TableRow key={category}>
                       <TableCell className="font-medium">{category}</TableCell>
-                      <TableCell colSpan={5} className="text-muted-foreground">
-                        No results
+                      <TableCell colSpan={5}>
+                        <span className="text-muted-foreground">Not run</span>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -121,14 +135,19 @@ export function EvalTable() {
                           : null;
                       return (
                         <TableRow key={ev.id}>
-                          <TableCell className="font-medium">{category}</TableCell>
-                          <TableCell className="text-xs font-mono">
+                          <TableCell className="font-medium whitespace-nowrap">
+                            {category}
+                          </TableCell>
+                          <TableCell
+                            className="font-mono text-xs"
+                            title={ev.modelId}
+                          >
                             {ev.modelId.slice(0, 8)}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="tabular-nums">
                             {ev.score !== null ? ev.score.toFixed(2) : "—"}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="tabular-nums">
                             {ev.baseModelScore !== null
                               ? ev.baseModelScore.toFixed(2)
                               : "—"}
@@ -136,12 +155,12 @@ export function EvalTable() {
                           <TableCell>
                             {delta !== null ? (
                               <span
-                                className={`flex items-center gap-1 text-sm ${
+                                className={`flex items-center gap-1 text-sm tabular-nums ${
                                   delta > 0
-                                    ? "text-green-500"
+                                    ? "text-emerald-600 dark:text-emerald-400"
                                     : delta < 0
-                                    ? "text-red-500"
-                                    : ""
+                                    ? "text-red-600 dark:text-red-400"
+                                    : "text-muted-foreground"
                                 }`}
                               >
                                 {delta > 0 && <TrendingUp className="h-3 w-3" />}
@@ -174,8 +193,9 @@ export function EvalTable() {
             </TableBody>
           </Table>
         </div>
+        )}
 
-        <p className="mt-3 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Benchmark categories: {BENCHMARK_CATEGORIES.join(", ")}
         </p>
       </CardContent>

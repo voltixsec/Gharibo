@@ -63,12 +63,17 @@ export function TaskRunner() {
   const refreshRecords = async () => {
     try {
       const res = await fetch("/api/research");
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const json = await res.json();
-      if (json.code === 0) {
-        setRecords(json.data);
-      }
-    } catch {
-      // ignore
+      if (json.code !== 0) throw new Error(json.message || "Request failed");
+      setRecords(json.data);
+    } catch (e) {
+      setRecords([]);
+      toast({
+        title: "Could not load research records",
+        description: e instanceof Error ? e.message : "Research service unavailable",
+        variant: "destructive",
+      });
     }
   };
 

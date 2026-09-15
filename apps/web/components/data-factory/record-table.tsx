@@ -10,13 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Filters } from "./filters";
 import { RecordEditor } from "./record-editor";
 import { useToast } from "@/hooks/use-toast";
 import type { DataFactoryRecord, VerificationStatus } from "@gharibo/shared";
 import { truncate, formatDate } from "@/lib/utils";
+import { ErrorState, StatusBadge } from "@/components/status";
 import {
   Check,
   X,
@@ -26,12 +26,20 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const STATUS_BADGE: Record<string, "default" | "secondary" | "success" | "destructive" | "warning" | "outline"> = {
-  RAW: "secondary",
-  NORMALIZED: "default",
+/**
+ * Record verification states map onto the shared semantic vocabulary so a
+ * colour means the same thing here as it does everywhere else in the lab.
+ * Only genuinely approved / training-ready records are green.
+ */
+const STATUS_VARIANT: Record<
+  string,
+  "neutral" | "queued" | "warning" | "success" | "failed"
+> = {
+  RAW: "neutral",
+  NORMALIZED: "queued",
   REVIEW_REQUIRED: "warning",
   APPROVED: "success",
-  REJECTED: "destructive",
+  REJECTED: "failed",
   TRAINING_READY: "success",
 };
 
@@ -47,9 +55,11 @@ export function RecordTable() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<DataFactoryRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
@@ -60,13 +70,15 @@ export function RecordTable() {
 
     try {
       const res = await fetch(`/api/data-factory?${params}`);
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const json = await res.json();
-      if (json.code === 0) {
-        setRecords(json.data.rows);
-        setTotal(json.data.total);
-      }
-    } catch {
-      // ignore
+      if (json.code !== 0) throw new Error(json.message || "Request failed");
+      setRecords(json.data.rows);
+      setTotal(json.data.total);
+    } catch (err) {
+      setRecords([]);
+      setTotal(0);
+      setError(err instanceof Error ? err.message : "Failed to load records");
     } finally {
       setLoading(false);
     }
@@ -165,7 +177,14 @@ export function RecordTable() {
       )}
 
       {/* Table */}
-      <div className="rounded-md border">
+      {error ? (
+        <ErrorState
+          title="Could not load records"
+          message={error}
+          className="rounded-md border border-dashed"
+        />
+      ) : (
+      <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -190,13 +209,13 @@ export function RecordTable() {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  Loading...
+                  Loading…
                 </TableCell>
               </TableRow>
             ) : records.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  No records found
+                  No records match the current filters.
                 </TableCell>
               </TableRow>
             ) : (
@@ -209,18 +228,23 @@ export function RecordTable() {
                     />
                   </TableCell>
                   <TableCell className="max-w-xs">
-                    <p className="truncate text-sm">{truncate(record.input, 60)}</p>
+                    <p className="truncate text-sm" title={record.input}>
+                      {truncate(record.input, 60)}
+                    </p>
                   </TableCell>
-                  <TableCell className="text-sm">{record.domain || "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm">
+                    {record.domain || "—"}
+                  </TableCell>
                   <TableCell>
-                    <Badge variant={STATUS_BADGE[record.verificationStatus] || "outline"} className="text-xs">
-                      {record.verificationStatus}
-                    </Badge>
+                    <StatusBadge
+                      variant={STATUS_VARIANT[record.verificationStatus] || "neutral"}
+                      label={record.verificationStatus}
+                    />
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="text-sm tabular-nums">
                     {record.qualityScore !== null ? record.qualityScore.toFixed(2) : "—"}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                     {formatDate(record.updatedAt)}
                   </TableCell>
                   <TableCell>
@@ -229,6 +253,7 @@ export function RecordTable() {
                       variant="ghost"
                       className="h-7 w-7 p-0"
                       onClick={() => setEditing(record)}
+                      aria-label="Edit record"
                     >
                       <Pencil className="h-3 w-3" />
                     </Button>
@@ -239,9 +264,10 @@ export function RecordTable() {
           </TableBody>
         </Table>
       </div>
+      )}
 
       {/* Pagination */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           {total} records total
         </p>
@@ -251,10 +277,11 @@ export function RecordTable() {
             variant="outline"
             disabled={page <= 1}
             onClick={() => setPage(page - 1)}
+            aria-label="Previous page"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm">
+          <span className="text-sm tabular-nums">
             {page} / {totalPages || 1}
           </span>
           <Button
@@ -262,6 +289,7 @@ export function RecordTable() {
             variant="outline"
             disabled={page >= totalPages}
             onClick={() => setPage(page + 1)}
+            aria-label="Next page"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

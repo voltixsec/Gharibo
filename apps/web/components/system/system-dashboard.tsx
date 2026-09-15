@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Terminal, HardDrive, Cpu, Server } from "lucide-react";
+import { StatusBadge, ErrorState, EmptyState, TruthNotice } from "@/components/status";
 
 interface SystemInfo {
   providers: Array<{
@@ -35,20 +35,46 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+/** A label/value row that survives long absolute paths and URLs. */
+function FactRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="min-w-0 rounded-md border p-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p
+        className={`mt-0.5 truncate text-sm ${mono ? "font-mono text-xs" : ""}`}
+        title={value}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export function SystemDashboard() {
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchInfo = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/system");
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const json = await res.json();
-      if (json.code === 0) {
-        setInfo(json.data);
-      }
-    } catch {
-      // ignore
+      if (json.code !== 0) throw new Error(json.message || "Request failed");
+      setInfo(json.data);
+    } catch (err) {
+      setInfo(null);
+      setError(err instanceof Error ? err.message : "Failed to load system info");
     } finally {
       setLoading(false);
     }
@@ -59,15 +85,36 @@ export function SystemDashboard() {
   }, [fetchInfo]);
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading system info...</p>;
+    return <p className="py-6 text-sm text-muted-foreground">Loading system info…</p>;
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Could not load system diagnostics"
+        message={error}
+        onRetry={fetchInfo}
+      />
+    );
   }
 
   if (!info) {
-    return <p className="text-sm text-muted-foreground">Failed to load system info</p>;
+    return (
+      <EmptyState
+        title="No system diagnostics available"
+        message="The diagnostics endpoint returned no data."
+      />
+    );
   }
 
   return (
     <div className="flex flex-col gap-6">
+      <TruthNotice
+        variant="info"
+        title="Observed facts only"
+        message="This page reports process, storage and provider configuration facts that can actually be read. It does not measure live accelerator, memory or network utilisation, and it shows no value it cannot read."
+      />
+
       {/* Provider Status */}
       <Card>
         <CardHeader>
@@ -86,29 +133,27 @@ export function SystemDashboard() {
               {info.providers.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between rounded-md border p-2"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm font-medium">
                       {p.displayName || p.modelId}
                     </span>
-                    <Badge variant="outline" className="text-xs">
+                    <span className="shrink-0 rounded border px-1.5 py-0.5 text-xs text-muted-foreground">
                       {p.provider}
-                    </Badge>
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={p.hasApiKey ? "success" : "destructive"}
-                      className="text-xs"
-                    >
-                      {p.hasApiKey ? "Key Set" : "No Key"}
-                    </Badge>
-                    <Badge
-                      variant={p.isActive ? "success" : "secondary"}
-                      className="text-xs"
-                    >
-                      {p.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <StatusBadge
+                      variant={p.hasApiKey ? "success" : "warning"}
+                      label={p.hasApiKey ? "Key reference set" : "No key reference"}
+                      detail="A stored reference only — the secret value is never read or shown."
+                    />
+                    <StatusBadge
+                      variant={p.isActive ? "queued" : "neutral"}
+                      label={p.isActive ? "Enabled" : "Disabled"}
+                      detail="Configuration flag, not a verified connection."
+                    />
                   </div>
                 </div>
               ))}
@@ -126,15 +171,12 @@ export function SystemDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Database Path</p>
-              <p className="font-mono text-xs">{info.storage.databasePath}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Database Size</p>
-              <p className="font-medium">{formatBytes(info.storage.databaseSizeBytes)}</p>
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FactRow label="Database Path" value={info.storage.databasePath} mono />
+            <FactRow
+              label="Database Size"
+              value={formatBytes(info.storage.databaseSizeBytes)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -148,27 +190,12 @@ export function SystemDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Node.js</p>
-              <p className="font-medium">{info.environment.nodeVersion}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Platform</p>
-              <p className="font-medium">{info.environment.platform}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Trainer URL</p>
-              <p className="font-mono text-xs">{info.environment.trainerUrl}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Inference URL</p>
-              <p className="font-mono text-xs">{info.environment.inferenceUrl}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Research URL</p>
-              <p className="font-mono text-xs">{info.environment.researchUrl}</p>
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FactRow label="Node.js" value={info.environment.nodeVersion} />
+            <FactRow label="Platform" value={info.environment.platform} />
+            <FactRow label="Trainer URL" value={info.environment.trainerUrl} mono />
+            <FactRow label="Inference URL" value={info.environment.inferenceUrl} mono />
+            <FactRow label="Research URL" value={info.environment.researchUrl} mono />
           </div>
         </CardContent>
       </Card>
@@ -182,14 +209,25 @@ export function SystemDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            {Object.entries(info.settings).map(([key, value]) => (
-              <div key={key} className="flex justify-between rounded-md border p-2">
-                <span className="text-muted-foreground">{key}</span>
-                <span className="font-medium">{value}</span>
-              </div>
-            ))}
-          </div>
+          {Object.keys(info.settings).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No settings recorded.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {Object.entries(info.settings).map(([key, value]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between gap-2 rounded-md border p-2"
+                >
+                  <span className="truncate text-sm text-muted-foreground" title={key}>
+                    {key}
+                  </span>
+                  <span className="truncate text-sm font-medium" title={value}>
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -34,6 +34,7 @@ export function useConversations() {
     systemPrompt?: string | null;
     temperature?: number;
     maxTokens?: number;
+    toolsEnabled?: boolean;
   }) => {
     const res = await fetch("/api/conversations", {
       method: "POST",

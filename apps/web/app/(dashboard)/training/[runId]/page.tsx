@@ -1,3 +1,5 @@
+import { PageHeader } from "@/components/page-header";
+import { PageContent } from "@/components/page-content";
 import { RunDetail } from "@/components/training/run-detail";
 
 export default function TrainingRunDetailPage({
@@ -6,14 +8,14 @@ export default function TrainingRunDetailPage({
   params: { runId: string };
 }) {
   return (
-    <div className="container mx-auto max-w-4xl p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Training Run</h1>
-        <p className="text-sm text-muted-foreground">
-          Linked Training Package, free-tier resilience state, and results import.
-        </p>
-      </div>
-      <RunDetail runId={params.runId} />
-    </div>
+    <>
+      <PageHeader
+        title="Training Run"
+        description="Linked training package, free-tier resilience state, and results import."
+      />
+      <PageContent width="wide">
+        <RunDetail runId={params.runId} />
+      </PageContent>
+    </>
   );
 }

@@ -22,18 +22,21 @@ export function DatasetForm({ onCreated }: DatasetFormProps) {
   const [records, setRecords] = useState<DataFactoryRecord[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const fetchApproved = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/data-factory?status=APPROVED&page=1&pageSize=1000");
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const json = await res.json();
-      if (json.code === 0) {
-        setRecords(json.data.rows);
-      }
-    } catch {
-      // ignore
+      if (json.code !== 0) throw new Error(json.message || "Request failed");
+      setRecords(json.data.rows);
+    } catch (err) {
+      setRecords([]);
+      setError(err instanceof Error ? err.message : "Failed to load approved records");
     } finally {
       setLoading(false);
     }
@@ -122,9 +125,15 @@ export function DatasetForm({ onCreated }: DatasetFormProps) {
         <ScrollArea className="h-64 rounded-md border">
           <div className="flex flex-col gap-1 p-2">
             {loading ? (
-              <p className="text-center text-sm text-muted-foreground py-4">Loading approved records...</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Loading approved records…
+              </p>
+            ) : error ? (
+              <p className="py-4 text-center text-sm text-red-600 dark:text-red-400">
+                {error}
+              </p>
             ) : records.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-4">
+              <p className="py-4 text-center text-sm text-muted-foreground">
                 No approved records. Approve records in Data Factory first.
               </p>
             ) : (
@@ -138,7 +147,9 @@ export function DatasetForm({ onCreated }: DatasetFormProps) {
                     onCheckedChange={() => toggleSelect(record.id)}
                   />
                   <div className="flex-1 overflow-hidden">
-                    <p className="truncate text-sm">{truncate(record.input, 60)}</p>
+                    <p className="truncate text-sm" title={record.input}>
+                      {truncate(record.input, 60)}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {record.domain || "—"} · {record.language || "—"}
                     </p>
@@ -151,7 +162,7 @@ export function DatasetForm({ onCreated }: DatasetFormProps) {
 
         <Button onClick={handleCreate} disabled={creating || !name || selected.size === 0}>
           <Check className="mr-2 h-4 w-4" />
-          {creating ? "Creating..." : `Create Dataset (${selected.size} records)`}
+          {creating ? "Creating…" : `Create Dataset (${selected.size} records)`}
         </Button>
       </CardContent>
     </Card>

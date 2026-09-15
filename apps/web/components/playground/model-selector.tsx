@@ -10,12 +10,17 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
-interface ModelSelectorProps {
-  value: string | null;
-  onChange: (value: string) => void;
+export interface ProviderSelection {
+  providerId: string;
+  modelId: string;
 }
 
-export function ModelSelector({ value, onChange }: ModelSelectorProps) {
+interface ModelSelectorProps {
+  value: string | null;
+  onSelect: (selection: ProviderSelection) => void;
+}
+
+export function ModelSelector({ value, onSelect }: ModelSelectorProps) {
   const { providers, loading } = useProviders();
 
   if (loading) {
@@ -41,7 +46,18 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label>Model</Label>
-      <Select value={value ?? undefined} onValueChange={onChange}>
+      <Select
+        value={value ?? undefined}
+        onValueChange={(selectedId) => {
+          const provider = providers.find((p) => p.id === selectedId);
+          if (provider) {
+            onSelect({
+              providerId: provider.id,
+              modelId: provider.modelId,
+            });
+          }
+        }}
+      >
         <SelectTrigger>
           <SelectValue placeholder="Select a model" />
         </SelectTrigger>
