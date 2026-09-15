@@ -714,8 +714,12 @@ export function isKaggleLaunchReauthorizedGoldState(state) {
 
 const COMPLETED_READINESS =
   "EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION";
-const COMPLETED_KERNEL_REF =
+const EVALUATION_AUTHORIZED_READINESS =
+  "EVALUATION_AUTHORIZED_AWAITING_EXECUTION";
+const ECK_KERNEL_REF =
   "vokaigharibo/gharibo-exp-001-kaggle-start-fec22ca2";
+/** The pinned base-model revision every governed arm must load, unadapted. */
+const DEC0026_BASE_MODEL_REVISION = "6cee5e81ee83917806bbde320786a8fb61efebee";
 const COMPLETED_KERNEL_VERSION = 3;
 const COMPLETED_EXTERNAL_STATUS = "KernelWorkerStatus.COMPLETE";
 const COMPLETED_GLOBAL_STEP = 160;
@@ -743,33 +747,49 @@ const COMPLETED_ACCEPTANCE_HASH =
  *   promotion — so the 1.11.0 acceptance still holds verbatim inside it.
  *
  * Any further revision is NOT accepted until it is added here deliberately.
+ *
+ * `1.13.0` — DEC-0032 evaluation authorization. Also ADDITIVE: it records the CEO decision
+ *   AUTHORIZED WITH LIMITS, closes BLK-0003, and moves evaluation to
+ *   EVALUATION_AUTHORIZED_AWAITING_EXECUTION. It changes no accepted execution fact — same
+ *   run, same package, same artifacts, same hashes, same dtype deviation, evaluation still
+ *   NOT_RUN and still unpromoted — so the 1.11.0 acceptance holds verbatim inside it too.
  */
-const COMPLETED_MASTER_STATE_VERSIONS = ["1.11.0", "1.12.0"];
+const COMPLETED_MASTER_STATE_VERSIONS = ["1.11.0", "1.12.0", "1.13.0", "1.14.0"];
 
 /**
- * DEC-0030 accepts the POST-EXECUTION reality of the artifact DEC-0029 authorized.
+ * The DEC-0030 acceptance core, independent of the master-state revision.
  *
- * It is deliberately NOT a supersession: `supersedesDecisionId` is null because
- * DEC-0027/0028/0029 remain the true history of what was launched, and attempts 1 and 2
- * stay recorded as ERROR-before-training. What this checkpoint adds is the acceptance of
- * a completed run — including the fp16 -> float32 runtime deviation, which is recorded
- * rather than smoothed over — and the explicit refusal to promote a model or to treat
- * training completion as evaluation.
+ * Split out from `isKaggleExecutionCompletedGoldState` so a LATER additive checkpoint
+ * (DEC-0032) can assert "the DEC-0030 acceptance still holds, verbatim, and here is what
+ * was added on top" without either duplicating the acceptance logic or loosening it. The
+ * revision pin stays in the exported predicate; this core checks only what DEC-0030
+ * accepted.
+ *
+ * The ONE field a later additive checkpoint may legitimately advance is the evaluation
+ * readiness marker — DEC-0032 moves it from COMPLETED_READINESS to
+ * EVALUATION_AUTHORIZED_READINESS without touching a single execution fact. Both values
+ * are therefore admissible here, and `isKaggleExecutionCompletedGoldState` pins the
+ * stricter COMPLETED_READINESS at the revision it froze.
  */
-export function isKaggleExecutionCompletedGoldState(state) {
+function acceptsCompletedExecutionCore(state) {
   const training = state?.training;
   const authorization = training?.authorization;
   const experiment = state?.experiments?.["GHARIBO-exp-001"];
   const completion = training?.executionCompletion;
+  const readinessIsPostCompletion =
+    authorization?.status === COMPLETED_READINESS ||
+    authorization?.status === EVALUATION_AUTHORIZED_READINESS;
+  const experimentReadinessIsPostCompletion =
+    experiment?.readinessStatus === COMPLETED_READINESS ||
+    experiment?.readinessStatus === EVALUATION_AUTHORIZED_READINESS;
 
   if (!completion ||
-      !COMPLETED_MASTER_STATE_VERSIONS.includes(state?.masterStateVersion) ||
       training?.status !== "COMPLETED" ||
       training?.hasStarted !== true ||
       state?.currentState?.trainingStatus !== "COMPLETED" ||
       state?.currentState?.trainingHasStarted !== true ||
-      authorization?.status !== COMPLETED_READINESS ||
-      experiment?.readinessStatus !== COMPLETED_READINESS ||
+      !readinessIsPostCompletion ||
+      !experimentReadinessIsPostCompletion ||
       experiment?.runStatus !== "COMPLETED" ||
       experiment?.evaluationStatus !== "NOT_RUN" ||
       completion?.status !== "KAGGLE_EXECUTION_COMPLETED_ACCEPTED" ||
@@ -797,7 +817,7 @@ export function isKaggleExecutionCompletedGoldState(state) {
   // ---------------------------------------------------------------- external execution
   if (completion?.worker !== "kaggle" ||
       completion?.accelerator !== "NvidiaTeslaT4" ||
-      completion?.kernelRef !== COMPLETED_KERNEL_REF ||
+      completion?.kernelRef !== ECK_KERNEL_REF ||
       completion?.kernelVersion !== COMPLETED_KERNEL_VERSION ||
       completion?.attemptNumber !== COMPLETED_KERNEL_VERSION ||
       completion?.artifactNotebookSha256 !== REAUTHORIZED_NOTEBOOK ||
@@ -918,6 +938,223 @@ export function isKaggleExecutionCompletedGoldState(state) {
 }
 
 /**
+ * DEC-0030 accepts the POST-EXECUTION reality of the artifact DEC-0029 authorized.
+ *
+ * It is deliberately NOT a supersession: `supersedesDecisionId` is null because
+ * DEC-0027/0028/0029 remain the true history of what was launched, and attempts 1 and 2
+ * stay recorded as ERROR-before-training. What this checkpoint adds is the acceptance of
+ * a completed run — including the fp16 -> float32 runtime deviation, which is recorded
+ * rather than smoothed over — and the explicit refusal to promote a model or to treat
+ * training completion as evaluation.
+ *
+ * The revision pin lives here: only the exact revisions in
+ * `COMPLETED_MASTER_STATE_VERSIONS` are accepted as "the DEC-0030 acceptance", so silent
+ * drift cannot pass as accepted.
+ */
+export function isKaggleExecutionCompletedGoldState(state) {
+  if (!COMPLETED_MASTER_STATE_VERSIONS.includes(state?.masterStateVersion)) return false;
+  // At the revisions this predicate froze (1.11.0 / 1.12.0) the readiness marker is pinned
+  // exactly. Later revisions legitimately advanced it — 1.13.0 is DEC-0032 (authorization),
+  // 1.14.0 is DEC-0033 (the infrastructure blocker) — and those are accepted through their
+  // own predicates, which each re-run this core underneath. Listing them here keeps the
+  // "current tip is an accepted completed execution" contract true without weakening it:
+  // every post-1.12.0 revision still has to pass `acceptsCompletedExecutionCore` verbatim.
+  const ADVANCED_READINESS_VERSIONS = ["1.13.0", "1.14.0"];
+  if (!ADVANCED_READINESS_VERSIONS.includes(state?.masterStateVersion) &&
+      (state?.training?.authorization?.status !== COMPLETED_READINESS ||
+        state?.experiments?.["GHARIBO-exp-001"]?.readinessStatus !== COMPLETED_READINESS)) {
+    return false;
+  }
+  // An advanced tip must NOT have moved evaluation or promotion forward.
+  if (ADVANCED_READINESS_VERSIONS.includes(state?.masterStateVersion)) {
+    if (state?.training?.evaluationResults !== 0) return false;
+    if (state?.experiments?.["GHARIBO-exp-001"]?.evaluationStatus !== "NOT_RUN") return false;
+    if (state?.experiments?.["GHARIBO-exp-001"]?.promotable !== false) return false;
+  }
+  return acceptsCompletedExecutionCore(state);
+}
+
+/**
+ * DEC-0032 records the CEO decision AUTHORIZED WITH LIMITS for exactly one governed
+ * held-out TEST benchmark.
+ *
+ * Like DEC-0031 it is ADDITIVE, not a supersession: the DEC-0030 acceptance must still
+ * hold verbatim (`acceptsCompletedExecutionCore`), and DEC-0032 adds only the
+ * authorization layer on top. What it must NOT do is move evaluation forward — so this
+ * predicate explicitly requires that evaluation is still NOT_RUN, that
+ * `evaluationResults` is still 0, and that the model is still unpromoted. Authorizing a
+ * measurement is not taking it, and this predicate fails if anyone tries to conflate the
+ * two.
+ */
+export function isEvaluationAuthorizedGoldState(state) {
+  const training = state?.training;
+  const authorization = training?.authorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  const evalAuthorization = training?.evaluationAuthorization;
+
+  // The DEC-0030 acceptance must still hold verbatim underneath.
+  if (!acceptsCompletedExecutionCore(state)) return false;
+
+  // ...and evaluation must NOT have moved: authorization is not execution.
+  if (training?.evaluationResults !== 0) return false;
+  if (experiment?.evaluationStatus !== "NOT_RUN") return false;
+  if (experiment?.promotable !== false) return false;
+  if (experiment?.runStatus !== "COMPLETED") return false;
+
+  if (authorization?.status !== EVALUATION_AUTHORIZED_READINESS ||
+      experiment?.readinessStatus !== EVALUATION_AUTHORIZED_READINESS) {
+    return false;
+  }
+
+  if (!evalAuthorization ||
+      evalAuthorization.decisionId !== "DEC-0032" ||
+      evalAuthorization.decision !== "AUTHORIZED WITH LIMITS" ||
+      evalAuthorization.deciderRole !== "CEO" ||
+      evalAuthorization.decisionDate !== "2026-09-15" ||
+      evalAuthorization.scope !== "ONE_GOVERNED_HELD_OUT_TEST_BENCHMARK" ||
+      evalAuthorization.authorizationHash !==
+        "079afeb7088d0f731cb4175986a4d2ad7f3d35346046aac24ce57f8e6d5b3a96" ||
+      evalAuthorization.testSplitHash !== ACCEPTED_GOLD_HASHES.test ||
+      evalAuthorization.testRecordCount !== 80 ||
+      evalAuthorization.candidateAdapterSha256 !== COMPLETED_FINAL_ADAPTER ||
+      evalAuthorization.baseModelRevision !== DEC0026_BASE_MODEL_REVISION ||
+      evalAuthorization.leakageAuditStatus !== "PASS" ||
+      evalAuthorization.evaluationExecuted !== false ||
+      evalAuthorization.evaluationCompleted !== false ||
+      !Array.isArray(evalAuthorization.forbidden) ||
+      !evalAuthorization.forbidden.includes("model promotion") ||
+      !evalAuthorization.forbidden.includes("creating GHARIBO-V0.1")) {
+    return false;
+  }
+
+  // BLK-0003 must be CLOSED, and closed by this decision specifically.
+  const blocker = (state?.blockers || []).find((b) => b?.id === "BLK-0003");
+  if (!blocker || blocker.status !== "CLOSED" || blocker.closedByDecisionId !== "DEC-0032") {
+    return false;
+  }
+
+  // GHARIBO-V0.1 must still not exist.
+  const v01 = (state?.models?.derivedModels || []).find((m) => m?.id === "GHARIBO-V0.1");
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  const checkpoint = decisions.filter((d) => d?.id === "DEC-0032");
+  if (checkpoint.length !== 1 ||
+      checkpoint[0].status !== "ACCEPTED" ||
+      checkpoint[0].supersedes !== null ||
+      checkpoint[0].supersededBy !== null) {
+    return false;
+  }
+
+  // Rebuild the DEC-0030-only tip and require the original predicate to still accept it.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.12.0";
+  before.training.authorization.status = COMPLETED_READINESS;
+  before.experiments["GHARIBO-exp-001"].readinessStatus = COMPLETED_READINESS;
+  delete before.training.evaluationAuthorization;
+  delete before.blockers.find((b) => b?.id === "BLK-0003")?.closedByDecisionId;
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0032");
+  return isKaggleExecutionCompletedGoldState(before);
+}
+
+/**
+ * DEC-0033 records the TRUTHFUL OUTCOME of the session DEC-0032 authorized: the benchmark
+ * could not execute, because no GPU execution environment was available.
+ *
+ * This is still the AUTHORIZED / NOT-RUN family, so this predicate layers on top of
+ * `isEvaluationAuthorizedGoldState` rather than replacing it. What it adds is the
+ * requirement that the failure is stated as a failure:
+ *
+ *   - the blocker is recorded, OPEN, and attributed to DEC-0033;
+ *   - `testInferenceOccurred` is false and `testRecordsParsed` is 0 — the claim that no
+ *     measurement happened has to be machine-checkable, not asserted in prose;
+ *   - the authorization is explicitly NOT consumed, because no TEST inference materially
+ *     occurred and DEC-0032 hardStops[2] is therefore not triggered;
+ *   - evaluation stays NOT_RUN with `evaluationResults` 0 and the model stays unpromoted.
+ *
+ * The point of this predicate is to make "we could not measure" fail loudly if anyone later
+ * edits the state to look like "we measured". An infrastructure blocker is not a score, and
+ * the one thing it must never become is a null dressed up as a zero.
+ */
+export function isEvaluationInfrastructureBlockedGoldState(state) {
+  const training = state?.training;
+  const evalAuthorization = training?.evaluationAuthorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+
+  // The DEC-0032 authorization must still hold verbatim underneath.
+  if (!isEvaluationAuthorizedGoldState(state)) return false;
+
+  if (!evalAuthorization) return false;
+
+  if (evalAuthorization.executionBlockerId !== "BLK-0004" ||
+      evalAuthorization.executionBlockerResolutionId !== "DEC-0033" ||
+      evalAuthorization.executionBlockerClass !== "INFRASTRUCTURE_NO_EXECUTION_ENVIRONMENT" ||
+      evalAuthorization.executionBlockerPhase !== "PRE_INFERENCE" ||
+      evalAuthorization.executionBlockerRecord !==
+        "governance/DEC-0033-evaluation-infrastructure-blocker.json") {
+    return false;
+  }
+  if (typeof evalAuthorization.executionBlockerHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(evalAuthorization.executionBlockerHash)) {
+    return false;
+  }
+
+  // No measurement happened, and the state has to say so in machine-readable form.
+  if (evalAuthorization.executionAttempted !== true) return false;
+  if (evalAuthorization.executionSucceeded !== false) return false;
+  if (evalAuthorization.testInferenceOccurred !== false) return false;
+  if (evalAuthorization.testRecordsParsed !== 0) return false;
+  if (evalAuthorization.metricValuesProduced !== 0) return false;
+  if (evalAuthorization.evaluationStatusAfterExecutionAttempt !==
+      EVALUATION_AUTHORIZED_READINESS) {
+    return false;
+  }
+  if (evalAuthorization.authorizationConsumed !== false) return false;
+
+  // Evaluation must still not have moved.
+  if (training?.evaluationResults !== 0) return false;
+  if (experiment?.evaluationStatus !== "NOT_RUN") return false;
+  if (experiment?.promotable !== false) return false;
+
+  // The blocker must be recorded, OPEN, and attributable to this decision.
+  const blocker = (state?.blockers || []).find((b) => b?.id === "BLK-0004");
+  if (!blocker || blocker.status !== "OPEN") return false;
+
+  // GHARIBO-V0.1 must still not exist.
+  const v01 = (state?.models?.derivedModels || []).find((m) => m?.id === "GHARIBO-V0.1");
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  const record = decisions.filter((d) => d?.id === "DEC-0033");
+  if (record.length !== 1 ||
+      record[0].status !== "ACCEPTED" ||
+      record[0].supersedes !== null ||
+      record[0].supersededBy !== null) {
+    return false;
+  }
+
+  // Rebuild the DEC-0032-only tip and require the previous predicate to still accept it.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.13.0";
+  delete before.training.evaluationAuthorization.executionBlockerId;
+  delete before.training.evaluationAuthorization.executionBlockerResolutionId;
+  delete before.training.evaluationAuthorization.executionBlockerHash;
+  delete before.training.evaluationAuthorization.executionBlockerRecord;
+  delete before.training.evaluationAuthorization.executionBlockerClass;
+  delete before.training.evaluationAuthorization.executionBlockerPhase;
+  delete before.training.evaluationAuthorization.executionAttempted;
+  delete before.training.evaluationAuthorization.executionSucceeded;
+  delete before.training.evaluationAuthorization.testInferenceOccurred;
+  delete before.training.evaluationAuthorization.testRecordsParsed;
+  delete before.training.evaluationAuthorization.metricValuesProduced;
+  delete before.training.evaluationAuthorization.evaluationStatusAfterExecutionAttempt;
+  delete before.training.evaluationAuthorization.authorizationConsumed;
+  before.blockers = before.blockers.filter((b) => b?.id !== "BLK-0004");
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0033");
+  return isEvaluationAuthorizedGoldState(before);
+}
+
+/**
  * Reconstructs the DEC-0029 launch checkpoint exactly as it stood BEFORE DEC-0030
  * accepted the completed execution. DEC-0029 stays an ACCEPTED decision: DEC-0030
  * accepts its outcome rather than replacing its authority.
@@ -949,6 +1186,8 @@ export function isAcceptedGoldGovernanceState(state) {
     isKaggleStartAuthorizedGoldState(state) ||
     isKaggleLaunchRepairedGoldState(state) ||
     isKaggleLaunchReauthorizedGoldState(state) ||
+    isEvaluationAuthorizedGoldState(state) ||
+    isEvaluationInfrastructureBlockedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

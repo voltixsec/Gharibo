@@ -1,0 +1,70 @@
+{
+  "auditCohort": {
+    "auditSeed": 3407,
+    "size": 100,
+    "testAudited": 0
+  },
+  "checks": [
+    {
+      "detail": "recomputed datasetHash/trainSplitHash/validationSplitHash/testSplitHash equal the pinned dataset-card values",
+      "name": "hash_reproduction",
+      "result": "PASS"
+    },
+    {
+      "detail": "DEC-0030 accepted execution record agrees with dataset-card.json on all four hashes",
+      "name": "manifest_anchor_agreement",
+      "result": "PASS"
+    },
+    {
+      "detail": "train∩test=0 validation∩test=0 train∩validation=0 (recordLineHash set intersection; 0 required)",
+      "name": "split_disjointness",
+      "result": "PASS"
+    },
+    {
+      "detail": "train=640 validation=80 test=80 flat=800; splits union to exactly the flat corpus",
+      "name": "partition_completeness",
+      "result": "PASS"
+    },
+    {
+      "detail": "uploaded Kaggle bundle training lines ∩ TEST = 0; bundle test.jsonl present = False (false required — TEST payload was never uploaded)",
+      "name": "training_set_containment",
+      "result": "PASS"
+    },
+    {
+      "detail": "distinct system/developer templates = 1 (1 required); TEST lines appearing verbatim as a frozen template = 0",
+      "name": "prompt_containment",
+      "result": "PASS"
+    },
+    {
+      "detail": "audited ∩ TEST = 0 by lineHash, 0 by flat line index (cohort size 100; 0 required)",
+      "name": "audit_cohort_quarantine",
+      "result": "PASS"
+    }
+  ],
+  "counts": {
+    "test": 80,
+    "train": 640,
+    "validation": 80
+  },
+  "dataset": {
+    "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+    "flatCorpusLines": 800,
+    "id": "GHARIBO-Research-Gold-v0.1"
+  },
+  "kind": "HASH_AND_ID_ONLY_NO_TEST_CONTENT_INSPECTED",
+  "pinned": {
+    "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+    "testSplitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+    "trainSplitHash": "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2",
+    "validationSplitHash": "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787"
+  },
+  "procedure": "docs/RESEARCH_BENCHMARK.md §3.5",
+  "recomputed": {
+    "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+    "testSplitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+    "trainSplitHash": "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2",
+    "validationSplitHash": "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787"
+  },
+  "semanticContentInspected": false,
+  "status": "PASS"
+}

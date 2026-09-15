@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.13.0 |
-| **Last Updated** | 2026-09-15 |
+| **Version** | 1.14.0 |
+| **Last Updated** | 2026-09-16 |
 
 The authoritative index of every governed document. Rules for ownership, statuses, and change
 control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
@@ -26,14 +26,15 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 | Environment Qualification Contract | `docs/ENV_QUALIFICATION_CONTRACT.md` | Architecture | Domain spec | Draft | 1.5.0 | 2026-09-15 |
 | Data Factory | `docs/DATA_FACTORY.md` | Architecture | Domain spec | Frozen | 1.4.0 | 2026-09-14 |
 | Evaluation Framework | `docs/EVALUATION.md` | Architecture | Domain spec | Frozen | 1.2.0 | 2026-09-14 |
-| Evaluation Authorization Request | `docs/EVALUATION_AUTHORIZATION_REQUEST.md` | Architecture | Governance | In Review | 1.0.0 | 2026-09-15 |
+| Evaluation Authorization Request | `docs/EVALUATION_AUTHORIZATION_REQUEST.md` | Architecture | Governance | Approved | 1.2.0 | 2026-09-16 |
+| Evaluation Execution Blocker | `docs/EVALUATION_EXECUTION_BLOCKER.md` | Architecture | Governance | Approved | 1.0.0 | 2026-09-16 |
 | Research Benchmark | `docs/RESEARCH_BENCHMARK.md` | Architecture | Domain spec | Draft | 1.1.0 | 2026-09-14 |
 | Research Gym | `docs/RESEARCH_GYM.md` | Architecture | Domain spec | Frozen | 1.0.0 | 2026-09-14 |
 | Model Registry | `docs/MODEL_REGISTRY.md` | Architecture | Domain spec | Frozen | 1.4.0 | 2026-09-15 |
 | Roadmap | `docs/ROADMAP.md` | Product | Roadmap | Approved | 1.3.0 | 2026-09-15 |
 | Documentation Governance | `docs/DOCUMENTATION_GOVERNANCE.md` | Architecture | Governance | Frozen | 1.0.0 | 2026-09-14 |
-| Document Register | `docs/DOCUMENT_REGISTER.md` | Architecture | Governance | Living | 1.13.0 | 2026-09-15 |
-| Master State (generated) | `docs/GHARIBO_MASTER_STATE.md` | Architecture | Governance | Living | 1.12.0 | 2026-09-15 |
+| Document Register | `docs/DOCUMENT_REGISTER.md` | Architecture | Governance | Living | 1.14.0 | 2026-09-16 |
+| Master State (generated) | `docs/GHARIBO_MASTER_STATE.md` | Architecture | Governance | Living | 1.14.0 | 2026-09-15 |
 | Master State (canonical) | `governance/GHARIBO_MASTER_STATE.json` | Architecture | Governance | Living | 1.0.0 | 2026-09-15 |
 | ADR Index | `docs/adr/README.md` | Architecture | Governance | Living | 1.4.0 | 2026-09-15 |
 | ADR Template | `docs/adr/TEMPLATE.md` | Architecture | Governance | Living | 1.0.0 | 2026-09-14 |
@@ -41,7 +42,7 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 | Sequence Diagram | `docs/sequence-diagram.mermaid` | Architecture | Diagram | Frozen | 1.0.0 | 2026-09-14 |
 | README (Runbook) | `README.md` | Architecture | Runbook | Living | 1.0.0 | 2026-09-14 |
 | Project State | `PROJECT_STATE.md` | Architecture | Governance | Living | 1.2.0 | 2026-09-15 |
-| Changelog | `CHANGELOG.md` | Delivery | Delivery note | Living | 1.2.0 | 2026-09-15 |
+| Changelog | `CHANGELOG.md` | Delivery | Delivery note | Living | 1.3.0 | 2026-09-16 |
 | Delivery Overview | `overview.md` | Delivery | Delivery note | Superseded | 1.0.0 | 2026-09-14 |
 
 ## Architecture Decision Records

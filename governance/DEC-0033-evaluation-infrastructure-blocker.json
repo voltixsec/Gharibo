@@ -1,0 +1,82 @@
+{
+  "status": "EVALUATION_BLOCKED_ON_INFRASTRUCTURE",
+  "decisionId": "DEC-0033",
+  "supersedesDecisionId": null,
+  "recordKind": "INFRASTRUCTURE_BLOCKER_NOT_AN_EVALUATION_RESULT",
+  "recordedAt": "2026-09-16T00:00:00.000Z",
+  "recorderRole": "Delivery Director",
+  "recordDate": "2026-09-16",
+  "decision": "BENCHMARK NOT EXECUTED — INFRASTRUCTURE UNAVAILABLE",
+  "recordBasis": "docs/EVALUATION_EXECUTION_BLOCKER.md",
+  "blockerClass": "INFRASTRUCTURE_NO_EXECUTION_ENVIRONMENT",
+  "blockerSubClass": "NO_GPU_COMPUTE_AVAILABLE",
+  "blockerPhase": "PRE_INFERENCE",
+  "testInferenceOccurred": false,
+  "testRecordsParsed": 0,
+  "metricValuesProduced": 0,
+  "preconditionsSatisfied": {
+    "authorizationRecorded": true,
+    "authorizationDecisionId": "DEC-0032",
+    "authorizationHash": "079afeb7088d0f731cb4175986a4d2ad7f3d35346046aac24ce57f8e6d5b3a96",
+    "nextDecisionIdVerifiedNotAssumed": true,
+    "blockerClosedOnlyThroughDecision": "BLK-0003",
+    "masterStateTransitioned": true,
+    "governanceValidatorsPassedBeforeTestAccess": true,
+    "leakageAuditStatus": "PASS",
+    "leakageAuditRecord": "governance/EVALUATION-LEAKAGE-AUDIT.json",
+    "splitDisjointnessProven": true,
+    "auditCohortQuarantined": true,
+    "testRecordCountVerified": 80,
+    "candidateAdapterIdentityVerified": true,
+    "baseModelRevisionPinned": true,
+    "promptPayloadProjected": true,
+    "scoringHarnessDeterministic": true,
+    "notRunRuleEnforcedStructurally": true
+  },
+  "reasons": [
+    {
+      "id": "NO_LOCAL_GPU",
+      "detail": "The host has no CUDA device (nvidia-smi is absent) and 36 GB of system RAM. The pinned artifact openai/gpt-oss-20b is a ~20.9B-parameter model whose accepted runtime deviation is a float32 adapter (DEC-0030, MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION). A float32 load at that scale needs roughly 40 GB of accelerator memory, so local execution was not viable and was ruled out before any attempt."
+    },
+    {
+      "id": "NO_REMOTE_GPU_SESSION_COMPLETED",
+      "detail": "The mandated execution environment is a governed Kaggle T4 run: DEC-0032 forbids paid providers, and the zero-cost mandate (2026-09-14) excludes Colab. A Kaggle benchmark executes asynchronously — the kernel is pushed, queued, then runs unattended, and its outputs are retrievable only once the remote job finishes and is downloaded. The dependency-install stage alone was measured at dozens of minutes during the accepted qualification, and two inference arms over 80 records at up to 1024 new tokens are expected to add substantially more. That window exceeded the execution time available to this session."
+    },
+    {
+      "id": "KERNEL_GENERATOR_UNREPAIRED",
+      "detail": "scripts/eval/build-eval-kernel.mjs had not been corrected or executed. Two defects were identified against the accepted production artifacts: (a) it used an ad-hoc %pip sequence instead of the accepted three-stage uv install discipline, which would produce an environment that is not the accepted engine freeze and would therefore make the benchmark incomparable to the qualification baseline; (b) it called apply_chat_template(..., return_tensors='pt', return_dict=True) directly on message dicts, whereas the proven production path renders with tokenize=False, add_generation_prompt=False to a string and tokenizes afterwards — and rendering is a frozen prompt/template rule under the benchmark specification. Pushing the unrepaired kernel would not have produced a trustworthy measurement."
+    }
+  ],
+  "notDone": [
+    "TEST records parsed for inference",
+    "BASE arm inference",
+    "CANDIDATE arm inference",
+    "M1-M13 measurement",
+    "evaluationStatus set to a completed state",
+    "evaluationResults incremented",
+    "model promotion",
+    "creation of GHARIBO-V0.1"
+  ],
+  "authorizationConsumed": false,
+  "authorizationStillValid": true,
+  "authorizationStillValidReason": "DEC-0032 grants exactly ONE governed held-out TEST benchmark execution. No TEST inference materially occurred, so the grant is not spent. DEC-0032 hardStops[2] ('if TEST inference has materially occurred, the run MUST NOT be repeated merely because scores are disappointing') is therefore not triggered, and the next attempt may execute the benchmark without a new authorization decision provided the harness is first repaired and both arms run in a single execution.",
+  "trainingStatusUnchanged": "COMPLETED",
+  "candidateStatusUnchanged": "EXPERIMENTAL_UNPROMOTED",
+  "ghariboV01StatusUnchanged": "NOT_CREATED",
+  "evaluationStatusUnchanged": "NOT_RUN",
+  "evaluationResultsUnchanged": 0,
+  "promotionPerformed": false,
+  "note": "This record states a fact about an execution environment, not a fact about the model. It carries NO score of any kind: no metric may exist before a real execution produces it (docs/RESEARCH_BENCHMARK.md 9), and 0, \"N/A\" and estimates are forbidden placeholders. GHARIBO-exp-001 remains an unmeasured, unpromoted experimental adapter.",
+  "references": [
+    "docs/EVALUATION_EXECUTION_BLOCKER.md",
+    "docs/EVALUATION_AUTHORIZATION_REQUEST.md",
+    "docs/EVALUATION.md",
+    "docs/RESEARCH_BENCHMARK.md",
+    "governance/DEC-0032-evaluation-authorization.json",
+    "governance/EVALUATION-LEAKAGE-AUDIT.json",
+    "governance/DEC-0030-kaggle-execution-acceptance.json",
+    "scripts/eval/build-eval-kernel.mjs",
+    "scripts/eval/leakage-audit.py"
+  ],
+  "blockerHash": "a6ceac1f82148e21207c5628f33ad63c0976d7943b4f4810401f0d26e1097575"
+}

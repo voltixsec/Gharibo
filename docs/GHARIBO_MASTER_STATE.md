@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.12.0 |
+| **Version** | 1.14.0 |
 | **Last Updated** | 2026-09-15 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | COMPLETED |
 | Training invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (kernel version 3, KernelWorkerStatus.COMPLETE): 640 examples, 1 epoch, 160 steps, train_loss 0.6016419500112533, effective runtime dtype float32 against a declared fp16 (engine-imposed, accepted, package not retroactively edited), TEST payload never uploaded or accessed. The result is an EXPERIMENTAL adapter: no evaluation has run and GHARIBO-V0.1 is NOT_CREATED. Next gate: an explicit evaluation authorization before TEST is touched. |
+| Blocker summary | DEC-0032 authorized exactly one governed held-out TEST benchmark (AUTHORIZED WITH LIMITS, CEO, 2026-09-15) and closed BLK-0003; the docs/RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED (TRAIN∩TEST=0, VALIDATION∩TEST=0, AUDIT∩TEST=0). The authorized benchmark then could NOT execute, because no GPU execution environment was available (BLK-0004, DEC-0033): no local CUDA device, and the mandated governed Kaggle T4 run is asynchronous over a window wider than the session while its kernel generator remained unrepaired. No TEST record was parsed in inference and no metric value was produced, so every M1-M13 score remains null, evaluation stays NOT_RUN with evaluationResults 0, and the single authorized benchmark execution is NOT spent. Training stays COMPLETED, the adapter stays EXPERIMENTAL, and GHARIBO-V0.1 stays NOT_CREATED. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -70,7 +70,7 @@
 | Environment qualification | QUALIFIED |
 | Qualification hash | 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 |
 | Package preview | PREVIEW_ONLY |
-| Authorization status | EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION |
+| Authorization status | EVALUATION_AUTHORIZED_AWAITING_EXECUTION |
 | Authorization decision | DEC-0025 |
 | Authorized code snapshot | ad1e011c55729f5447b324d35b4ad88d0a47d10f |
 | Authorized preview package ID | f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c |
@@ -161,7 +161,7 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | EVALUATION_AUTHORIZED_AWAITING_EXECUTION | 9/12 | GHARIBO-V0.1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** Training completed, but promotion requires at least one real evaluation result and none exists. Training completion is not model promotion (ADR-0008).
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -369,6 +369,8 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0029 | 2026-09-15 | Stage the governed Kaggle install and re-authorize a single retry | ACCEPTED | — |
 | DEC-0030 | 2026-09-15 | Accept the completed GHARIBO-exp-001 Kaggle execution and record the fp16→float32 runtime deviation | ACCEPTED | — |
 | DEC-0031 | 2026-09-15 | Accept ADR-0020 and amend the Frozen Milestone 1 specifications to reflect the executed GHARIBO-exp-001 run | ACCEPTED | `docs/adr/ADR-0020-post-execution-truth-reconciliation.md` |
+| DEC-0032 | 2026-09-15 | Authorize exactly one governed held-out TEST benchmark for GHARIBO-exp-001 | ACCEPTED | — |
+| DEC-0033 | 2026-09-16 | Record the infrastructure blocker that prevented the DEC-0032 governed held-out TEST benchmark from executing | ACCEPTED | — |
 
 ## Validation
 
@@ -418,13 +420,14 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | --- | --- | --- | --- | --- | --- |
 | BLK-0001 | CLOSED | Free-Kaggle v6 qualification completed and CTO-accepted | CLOSED 2026-09-15. Qualification artifact 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 is QUALIFIED with two independent fresh passes IDENTICAL and active-runtime alignment IDENTICAL. The measured engine freeze unsloth-freeze-2026.09.15 has been applied. This closure does not authorize training. | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/TRAINING_STRATEGY.md |
 | BLK-0002 | CLOSED | gpt-oss-20b model compatibility measured successfully | CLOSED 2026-09-15. openai/gpt-oss-20b loaded on the real free Kaggle GPU through the intended 4-bit QLoRA path; tokenizer/Harmony, adapter init, batch collation and one forward-only no_grad pass succeeded. Parameter digest remained 951055a91551d1d442d45f342a33ba3bfbb0efe500b8cc7c41ca0cf6a61a6331; TEST was not accessed; no training primitive executed and output hygiene passed. | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/adr/ADR-0018-real-model-compatibility-qualification.md |
-| BLK-0003 | OPEN | Held-out TEST evaluation is not authorized | OPEN 2026-09-15. GHARIBO-exp-001 has completed training, but no accepted governance rule authorizes held-out TEST evaluation at this stage. TEST must not be used for validation, model selection, prompt engineering or checkpoint selection. An explicit evaluation authorization is required before the first benchmark run (docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md §3.5 leakage audit). | STAGE-2 | docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md, governance/DEC-0030-kaggle-execution-acceptance.json |
+| BLK-0003 | CLOSED | Held-out TEST evaluation authorization obtained | CLOSED 2026-09-15 by DEC-0032. The CEO authorized ONE governed held-out TEST benchmark with the decision AUTHORIZED WITH LIMITS, scoped to BASE inference, CANDIDATE inference, M1-M13 measurement and required access logging, and explicitly forbidding training, tuning, selection, promotion, dataset mutation and second-pass optimization. The docs/RESEARCH_BENCHMARK.md 3.5 leakage audit subsequently PASSED (TRAIN∩TEST=0, VALIDATION∩TEST=0, AUDIT∩TEST=0, hash reproduction exact), which is the second and final condition for parsing TEST. This closure authorizes measurement only - it does not record a score and does not authorize promotion; GHARIBO-V0.1 stays NOT_CREATED. | STAGE-2 | docs/EVALUATION_AUTHORIZATION_REQUEST.md, docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md, governance/DEC-0032-evaluation-authorization.json, governance/EVALUATION-LEAKAGE-AUDIT.json, governance/DEC-0030-kaggle-execution-acceptance.json |
+| BLK-0004 | OPEN | No GPU execution environment available for the authorized held-out TEST benchmark | OPENED 2026-09-16 by DEC-0033. DEC-0032's single authorized benchmark could not execute: the host has no CUDA device and the pinned artifact's accepted float32 adapter needs roughly 40 GB of accelerator memory, so local execution is not viable; and the mandated governed Kaggle T4 run is asynchronous over a window wider than the session, with its kernel generator still unrepaired. No TEST inference occurred and no score exists. The authorization is NOT spent. Closes when one governed Kaggle T4 execution completes BASE then CANDIDATE over the same 80 TEST records and real M1-M13 values are registered. | STAGE-1 | docs/EVALUATION_EXECUTION_BLOCKER.md, governance/DEC-0033-evaluation-infrastructure-blocker.json, governance/DEC-0032-evaluation-authorization.json |
 
 ## Next Actions
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Obtain an explicit, recorded evaluation authorization before any held-out TEST use, then run the governed benchmark (leakage audit first) and record real scores. Until then the adapter stays EXPERIMENTAL. | EXPLICIT_EVALUATION_AUTHORIZATION | docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md, governance/DEC-0030-kaggle-execution-acceptance.json |
+| ACT-0001 | P0 | Repair and execute the ONE already-authorized governed held-out TEST benchmark (BASE then CANDIDATE over the same 80 TEST records, identical decoding, one execution). First repair scripts/eval/build-eval-kernel.mjs: reproduce the accepted three-stage uv install discipline (install -> --upgrade --no-deps -> --no-deps --upgrade torchao>=0.16.0) with preserved torch/triton constraint-pinned and triton_kernels skipped, and render prompts with tokenize=False, add_generation_prompt=False before tokenizing. Then add scripts/eval/check-eval-kernel.mjs, push a PRIVATE prompts-only Kaggle dataset (never gold.jsonl), run one Kaggle T4 execution, download the prediction payloads, score locally with scripts/eval/score-arm.mjs, and register the real M1-M13 values. Do NOT promote on the result: a separate promotion decision is required. Blocked item: BLK-0004. | DEC-0032 | docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md, docs/EVALUATION_EXECUTION_BLOCKER.md, governance/DEC-0032-evaluation-authorization.json, governance/DEC-0033-evaluation-infrastructure-blocker.json, governance/EVALUATION-LEAKAGE-AUDIT.json, scripts/eval/build-eval-kernel.mjs |
 | ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
 
 ## History
@@ -442,6 +445,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.8.0 | 2026-09-15 | Accepted DEC-0027 Kaggle Start authorization for the exact QUEUED GHARIBO-exp-001 run and the safe content-addressed launch notebook. Training remains NOT_STARTED until real Kaggle execution evidence is observed. | — | PENDING_CHECKPOINT |
 | 1.11.0 | 2026-09-15 | Post-execution acceptance: DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and recorded the fp16→float32 runtime deviation instead of hiding it. Training state moved to COMPLETED, artifacts were registered, TEST isolation was re-proven, and evaluation stayed NOT_RUN with no model promotion. | — | PENDING_CHECKPOINT |
 | 1.12.0 | 2026-09-15 | Documentation and validator reconciliation: ADR-0020 accepted (DEC-0031). The obsolete "TRAINING HAS NOT STARTED" validator invariant was replaced with post-execution invariants; docs/MODEL_REGISTRY.md and docs/TRAINING_STRATEGY.md gained additive v1.4.0 notes (fp16-only T4 assumption corrected to float32); docs/ROADMAP.md STAGE-1 moved NOT_STARTED -> IN_PROGRESS; docs/ARCHITECTURE.md moved to v1.2.1 for the adrs fact 19 -> 20. No evaluation, no promotion. | — | PENDING_CHECKPOINT |
+| 1.13.0 | 2026-09-15 | Evaluation authorization recorded. DEC-0032 captures the CEO decision AUTHORIZED WITH LIMITS for exactly one governed held-out TEST benchmark, closes BLK-0003 through that decision, and moves evaluation to EVALUATION_AUTHORIZED_AWAITING_EXECUTION. The RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED before any TEST parse. No score is claimed: evaluation has not executed, the adapter stays EXPERIMENTAL and GHARIBO-V0.1 stays NOT_CREATED. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -578,4 +582,15 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - replaced the obsolete TRAINING HAS NOT STARTED validator invariant with post-execution invariants
 - added a roadmap STAGE-1 / training status consistency invariant so this class of contradiction is caught automatically
 - The containing commit cannot embed its own SHA. DEC-0030's acceptance hash is content-addressed over the acceptance body and is stable independent of the commit.
+- Training executed: true
+
+**1.13.0 — changes**
+- added DEC-0032 evaluation authorization (authorizationHash 079afeb7088d0f731cb4175986a4d2ad7f3d35346046aac24ce57f8e6d5b3a96)
+- added governance/DEC-0032-evaluation-authorization.json (deterministic generator + --check drift mode)
+- added governance/EVALUATION-LEAKAGE-AUDIT.json and scripts/eval/leakage-audit.py (RESEARCH_BENCHMARK.md 3.5 audit, hash/ID-only)
+- closed BLK-0003 through DEC-0032 only
+- evaluation EVALUATION_READY_AWAITING_AUTHORIZATION -> EVALUATION_AUTHORIZED_AWAITING_EXECUTION
+- completed the docs/EVALUATION_AUTHORIZATION_REQUEST.md decision block truthfully
+- kept evaluationStatus NOT_RUN, evaluationResults 0, GHARIBO-V0.1 NOT_CREATED
+- This checkpoint authorizes measurement. It records no score and does not constitute an evaluation result.
 - Training executed: true

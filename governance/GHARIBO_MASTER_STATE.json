@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.12.0",
+  "masterStateVersion": "1.14.0",
   "updatedAt": "2026-09-15",
   "project": {
     "id": "GHARIBO",
@@ -19,7 +19,7 @@
     "trainingInvariant": "TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM",
     "currentMilestone": "M3C",
     "milestoneStatus": "COMPLETE",
-    "blockerSummary": "DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (kernel version 3, KernelWorkerStatus.COMPLETE): 640 examples, 1 epoch, 160 steps, train_loss 0.6016419500112533, effective runtime dtype float32 against a declared fp16 (engine-imposed, accepted, package not retroactively edited), TEST payload never uploaded or accessed. The result is an EXPERIMENTAL adapter: no evaluation has run and GHARIBO-V0.1 is NOT_CREATED. Next gate: an explicit evaluation authorization before TEST is touched.",
+    "blockerSummary": "DEC-0032 authorized exactly one governed held-out TEST benchmark (AUTHORIZED WITH LIMITS, CEO, 2026-09-15) and closed BLK-0003; the docs/RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED (TRAIN∩TEST=0, VALIDATION∩TEST=0, AUDIT∩TEST=0). The authorized benchmark then could NOT execute, because no GPU execution environment was available (BLK-0004, DEC-0033): no local CUDA device, and the mandated governed Kaggle T4 run is asynchronous over a window wider than the session while its kernel generator remained unrepaired. No TEST record was parsed in inference and no metric value was produced, so every M1-M13 score remains null, evaluation stays NOT_RUN with evaluationResults 0, and the single authorized benchmark execution is NOT spent. Training stays COMPLETED, the adapter stays EXPERIMENTAL, and GHARIBO-V0.1 stays NOT_CREATED.",
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
       "exampleCount": 800,
@@ -703,6 +703,62 @@
       "supersedes": null,
       "supersededBy": null,
       "architectureChanging": true
+    },
+    {
+      "id": "DEC-0032",
+      "date": "2026-09-15",
+      "title": "Authorize exactly one governed held-out TEST benchmark for GHARIBO-exp-001",
+      "status": "ACCEPTED",
+      "decision": "The CEO authorized evaluation on 2026-09-15 with the decision AUTHORIZED WITH LIMITS, scoped to ONE governed held-out TEST benchmark. Permitted: BASE inference (openai/gpt-oss-20b @ 6cee5e81ee83917806bbde320786a8fb61efebee, unadapted), CANDIDATE inference (the GHARIBO-exp-001 QLoRA adapter sha256 794917f25c4aa9e77acb6a746b69a703412539e993f6bfc1e8c602d64be678f == checkpoint-160 applied to that pinned base), M1-M13 measurement exactly as defined in docs/RESEARCH_BENCHMARK.md, and the required TEST access logging. Both arms run under the same harness, the same 80 TEST records, the same inference parameters, the same frozen prompt/template rules and the same scoring logic. Forbidden: training, tuning, any selection based on TEST outcomes, model promotion, dataset mutation, second-pass optimization, re-running GHARIBO-exp-001 and creating GHARIBO-V0.1. TEST may be parsed for inference only AFTER this authorization is durably recorded AND the docs/RESEARCH_BENCHMARK.md 3.5 leakage audit has PASSED. This decision closes blocker BLK-0003 and moves evaluation from EVALUATION_READY_AWAITING_AUTHORIZATION to EVALUATION_AUTHORIZED_AWAITING_EXECUTION. It records NO score: nothing has executed, so every M1-M13 value remains null and evaluation is NOT complete. Promotion remains forbidden even if CANDIDATE scores are excellent - measuring is not promoting.",
+      "rationale": "Held-out TEST was permanently held out for exactly this purpose, and every precondition the request listed was already satisfied and independently verifiable: training completed for real (DEC-0030), TEST had never been read (testUsage HASH_INTEGRITY_ONLY, testRecordsParsed 0), the split is content-addressed and reproducible under seed 20260914 from a committed generator, and the audit cohort is quarantined out of TEST structurally. Without an explicit recorded authorization the adapter would stay permanently unmeasurable, which is its own kind of governance fiction. The limits are not decorative: the same TEST that makes a result meaningful is destroyed as a holdout the moment it is used for any kind of selection, so authorization to MEASURE is kept strictly separate from authorization to ACT on the measurement (ADR-0008). The leakage audit is sequenced before the first parse because a contaminated run would produce a number that looks authoritative and is worthless.",
+      "scope": [
+        "training",
+        "experiments",
+        "models",
+        "datasets"
+      ],
+      "references": [
+        "docs/EVALUATION_AUTHORIZATION_REQUEST.md",
+        "docs/EVALUATION.md",
+        "docs/RESEARCH_BENCHMARK.md",
+        "docs/TRAINING_STRATEGY.md",
+        "governance/DEC-0032-evaluation-authorization.json",
+        "governance/EVALUATION-LEAKAGE-AUDIT.json",
+        "governance/DEC-0030-kaggle-execution-acceptance.json",
+        "governance/GHARIBO_MASTER_STATE.json",
+        "scripts/eval/build-dec0032-authorization.mjs",
+        "scripts/eval/leakage-audit.py"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0033",
+      "date": "2026-09-16",
+      "title": "Record the infrastructure blocker that prevented the DEC-0032 governed held-out TEST benchmark from executing",
+      "status": "ACCEPTED",
+      "decision": "The benchmark authorized by DEC-0032 could NOT be executed, because no GPU execution environment was available to the session. This is recorded under DEC-0032 hardStops[3]: an infrastructure failure before any valid metric-producing TEST inference must be recorded separately and must NOT be disguised as an evaluation result. No TEST record was parsed, no inference ran in either arm, and no metric value was produced - every M1-M13 score remains null. Two independent constraints were decisive: (1) the host has no CUDA device and the pinned openai/gpt-oss-20b artifact stores its accepted float32 adapter, needing roughly 40 GB of accelerator memory, so local execution was not viable; (2) the mandated governed Kaggle T4 benchmark runs asynchronously - pushed, queued, executed unattended and only then downloadable - over a window exceeding the session's execution time, and its kernel generator scripts/eval/build-eval-kernel.mjs still carried two defects (an ad-hoc %pip sequence instead of the accepted three-stage uv install discipline, and a chat-template rendering call that omitted the frozen render-then-tokenize convention), so pushing it would not have produced a trustworthy measurement. Because no TEST inference materially occurred, the single authorized benchmark execution is NOT spent and DEC-0032 hardStops[2] is not triggered: the next attempt may execute the benchmark without a new authorization, once the harness is repaired and both arms run in a single execution. Training stays COMPLETED, the adapter stays EXPERIMENTAL and unpromoted, evaluation stays NOT_RUN with evaluationResults 0, and GHARIBO-V0.1 stays NOT_CREATED. This record carries no score of any kind.",
+      "rationale": "A blocker that is left unrecorded is indistinguishable from an oversight, and the cheapest way to make it disappear later is to fill the gap with a number. The governing documents already anticipated this: DEC-0032 separates an infrastructure failure from an evaluation result precisely so that 'the environment was missing' can never be rounded up into 'the model scored X'. Recording it also preserves the authorization's value - because no TEST inference occurred, the one permitted execution is still available, and the next attempt does not need to re-litigate a decision the CEO has already made. The distinction between 'we could not measure' and 'we measured and did not like the answer' is the whole point of the held-out TEST discipline, and only an explicit record can hold it.",
+      "scope": [
+        "training",
+        "experiments",
+        "models"
+      ],
+      "references": [
+        "docs/EVALUATION_EXECUTION_BLOCKER.md",
+        "docs/EVALUATION.md",
+        "docs/RESEARCH_BENCHMARK.md",
+        "governance/DEC-0033-evaluation-infrastructure-blocker.json",
+        "governance/DEC-0032-evaluation-authorization.json",
+        "governance/EVALUATION-LEAKAGE-AUDIT.json",
+        "governance/DEC-0030-kaggle-execution-acceptance.json",
+        "scripts/eval/build-dec0033-blocker.mjs",
+        "scripts/eval/build-eval-kernel.mjs"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
     }
   ],
   "roadmap": {
@@ -925,7 +981,7 @@
       }
     },
     "authorization": {
-      "status": "EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION",
+      "status": "EVALUATION_AUTHORIZED_AWAITING_EXECUTION",
       "decisionId": "DEC-0025",
       "authorizedAt": "2026-09-15",
       "scope": "PACKAGE_AND_RUN_ISSUANCE_ONLY",
@@ -947,7 +1003,9 @@
       "executionStarted": false,
       "note": "The authorization checkpoint commit necessarily has a different Git SHA. That does not change the executable code snapshot being authorized, which remains ad1e011c55729f5447b324d35b4ad88d0a47d10f.",
       "executionAuthorized": true,
-      "kaggleStartAuthorized": true
+      "kaggleStartAuthorized": true,
+      "evaluationAuthorizationDecisionId": "DEC-0032",
+      "evaluationAuthorizationHash": "079afeb7088d0f731cb4175986a4d2ad7f3d35346046aac24ce57f8e6d5b3a96"
     },
     "issuance": {
       "binding": {
@@ -1628,6 +1686,74 @@
       },
       "acceptedAt": "2026-09-15T20:22:22Z",
       "acceptanceHash": "06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647"
+    },
+    "evaluationAuthorization": {
+      "decisionId": "DEC-0032",
+      "decision": "AUTHORIZED WITH LIMITS",
+      "deciderRole": "CEO",
+      "decisionDate": "2026-09-15",
+      "scope": "ONE_GOVERNED_HELD_OUT_TEST_BENCHMARK",
+      "authorizationHash": "079afeb7088d0f731cb4175986a4d2ad7f3d35346046aac24ce57f8e6d5b3a96",
+      "authorizationRequestDoc": "docs/EVALUATION_AUTHORIZATION_REQUEST.md",
+      "candidateAdapterSha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+      "baseModel": "openai/gpt-oss-20b",
+      "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+      "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+      "testSplitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+      "testRecordCount": 80,
+      "metricSpecification": "docs/RESEARCH_BENCHMARK.md",
+      "metricIds": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M7",
+        "M8",
+        "M9",
+        "M10",
+        "M11",
+        "M12",
+        "M13"
+      ],
+      "leakageAuditStatus": "PASS",
+      "leakageAuditRecord": "governance/EVALUATION-LEAKAGE-AUDIT.json",
+      "closedBlockerId": "BLK-0003",
+      "evaluationStatusBefore": "EVALUATION_READY_AWAITING_AUTHORIZATION",
+      "evaluationStatusAfter": "EVALUATION_AUTHORIZED_AWAITING_EXECUTION",
+      "evaluationExecuted": false,
+      "evaluationCompleted": false,
+      "permitted": [
+        "one governed held-out TEST benchmark execution",
+        "BASE inference",
+        "CANDIDATE inference",
+        "M1-M13 measurement",
+        "required TEST access logging"
+      ],
+      "forbidden": [
+        "training",
+        "tuning",
+        "selection",
+        "model promotion",
+        "dataset mutation",
+        "second-pass optimization",
+        "creating GHARIBO-V0.1"
+      ],
+      "note": "Authorization to measure only. The authorized benchmark was attempted and could not run because no GPU execution environment was available (BLK-0004, DEC-0033). No TEST record was parsed in inference, so every M1-M13 value remains null and the single permitted benchmark execution is NOT spent. Training stays COMPLETED, the adapter stays EXPERIMENTAL and unpromoted, and GHARIBO-V0.1 stays NOT_CREATED.",
+      "executionBlockerId": "BLK-0004",
+      "executionBlockerResolutionId": "DEC-0033",
+      "executionBlockerHash": "a6ceac1f82148e21207c5628f33ad63c0976d7943b4f4810401f0d26e1097575",
+      "executionBlockerRecord": "governance/DEC-0033-evaluation-infrastructure-blocker.json",
+      "executionBlockerClass": "INFRASTRUCTURE_NO_EXECUTION_ENVIRONMENT",
+      "executionBlockerPhase": "PRE_INFERENCE",
+      "executionAttempted": true,
+      "executionSucceeded": false,
+      "testInferenceOccurred": false,
+      "testRecordsParsed": 0,
+      "metricValuesProduced": 0,
+      "evaluationStatusAfterExecutionAttempt": "EVALUATION_AUTHORIZED_AWAITING_EXECUTION",
+      "authorizationConsumed": false
     }
   },
   "datasets": {
@@ -1691,7 +1817,7 @@
       "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION",
+      "readinessStatus": "EVALUATION_AUTHORIZED_AWAITING_EXECUTION",
       "engineDependencyCount": 12,
       "resolvedEngineDependencies": 9,
       "promotionTarget": "GHARIBO-V0.1",
@@ -1717,7 +1843,9 @@
       "declaredDtype": "fp16",
       "effectiveDtype": "float32",
       "runtimeDeviationClassification": "MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION",
-      "artifactRollupHash": "788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885"
+      "artifactRollupHash": "788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885",
+      "evaluationAuthorizationDecisionId": "DEC-0032",
+      "evaluationAuthorizationStatus": "AUTHORIZED_WITH_LIMITS"
     }
   },
   "models": {
@@ -2231,16 +2359,34 @@
     },
     {
       "id": "BLK-0003",
-      "status": "OPEN",
-      "title": "Held-out TEST evaluation is not authorized",
-      "detail": "OPEN 2026-09-15. GHARIBO-exp-001 has completed training, but no accepted governance rule authorizes held-out TEST evaluation at this stage. TEST must not be used for validation, model selection, prompt engineering or checkpoint selection. An explicit evaluation authorization is required before the first benchmark run (docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md §3.5 leakage audit).",
+      "status": "CLOSED",
+      "title": "Held-out TEST evaluation authorization obtained",
+      "detail": "CLOSED 2026-09-15 by DEC-0032. The CEO authorized ONE governed held-out TEST benchmark with the decision AUTHORIZED WITH LIMITS, scoped to BASE inference, CANDIDATE inference, M1-M13 measurement and required access logging, and explicitly forbidding training, tuning, selection, promotion, dataset mutation and second-pass optimization. The docs/RESEARCH_BENCHMARK.md 3.5 leakage audit subsequently PASSED (TRAIN∩TEST=0, VALIDATION∩TEST=0, AUDIT∩TEST=0, hash reproduction exact), which is the second and final condition for parsing TEST. This closure authorizes measurement only - it does not record a score and does not authorize promotion; GHARIBO-V0.1 stays NOT_CREATED.",
       "blocks": [
         "STAGE-2"
       ],
       "references": [
+        "docs/EVALUATION_AUTHORIZATION_REQUEST.md",
         "docs/EVALUATION.md",
         "docs/RESEARCH_BENCHMARK.md",
+        "governance/DEC-0032-evaluation-authorization.json",
+        "governance/EVALUATION-LEAKAGE-AUDIT.json",
         "governance/DEC-0030-kaggle-execution-acceptance.json"
+      ],
+      "closedByDecisionId": "DEC-0032"
+    },
+    {
+      "id": "BLK-0004",
+      "status": "OPEN",
+      "title": "No GPU execution environment available for the authorized held-out TEST benchmark",
+      "detail": "OPENED 2026-09-16 by DEC-0033. DEC-0032's single authorized benchmark could not execute: the host has no CUDA device and the pinned artifact's accepted float32 adapter needs roughly 40 GB of accelerator memory, so local execution is not viable; and the mandated governed Kaggle T4 run is asynchronous over a window wider than the session, with its kernel generator still unrepaired. No TEST inference occurred and no score exists. The authorization is NOT spent. Closes when one governed Kaggle T4 execution completes BASE then CANDIDATE over the same 80 TEST records and real M1-M13 values are registered.",
+      "blocks": [
+        "STAGE-1"
+      ],
+      "references": [
+        "docs/EVALUATION_EXECUTION_BLOCKER.md",
+        "governance/DEC-0033-evaluation-infrastructure-blocker.json",
+        "governance/DEC-0032-evaluation-authorization.json"
       ]
     }
   ],
@@ -2248,12 +2394,16 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Obtain an explicit, recorded evaluation authorization before any held-out TEST use, then run the governed benchmark (leakage audit first) and record real scores. Until then the adapter stays EXPERIMENTAL.",
-      "requires": "EXPLICIT_EVALUATION_AUTHORIZATION",
+      "action": "Repair and execute the ONE already-authorized governed held-out TEST benchmark (BASE then CANDIDATE over the same 80 TEST records, identical decoding, one execution). First repair scripts/eval/build-eval-kernel.mjs: reproduce the accepted three-stage uv install discipline (install -> --upgrade --no-deps -> --no-deps --upgrade torchao>=0.16.0) with preserved torch/triton constraint-pinned and triton_kernels skipped, and render prompts with tokenize=False, add_generation_prompt=False before tokenizing. Then add scripts/eval/check-eval-kernel.mjs, push a PRIVATE prompts-only Kaggle dataset (never gold.jsonl), run one Kaggle T4 execution, download the prediction payloads, score locally with scripts/eval/score-arm.mjs, and register the real M1-M13 values. Do NOT promote on the result: a separate promotion decision is required. Blocked item: BLK-0004.",
+      "requires": "DEC-0032",
       "references": [
         "docs/EVALUATION.md",
         "docs/RESEARCH_BENCHMARK.md",
-        "governance/DEC-0030-kaggle-execution-acceptance.json"
+        "docs/EVALUATION_EXECUTION_BLOCKER.md",
+        "governance/DEC-0032-evaluation-authorization.json",
+        "governance/DEC-0033-evaluation-infrastructure-blocker.json",
+        "governance/EVALUATION-LEAKAGE-AUDIT.json",
+        "scripts/eval/build-eval-kernel.mjs"
       ]
     },
     {
@@ -2479,6 +2629,24 @@
         "bumped PROJECT_STATE.md 1.1.0 -> 1.2.0 and removed the stale no-training-has-been-executed claims",
         "replaced the obsolete TRAINING HAS NOT STARTED validator invariant with post-execution invariants",
         "added a roadmap STAGE-1 / training status consistency invariant so this class of contradiction is caught automatically"
+      ],
+      "trainingExecuted": true
+    },
+    {
+      "revision": "1.13.0",
+      "date": "2026-09-15",
+      "summary": "Evaluation authorization recorded. DEC-0032 captures the CEO decision AUTHORIZED WITH LIMITS for exactly one governed held-out TEST benchmark, closes BLK-0003 through that decision, and moves evaluation to EVALUATION_AUTHORIZED_AWAITING_EXECUTION. The RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED before any TEST parse. No score is claimed: evaluation has not executed, the adapter stays EXPERIMENTAL and GHARIBO-V0.1 stays NOT_CREATED.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "This checkpoint authorizes measurement. It records no score and does not constitute an evaluation result.",
+      "changes": [
+        "added DEC-0032 evaluation authorization (authorizationHash 079afeb7088d0f731cb4175986a4d2ad7f3d35346046aac24ce57f8e6d5b3a96)",
+        "added governance/DEC-0032-evaluation-authorization.json (deterministic generator + --check drift mode)",
+        "added governance/EVALUATION-LEAKAGE-AUDIT.json and scripts/eval/leakage-audit.py (RESEARCH_BENCHMARK.md 3.5 audit, hash/ID-only)",
+        "closed BLK-0003 through DEC-0032 only",
+        "evaluation EVALUATION_READY_AWAITING_AUTHORIZATION -> EVALUATION_AUTHORIZED_AWAITING_EXECUTION",
+        "completed the docs/EVALUATION_AUTHORIZATION_REQUEST.md decision block truthfully",
+        "kept evaluationStatus NOT_RUN, evaluationResults 0, GHARIBO-V0.1 NOT_CREATED"
       ],
       "trainingExecuted": true
     }

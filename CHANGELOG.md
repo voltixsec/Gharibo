@@ -5,8 +5,8 @@
 | **Document Owner** | Delivery (GHARIBO AI LAB) |
 | **Type** | Delivery note |
 | **Status** | Living |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-09-15 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-09-16 |
 
 All notable changes to GHARIBO AI LAB are recorded here.
 
@@ -381,6 +381,87 @@ downloaded.
   allowance; GitHub holds source and docs only.
 - **No fabrication.** No datasets, benchmarks, or metrics have been invented. Milestone 2 builds
   the pipeline and stops before execution by design.
+
+---
+
+## [Unreleased] — Evaluation authorization & governed held-out benchmark
+
+**Status: authorization + pre-execution governance only. The governed benchmark was NOT executed.
+No TEST record was parsed. No metric value exists.**
+
+#### Added
+
+- `governance/DEC-0032-evaluation-authorization.json` — the human authorization record. Decision
+  `AUTHORIZED WITH LIMITS`, decider `CEO`, date `2026-09-15`. Scope is exactly **one** governed
+  benchmark execution (BASE inference, CANDIDATE inference, M1–M13 measurement, access logging).
+  Explicitly **not** authorized: promotion, further training, checkpoint selection, prompt tuning,
+  few-shot selection, threshold tuning, test-driven filtering, dataset modification, a second
+  evaluation attempt, re-running `GHARIBO-exp-001`, creating `GHARIBO-V0.1`. `authorizationConsumed`
+  is `false` — the single permitted execution is still available.
+- `governance/EVALUATION-LEAKAGE-AUDIT.json` — the pre-access leakage audit required by
+  `docs/RESEARCH_BENCHMARK.md` §3.5. Proves by content hash, not by assertion, that
+  `TRAIN ∩ TEST = 0`, `VALIDATION ∩ TEST = 0`, and `audit cohort ∩ TEST = 0`. **PASS.** No TEST
+  semantic content was inspected to produce it.
+- `governance/DEC-0033-evaluation-infrastructure-blocker.json` — the honest record of why the
+  benchmark could not run. `blockerClass = INFRASTRUCTURE_NO_EXECUTION_ENVIRONMENT`,
+  `subClass = NO_GPU_COMPUTE_AVAILABLE`, `phase = PRE_INFERENCE`,
+  `recordKind = INFRASTRUCTURE_BLOCKER_NOT_AN_EVALUATION_RESULT`. The authorization is **not**
+  consumed and remains valid.
+- `docs/EVALUATION_EXECUTION_BLOCKER.md` — the human-readable companion to DEC-0033: the 16
+  preconditions that were verified READY, the blocker itself, an explicit list of what was **not**
+  done, and the 8 ordered steps required to unblock.
+- `scripts/eval/build-dec0032-authorization.mjs`, `scripts/eval/build-dec0033-blocker.mjs` —
+  deterministic generators with `--check` drift modes, so neither governance record can be
+  hand-edited out of sync with its committed source.
+- `scripts/eval/verify-evaluation-state.mjs` — a deterministic PASS/FAIL verifier (30 checks in 7
+  groups) that enforces the honesty of the evaluation layer: no score may exist without execution,
+  no placeholder score is tolerated, the authorization must be intact, an infrastructure blocker
+  must be recorded **as** a blocker, TEST must remain isolated, nothing may be promoted, and
+  `training` must remain unchanged.
+
+#### Changed
+
+- `governance/GHARIBO_MASTER_STATE.json` — master state `1.12.0 → 1.14.0`. Evaluation moves
+  `EVALUATION_READY_AWAITING_AUTHORIZATION → EVALUATION_AUTHORIZED_READINESS`, the authorization
+  is recorded, and the previously blocking `BLK-0003` is **CLOSED by DEC-0032** (closed only
+  through an accepted human decision, never by inference). New blocker `BLK-0004`
+  (`INFRASTRUCTURE_NO_EXECUTION_ENVIRONMENT`, **OPEN**) is the sole reason execution did not occur.
+  `training.status` remains `COMPLETED`; no experiment status was rewritten.
+- `docs/GHARIBO_MASTER_STATE.md` — regenerated deterministically (`npm run master:generate`), now
+  33 decisions, 4 blockers, version `1.14.0`. Never hand-edited.
+- `docs/EVALUATION_AUTHORIZATION_REQUEST.md` — v1.2.0. Records the signed decision and carries a
+  `⛔ EXECUTION BLOCKED — INFRASTRUCTURE UNAVAILABLE` banner stating plainly that no TEST parse
+  occurred and that the authorization is unspent.
+- `docs/DOCUMENT_REGISTER.md` — registered `docs/EVALUATION_EXECUTION_BLOCKER.md`; the evaluation
+  authorization request is now `Approved | 1.2.0`; register + master-state rows moved to `1.14.0`.
+- `apps/web/lib/training/gold-authorization.mjs` — added
+  `isEvaluationInfrastructureBlockedGoldState()`, which layers on top of
+  `isEvaluationAuthorizedGoldState()` and requires the DEC-0033 blocker to be exact (class, phase,
+  record, 64-hex hash) while `testInferenceOccurred === false`, `testRecordsParsed === 0`, and
+  `metricValuesProduced === 0`. It strips its own layer and re-asserts the prior predicate, so it
+  can never be satisfied by loosening the gate beneath it. The version allow-list
+  `COMPLETED_MASTER_STATE_VERSIONS` gained `1.13.0` / `1.14.0`; the advanced-tip path additionally
+  requires `evaluationResults === 0`, `evaluationStatus === "NOT_RUN"`, `promotable === false`, so
+  the tolerance cannot be abused to smuggle in an evaluation claim.
+- `package.json` — `eval:audit:auth`, `eval:audit:blocker`, `eval:audit:leakage`, `eval:verify`,
+  and the composing `verify:eval` gate.
+
+#### Notes
+
+- **The benchmark did not run, and no result is reported.** Two independent constraints: there is
+  no local CUDA device (the artifact is a ~20.9 B-parameter model trained effectively in float32),
+  and the mandated governed Kaggle T4 path is asynchronous over a window wider than this session,
+  with its kernel generator still carrying two unrepaired defects. Per the authorization's own
+  hard stop, an infrastructure failure before TEST inference is recorded separately and is **not**
+  disguised as an evaluation result.
+- **M1–M13 remain `null` / `NOT_RUN`.** No `0`, no `"N/A"`, no estimate, no synthetic success.
+- **`GHARIBO-V0.1` remains `NOT_CREATED`. Nothing is promoted.** The candidate adapter stays
+  experimental. This is enforced by a test, not by convention.
+- **Repository safety.** No raw TEST record, inference transcript, weight, adapter binary, Kaggle
+  output binary, database, or secret is committed. The evaluation item bundle lives under the
+  gitignored `.workbuddy-ai/`; raw processed data lives under the gitignored
+  `data/processed/*`. Committed content is governance records, evaluation code, hash manifests,
+  metrics summaries and docs only.
 
 ---
 

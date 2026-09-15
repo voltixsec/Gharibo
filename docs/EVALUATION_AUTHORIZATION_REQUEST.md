@@ -4,19 +4,40 @@
 |-------|-------|
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
-| **Status** | In Review |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-09-15 |
+| **Status** | Approved |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-09-16 |
 
-> ## ⚠️ THIS DOCUMENT GRANTS NO PERMISSION
+> ## ✅ DECISION RECORDED — `AUTHORIZED WITH LIMITS`
 >
-> As of **2026-09-15** the held-out `TEST` split is **NOT authorized** for use in any form. This
-> document is a **request**. Until the decision block in §8 is completed and recorded as an
-> accepted decision in `governance/GHARIBO_MASTER_STATE.json`, the project remains at
-> `EVALUATION_READY_AWAITING_AUTHORIZATION` and `GHARIBO-exp-001` evaluation stays `NOT_RUN`.
+> On **2026-09-15** the CEO decided: **`AUTHORIZED WITH LIMITS`**, scoped to **one** governed
+> held-out `TEST` benchmark. The decision is recorded as **`DEC-0032`**
+> (`governance/DEC-0032-evaluation-authorization.json`) and is the only rule that closes blocker
+> **BLK-0003**.
 >
-> Nothing in this document, and nothing in the completion of training, may be read as consent.
-> Blocker **BLK-0003** is `OPEN`.
+> The authorization permits exactly the `BASE` inference, `CANDIDATE` inference, `M1–M13`
+> measurement and access logging requested in §1 and §4 of this document. It permits **nothing**
+> in §2. It does not mark evaluation complete — nothing has executed yet, so every metric
+> remains `null` / `NOT_RUN`.
+>
+> Two conditions gate the first TEST parse: the decision must be durably recorded in the master
+> state (done), and the §3.5 leakage audit must `PASS`
+> (`governance/EVALUATION-LEAKAGE-AUDIT.json`).
+
+> ## ⛔ EXECUTION BLOCKED — INFRASTRUCTURE UNAVAILABLE
+>
+> The benchmark authorized above was **attempted and could not run**: no GPU execution
+> environment was available. This is recorded as **`DEC-0033`**
+> (`governance/DEC-0033-evaluation-infrastructure-blocker.json`, blocker **`BLK-0004`**) and
+> documented in full in [`EVALUATION_EXECUTION_BLOCKER.md`](EVALUATION_EXECUTION_BLOCKER.md),
+> exactly as `DEC-0032` `hardStops[3]` requires — an infrastructure failure is recorded
+> separately and is **not** disguised as an evaluation result.
+>
+> **No TEST record was parsed in inference, and no metric value was produced.** Every `M1–M13`
+> score remains `null`; evaluation stays `NOT_RUN` with `evaluationResults: 0`. Because no TEST
+> inference materially occurred, the single benchmark execution this authorization grants is
+> **not spent** and `DEC-0032` `hardStops[2]` is not triggered — the benchmark may still be
+> executed under this same authorization once the harness is repaired.
 
 ---
 
@@ -96,20 +117,34 @@ value today.
 
 | Field | Value |
 |-------|-------|
-| Decision | *(AUTHORIZED / AUTHORIZED WITH LIMITS / REJECTED / DEFERRED — unfilled)* |
-| Decider | *(CTO or CEO — unfilled)* |
-| Date | *(unfilled)* |
-| Scope limitations | *(unfilled — e.g. single run, no selection, no promotion)* |
-| Resulting decision id | *(to be created on approval)* |
+| Decision | **AUTHORIZED WITH LIMITS** |
+| Decider | **CEO** |
+| Date | **2026-09-15** |
+| Scope limitations | **One** governed held-out TEST benchmark. Permitted: BASE inference, CANDIDATE inference, M1–M13 measurement, required access logging. Forbidden: training, tuning, selection, promotion, dataset mutation, second-pass optimization, creating `GHARIBO-V0.1`. |
+| Resulting decision id | **`DEC-0032`** — `governance/DEC-0032-evaluation-authorization.json` |
+| Closed blocker | **`BLK-0003`** — `OPEN → CLOSED`, closed only by `DEC-0032` |
+| Evaluation state | `EVALUATION_READY_AWAITING_AUTHORIZATION` → `EVALUATION_AUTHORIZED_AWAITING_EXECUTION` |
 
-**This block is deliberately empty.** Filling it is a human act. Until it is filled, no TEST
-record may be parsed.
+**This block was completed as a human act** — the CEO decision above is the authorization. Until
+the §3.5 leakage audit passed, no TEST record could be parsed; that audit is recorded in
+`governance/EVALUATION-LEAKAGE-AUDIT.json`.
 
 ## 9. If authorization is not granted
+
+*(Not applicable — authorization was granted on 2026-09-15 as `DEC-0032`. Retained for the record
+of what the alternative end state would have been.)*
 
 The project stays exactly where it is: `EVALUATION_READY_AWAITING_AUTHORIZATION`,
 evaluation `NOT_RUN`, `GHARIBO-V0.1` `NOT_CREATED`, roadmap `STAGE-1` `IN_PROGRESS`. That is a
 valid, honest end state — the alternative is a number nobody earned.
+
+## 10. What remains forbidden after authorization
+
+Authorization to *measure* is not authorization to *act on the measurement*. Even a strong
+CANDIDATE result does not promote anything: promotion is a separate governance act requiring its
+own decision. In particular this authorization does not permit re-running the benchmark to
+improve a number, selecting a checkpoint on TEST, tuning prompts or few-shot examples, or
+creating `GHARIBO-V0.1`.
 
 ## References
 
@@ -118,4 +153,8 @@ valid, honest end state — the alternative is a number nobody earned.
 - `docs/adr/ADR-0008-model-registry-status-gates.md` — promotion gates
 - `docs/adr/ADR-0020-post-execution-truth-reconciliation.md` — why we stop here
 - `governance/DEC-0030-kaggle-execution-acceptance.json` — accepted execution evidence
-- `governance/GHARIBO_MASTER_STATE.json` — `blockers.BLK-0003`, `nextActions.ACT-0001`
+- `governance/DEC-0032-evaluation-authorization.json` — the recorded authorization (this request's answer)
+- `governance/DEC-0033-evaluation-infrastructure-blocker.json` — why the authorized benchmark could not execute
+- [`docs/EVALUATION_EXECUTION_BLOCKER.md`](EVALUATION_EXECUTION_BLOCKER.md) — the infrastructure blocker record
+- `governance/EVALUATION-LEAKAGE-AUDIT.json` — the §3.5 leakage audit that gates the first TEST parse
+- `governance/GHARIBO_MASTER_STATE.json` — `blockers.BLK-0003` (closed), `blockers.BLK-0004` (open), `nextActions.ACT-0001`

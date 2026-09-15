@@ -29,7 +29,12 @@
     "issue:gold": "node scripts/training/issue-gold.mjs",
     "kaggle:prepare": "node scripts/training/prepare-kaggle-start.mjs",
     "build:dec0030": "node scripts/training/build-dec0030-acceptance.mjs --check",
-    "verify:result": "python scripts/training/verify-kaggle-result.py"
+    "verify:result": "python scripts/training/verify-kaggle-result.py",
+    "eval:audit:auth": "node scripts/eval/build-dec0032-authorization.mjs --check",
+    "eval:audit:blocker": "node scripts/eval/build-dec0033-blocker.mjs --check",
+    "eval:audit:leakage": "python scripts/eval/leakage-audit.py --check",
+    "eval:verify": "node scripts/eval/verify-evaluation-state.mjs",
+    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:leakage && npm run eval:verify"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
