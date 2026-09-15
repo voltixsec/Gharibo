@@ -23,7 +23,7 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 | System Architecture | `docs/ARCHITECTURE.md` | Architecture | Architecture | Frozen | 1.1.3 | 2026-09-14 |
 | System Architecture (M2) | `docs/ARCHITECTURE_MILESTONE_2.md` | Architecture | Architecture | Frozen | 1.0.0 | 2026-09-14 |
 | Training Strategy | `docs/TRAINING_STRATEGY.md` | Architecture | Domain spec | Frozen | 1.3.0 | 2026-09-14 |
-| Environment Qualification Contract | `docs/ENV_QUALIFICATION_CONTRACT.md` | Architecture | Domain spec | Draft | 1.4.0 | 2026-09-14 |
+| Environment Qualification Contract | `docs/ENV_QUALIFICATION_CONTRACT.md` | Architecture | Domain spec | Draft | 1.5.0 | 2026-09-15 |
 | Data Factory | `docs/DATA_FACTORY.md` | Architecture | Domain spec | Frozen | 1.4.0 | 2026-09-14 |
 | Evaluation Framework | `docs/EVALUATION.md` | Architecture | Domain spec | Frozen | 1.2.0 | 2026-09-14 |
 | Research Benchmark | `docs/RESEARCH_BENCHMARK.md` | Architecture | Domain spec | Draft | 1.1.0 | 2026-09-14 |

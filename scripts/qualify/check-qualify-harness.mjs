@@ -11,7 +11,7 @@
  *      `UNSLOTH_ENGINE_VERSION` / `BASE_MODEL_*` / `LOADER_MODEL_ID` and the declared
  *      recipe defaults in apps/web/lib/training/package.ts (no drift);
  *   3. the inventory pre-fills NO version and NO SHA (never fabricate);
- *   4. the emitted artifact conforms to docs/ENV_QUALIFICATION_CONTRACT.md v1.4.0
+ *   4. the emitted artifact conforms to docs/ENV_QUALIFICATION_CONTRACT.md v1.5.0
  *      (§3 top level, §4 records, §5 environment, §6 reproducibility, §7 unknowns,
  *      §8 status, §9 content address, §10 self-validation, §14 model compatibility);
  *   5. the T4/Turing constraints are encoded (sm_75 floor, fp16, no bf16, no FA2,
@@ -60,7 +60,7 @@ const DATASET_DIR = p("data", "processed", "gharibo-research-gold-v0.1");
 /** Artifact schema version this harness targets (contract §3, `contract_schema_version`). */
 const CONTRACT_SCHEMA_VERSION = "1.1.0";
 /** Document version of docs/ENV_QUALIFICATION_CONTRACT.md this checker mirrors. */
-const CONTRACT_DOC_VERSION = "1.4.0";
+const CONTRACT_DOC_VERSION = "1.5.0";
 
 /** Every dependency the harness must resolve and record (Milestone 3A §A + §E promotion). */
 const REQUIRED_PINNED = [
@@ -78,7 +78,7 @@ const REQUIRED_PINNED = [
   "bitsandbytes",
   "openai-harmony",
 ];
-const REQUIRED_ADDITIONAL = ["torchao", "tokenizers"];
+const REQUIRED_ADDITIONAL = ["torchao", "tokenizers", "huggingface-hub"];
 const REQUIRED_HARMONY_CANDIDATES = [];
 
 /** Contract §3: the top-level keys the emitted record must carry. */
@@ -359,6 +359,38 @@ if (!/^\d+\.\d+\.\d+$/.test(inventory.harness_version ?? "")) {
 }
 if (!inventory.experiment_id) fail("inventory", "experiment_id is missing");
 
+// v4 regression: cross-list name uniqueness between dependencies[] and
+// additional_dependencies[]. A dependency name must appear in exactly ONE class.
+{
+  const pinnedNamesSet = new Set(inventory.pinned_dependencies.map((d) => d.name));
+  const additionalNamesList = inventory.additional_dependencies.map((d) => d.name);
+  for (const name of additionalNamesList) {
+    if (pinnedNamesSet.has(name)) {
+      fail("inventory", `cross-list violation: "${name}" appears in both pinned_dependencies[] and additional_dependencies[]`);
+    }
+  }
+}
+
+// v4 regression: huggingface-hub>=0.34.0,<1.0 must be in the resolver input
+// (additional_dependencies with the correct spec).
+{
+  const hfh = inventory.additional_dependencies.find((d) => d.name === "huggingface-hub");
+  if (!hfh) {
+    fail("inventory", "huggingface-hub is missing from additional_dependencies[]");
+  } else if (hfh.requested_spec !== "huggingface-hub>=0.34.0,<1.0" || hfh.install !== "huggingface-hub>=0.34.0,<1.0") {
+    fail("inventory", `huggingface-hub spec drift: expected "huggingface-hub>=0.34.0,<1.0", got "${hfh.requested_spec}"`);
+  }
+}
+
+// v4 regression: openai-harmony must be in dependencies[] (pinned) and NOT in
+// additional_dependencies[] (no duplication).
+{
+  const inPinned = inventory.pinned_dependencies.some((d) => d.name === "openai-harmony");
+  const inAdditional = inventory.additional_dependencies.some((d) => d.name === "openai-harmony");
+  if (!inPinned) fail("inventory", "openai-harmony must be in pinned_dependencies[] (governed by PINNED_ENGINE_DEPENDENCIES)");
+  if (inAdditional) fail("inventory", "openai-harmony must NOT be in additional_dependencies[] (cross-list duplication)");
+}
+
 // ---------------------------------------------------------------------------
 // 2b. Model identity, recipe defaults and dataset facts vs their real sources
 // ---------------------------------------------------------------------------
@@ -492,7 +524,7 @@ for (const { label, re } of PLACEHOLDER_PATTERNS) {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Contract conformance (docs/ENV_QUALIFICATION_CONTRACT.md v1.4.0)
+// 4. Contract conformance (docs/ENV_QUALIFICATION_CONTRACT.md v1.5.0)
 // ---------------------------------------------------------------------------
 
 if (!fs.existsSync(CONTRACT_DOC)) {
@@ -688,6 +720,31 @@ const installChecks = [
   ["export retains general inventory", /for requested in INVENTORY\['pinned_dependencies'\]:/],
   ["export retains runtime-only requests", /requested\['name'\] in PRESERVED or requested\['name'\] in skipped_names/],
   ["pass 2 uses shared plan", /fresh_plan = build_install_plan\(\['--python', fresh_python\], fresh=True\)/],
+  // v4 regression: huggingface-hub in resolver-managed stage
+  ["huggingface-hub in import smoke modules", /"huggingface_hub"/],
+  ["huggingface-hub resolver-managed spec", /huggingface-hub>=0\.34\.0,<1\.0/],
+  // v4 regression: build_install_plan always excludes PRESERVED (not just fresh=False)
+  ["build_install_plan always excludes preserved", /and d\['name'\] not in PRESERVED\]/],
+  ["constraint flags skipped in fresh pass", /constraint_flags = \[\] if fresh else CONSTRAINT_FLAGS/],
+  ["fresh pass disables transitive runtime deps", /fresh_isolation_flags = \([\s\S]*?'--no-deps'[\s\S]*?if fresh and PRESERVED else \[\]/],
+  ["fresh pass requires binary wheels", /'--only-binary', ':all:'/],
+  ["pass 2 rejects missing no-deps", /pass 2 stage permits transitive runtime dependencies/],
+  ["pass 2 rejects source builds", /pass 2 stage permits source-build dependencies/],
+  ["pass 2 rejects direct preserved requests", /pass 2 directly requests preserved dependency/],
+  ["fresh resolution excludes preserved", /fresh_repro_specs = \[[\s\S]*?d\['name'\] not in PRESERVED/],
+  ["fresh pinned records exclude preserved", /fresh_pinned_specs = \[[\s\S]*?d\['name'\] not in PRESERVED/],
+  ["pass 1 reproducibility hash excludes preserved", /PASS_1_REPRO_DEPENDENCIES = \[[\s\S]*?d\['name'\] not in PRESERVED/],
+  // v4 regression: preserved environment facts in reproducibility context
+  ["preserved_environment_facts in reproducibility", /'preserved_environment_facts'/],
+  ["preserved facts marked environment-preserved", /'source': 'environment-preserved'/],
+  // v4 regression: pass 2 comparison excludes preserved deps
+  ["pass 2 excludes preserved from comparison", /non_preserved_pass1 = \[d for d in dependencies if d\['name'\] not in PRESERVED\]/],
+  ["pass 2 fresh excludes preserved", /non_preserved_pass2 = \[d for d in fresh_pinned if d\['name'\] not in PRESERVED\]/],
+  // v4 regression: cross-list name uniqueness check
+  ["cross-list uniqueness validation", /cross-list name uniqueness violation/],
+  // v4 regression: harmony not duplicated when already pinned
+  ["harmony already pinned guard", /_harmony_already_pinned/],
+  ["harmony not duplicated into additional", /not duplicated into additional_dependencies/],
 ];
 for (const [label, re] of installChecks) {
   if (!re.test(notebookSource)) fail("install", `missing: ${label}`);
@@ -697,6 +754,7 @@ const expectedRecipe = new Map([
   ['unsloth', 'unsloth'], ['unsloth_zoo', 'unsloth_zoo'],
   ['transformers', 'transformers==4.56.2'], ['trl', 'trl==0.22.2'],
   ['tokenizers', 'tokenizers>=0.22.0,<=0.23.0'], ['torchao', 'torchao>=0.16.0'],
+  ['huggingface-hub', 'huggingface-hub>=0.34.0,<1.0'],
 ]);
 const recipeByName = new Map([...inventory.pinned_dependencies, ...inventory.additional_dependencies]
   .map(dep => [dep.name, dep]));
@@ -944,7 +1002,7 @@ console.log(`  notebook        : ${path.relative(ROOT, NOTEBOOK_PATH).split(path
 console.log(`  contract        : docs/ENV_QUALIFICATION_CONTRACT.md v${CONTRACT_DOC_VERSION} (artifact schema ${CONTRACT_SCHEMA_VERSION})`);
 console.log(`  cells           : ${cellSources.length}`);
 console.log(`  dependencies[]  : ${inventory.pinned_dependencies.map((d) => d.name).join(", ")}`);
-console.log(`  additional[]    : ${inventory.additional_dependencies.map((d) => d.name).join(", ")} + harmony`);
+console.log(`  additional[]    : ${inventory.additional_dependencies.map((d) => d.name).join(", ")} (harmony is pinned, not duplicated)`);
 console.log(`  engine_version  : ${engineVersion ?? "(unparsed)"}`);
 console.log(`  base model      : ${modelCompatibility.base_model ?? "(missing)"} @ ${modelCompatibility.expected_base_model_revision ?? "(missing)"}`);
 console.log(`  loader model    : ${modelCompatibility.loader_model ?? "(missing)"} (${modelCompatibility.loader_quantization ?? "?"})`);

@@ -5,9 +5,19 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Draft |
-| **Version** | 1.4.0 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.5.0 |
+| **Last Updated** | 2026-09-15 |
 
+> **v1.5.0 ? Kaggle v3 measured dependency/reproducibility corrections (2026-09-15).**
+> The qualification-only resolver now explicitly constrains `huggingface-hub>=0.34.0,<1.0`.
+> `openai-harmony` remains exclusively in the governed pinned dependency set.
+> On the Kaggle preserve-preinstalled path, `torch` and `triton` are recorded and verified as
+> environment-preserved runtime facts rather than claimed as PyPI-reproduced packages.
+> Pass 2 reproduces and strictly compares only the governed NON-PRESERVED dependency records.
+> Its mutating install stages use `--no-deps` and binary-only packages so preserved dependencies
+> cannot be introduced through runtime or source-build dependency resolution.
+> Dependency names must be unique across `dependencies[]` and `additional_dependencies[]`.
+>
 > **v1.4.0 — CTO governance corrections (TRAIN-ONLY fixture, generic GPU, output hygiene, no auto-freeze).**
 > Four corrections to the M3C qualification harness:
 > 1. **TRAIN-ONLY fixture:** The harness now attaches only `train.jsonl` as a Kaggle Dataset input
@@ -335,8 +345,11 @@ Harmony package (`openai-harmony`). **These 6 packages have been promoted to
 `PINNED_ENGINE_DEPENDENCIES` during the M3A autonomous work session** — they are now in
 `dependencies[]` (pinned_in_package_ts = true), not `additional_dependencies[]`. The harness picks
 them up automatically because it derives its inventory from that constant.
-Qualification-only checks also record `tokenizers>=0.22.0,<=0.23.0` and `torchao>=0.16.0`
-in `additional_dependencies[]`; `requested_spec` must retain these actual constraints.
+Qualification-only checks also record `tokenizers>=0.22.0,<=0.23.0`,
+`torchao>=0.16.0`, and `huggingface-hub>=0.34.0,<1.0` in
+`additional_dependencies[]`; `requested_spec` must retain these actual constraints.
+`openai-harmony` is governed by `PINNED_ENGINE_DEPENDENCIES` and MUST appear only in
+`dependencies[]`; a dependency name MUST NOT appear in both dependency classes.
 
 A bare name (e.g. `peft`) is an admissible `requested_spec`: it is a *request*, and the harness
 freezes the resolved `peft==<version>`. Writing the request invents no version.
@@ -365,9 +378,13 @@ commands and verify these versions after installation. A conflict must fail visi
 Exclude the explicit triton_kernels Git install, required import probe, and dependency record
 on this path; record the exclusion and reason in qualification-install-args.json. This is
 an exclusion of one recipe requirement, not permission to ignore a required import failure.
-Use the same selected dependency names in pass 2; its fresh environment requests the measured
-torch/triton versions. Equality remains strict, including for preserved packages. These measured
-versions are environment-preserved runtime facts, not universal GHARIBO dependency pins.
+Pass 2 reproduces only the selected NON-PRESERVED governed dependency records. The fresh
+environment MUST NOT directly request the measured Kaggle `torch` / `triton` builds and MUST
+prevent runtime and source-build dependency resolution from introducing them transitively.
+Strict equality applies to every NON-PRESERVED dependency that pass 2 reproduces. The measured
+`torch` / `triton` versions remain explicit `environment-preserved` reproducibility evidence;
+the artifact MUST NOT claim that those externally supplied runtime packages were reproduced
+from PyPI. These measured versions are runtime facts, not universal GHARIBO dependency pins.
 The TypeScript paste output retains the original requested specs with unresolved versions for
 preserved packages and includes the original triton_kernels entry even when this path skips it.
 
@@ -497,7 +514,7 @@ for pass_index in 1..P:                                  # P >= 2 required for I
 | `assertion` | `IDENTICAL` iff every pass produced the same sorted dependency set; `MISMATCH` iff any pass differs; `NOT_RUN` iff `P < 2` |
 | `passes` | At least 1; `P ≥ 2` required for `IDENTICAL` |
 | `comparison` | Always the literal `"exact-string-equality-per-name"` — no fuzzy, no range satisfaction |
-| `dependency_set_hash` | `sha256(canonical_json(sorted(dependencies)))` over `dependencies[]` including the frozen `spec`, `resolved_version`, and the git extensions |
+| `dependency_set_hash` | `sha256(canonical_json(sorted(non-preserved dependencies)))` over the reproducibility comparison scope, including frozen `spec`, `resolved_version`, and git extensions; preserved runtime facts are recorded separately |
 
 ### 6.3 Comparison rule
 
@@ -510,8 +527,14 @@ Two passes agree iff, for every `name`:
 
 A name present in one pass and absent in the other is a `MISMATCH`. A pass that failed to install is
 recorded with `resolved_version: null` for the failed names and makes the assertion `MISMATCH`.
-`additional_dependencies[]` (§4.5) is compared with the same four rules and reported separately; a
+`additional_dependencies[]` (?4.5) is compared with the same four rules and reported separately; a
 mismatch there is a `MISMATCH` for the run.
+
+On the Kaggle preserve-preinstalled path, this comparison scope excludes preserved `torch` and
+`triton`. Their exact measured versions are retained under reproducibility evidence as
+environment-provided facts. Pass 2 uses dependency-disabled, binary-only installation for the
+governed NON-PRESERVED records; therefore it proves reproducibility of that governed package set,
+not full reproduction of the externally supplied Kaggle runtime image.
 
 ### 6.4 Consequence
 
@@ -644,6 +667,7 @@ Computed exactly as `computePackageId` computes `package_id`
 17. Any record whose `spec` differs from `requested_spec` while `resolved_version` is `null`
     (an unfrozen spec must fall back verbatim — §4.0).
 18. `additional_dependencies[]` present and non-empty without a matching `warnings[]` entry (§4.5).
+18a. Any dependency `name` appearing in both `dependencies[]` and `additional_dependencies[]`.
 
 Rules 19–24 apply to the **model-compatibility block** (§14.3). They are additive: a record that
 violates one of them is invalid exactly as in rules 1–18. Rules 9 and 23 are the two that a

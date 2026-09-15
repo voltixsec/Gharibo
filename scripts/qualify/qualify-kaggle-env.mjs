@@ -365,6 +365,11 @@ const UNPINNED_QUALIFICATION_ENTRIES = [
   // additional_dependencies[] because it is not in PINNED_ENGINE_DEPENDENCIES.
   { name: "torchao", install: "torchao>=0.16.0", modules: ["torchao"] },
   { name: "tokenizers", install: "tokenizers>=0.22.0,<=0.23.0", modules: ["tokenizers"] },
+  // huggingface-hub: transformers==4.56.2 requires >=0.34.0,<1.0, but the Kaggle
+  // environment ships 1.11.0. Since transformers is installed with --no-deps,
+  // the incompatible huggingface-hub is not repaired. This must be resolved in
+  // the resolver-managed stage BEFORE the --no-deps critical stage.
+  { name: "huggingface-hub", install: "huggingface-hub>=0.34.0,<1.0", modules: ["huggingface_hub"] },
 ];
 
 /**
@@ -427,6 +432,7 @@ const IMPORT_SMOKE_MODULES = [
   "openai_harmony",
   "torchao",
   "tokenizers",
+  "huggingface_hub",
 ];
 
 const INVENTORY_JSON = JSON.stringify(
@@ -436,7 +442,7 @@ const INVENTORY_JSON = JSON.stringify(
     harmony_candidates: HARMONY_CANDIDATES,
     import_smoke_modules: IMPORT_SMOKE_MODULES,
     contract_schema_version: "1.1.0",
-    harness_version: "2.1.0",
+    harness_version: "2.2.0",
     experiment_id: "GHARIBO-exp-001",
     // ---- Model-compatibility qualification (contract §14) -------------------
     model_compatibility: {
@@ -1429,21 +1435,41 @@ FORCE_UPGRADE_SPECS = [
 ]
 
 def build_install_plan(target_flags, fresh=False):
+    # Preserved torch/triton are environment-provided on Kaggle and must NOT be
+    # downloaded from PyPI (the +cu128 build is not on the default index).
+    # Exclude them from the resolver install set in BOTH passes.
+    # In pass 1, they are preserved and verified after install.
+    # In pass 2, the fresh venv does not attempt to install them; they are
+    # recorded as environment-preserved facts in the reproducibility context,
+    # not as PyPI-resolved versions.
+    constraint_flags = [] if fresh else CONSTRAINT_FLAGS
+    # Pass 2 reproduces only the governed NON-PRESERVED package records.
+    # When Kaggle runtime facts are preserved, --no-deps prevents runtime
+    # dependency resolution from pulling torch/triton transitively, while
+    # --only-binary prevents source-build dependency resolution from doing so.
+    fresh_isolation_flags = (
+        ['--no-deps', '--only-binary', ':all:']
+        if fresh and PRESERVED else []
+    )
     main_args = [('%s==%s' % (d['name'], preserved_versions[d['name']]))
                  if d['name'] in preserved_versions else d['install']
                  for d in ALL_DEPENDENCIES
                  if not d['no_build_isolation']
                  and d['name'] not in ('torchao', 'transformers', 'tokenizers', 'trl', 'unsloth_zoo')
-                 and (fresh or d['name'] not in PRESERVED)]
+                 and d['name'] not in PRESERVED]
     if fresh and HARMONY_SPEC['install'] not in main_args:
         main_args.append(HARMONY_SPEC['install'])
-    base = [UV, 'pip', 'install', *target_flags, '--no-cache-dir', *CONSTRAINT_FLAGS]
-    plan = [('install', [*base, *main_args]),
-            ('force-upgrade', [*base, '--upgrade', '--no-deps', *FORCE_UPGRADE_SPECS]),
-            ('torchao-upgrade', [*base, '--no-deps', '--upgrade', 'torchao>=0.16.0'])]
+    base = [UV, 'pip', 'install', *target_flags, '--no-cache-dir', *constraint_flags]
+    plan = [('install', [*base, *fresh_isolation_flags, *main_args]),
+            ('force-upgrade', [*base, *fresh_isolation_flags,
+                               '--upgrade', '--no-deps', *FORCE_UPGRADE_SPECS]),
+            ('torchao-upgrade', [*base, *fresh_isolation_flags,
+                                 '--no-deps', '--upgrade', 'torchao>=0.16.0'])]
     for dep in ALL_DEPENDENCIES:
         if dep['no_build_isolation']:
-            plan.append(('no-build-isolation', [*base, '--no-build-isolation', dep['install']]))
+            plan.append(('no-build-isolation',
+                         [*base, *fresh_isolation_flags,
+                          '--no-build-isolation', dep['install']]))
     return plan
 
 def execute_install_plan(plan, timeout=None):
@@ -1724,7 +1750,10 @@ def print_records(records, title):
 print_records(dependencies, 'dependencies[] (contract 4.3 rule 1: exactly PINNED_ENGINE_DEPENDENCIES)')
 print_records(additional_dependencies, 'additional_dependencies[] (contract 4.5: recipe-required, not pinned)')
 
-PASS_1_DEPENDENCY_SET_HASH = sha256_canonical(dependencies)
+PASS_1_REPRO_DEPENDENCIES = [
+    d for d in dependencies if d['name'] not in PRESERVED
+]
+PASS_1_DEPENDENCY_SET_HASH = sha256_canonical(PASS_1_REPRO_DEPENDENCIES)
 print('')
 print('pass 1 dependency_set_hash:', PASS_1_DEPENDENCY_SET_HASH)`,
 
@@ -1767,12 +1796,24 @@ HARMONY_SPEC = {
 
 harmony_resolution = resolve_versions(sys.executable, [{'name': harmony_dist, 'modules': harmony_modules}])
 harmony_records = build_dependency_records([HARMONY_SPEC], harmony_resolution, mark_unpinned=True)
-additional_dependencies = sorted(additional_dependencies + harmony_records,
-                                 key=lambda item: item['name'])
+# Only add harmony records to additional_dependencies[] if the harmony package
+# is NOT already pinned in PINNED_ENGINE_DEPENDENCIES (i.e., not in
+# dependencies[]). openai-harmony is pinned in package.ts, so it belongs in
+# dependencies[] only — never duplicated into additional_dependencies[].
+_harmony_already_pinned = any(d['name'] == harmony_dist for d in PINNED_DEPENDENCIES)
+if not _harmony_already_pinned:
+    additional_dependencies = sorted(additional_dependencies + harmony_records,
+                                     key=lambda item: item['name'])
+else:
+    print('Harmony package %s is already pinned in PINNED_ENGINE_DEPENDENCIES — '
+          'not duplicated into additional_dependencies[]' % harmony_dist)
 print_records(harmony_records, 'harmony dependency (contract 4.5)')
 
 # Everything that must exist in the pass-2 environment.
-REPRODUCIBILITY_SPECS = PINNED_DEPENDENCIES + ADDITIONAL_DEPENDENCIES + [HARMONY_SPEC]`,
+# Exclude HARMONY_SPEC if already pinned to prevent cross-list duplication.
+REPRODUCIBILITY_SPECS = PINNED_DEPENDENCIES + ADDITIONAL_DEPENDENCIES
+if not _harmony_already_pinned:
+    REPRODUCIBILITY_SPECS = REPRODUCIBILITY_SPECS + [HARMONY_SPEC]`,
 
   String.raw`# --- Section 9: Reproducibility assertion - pass 2 (contract 6) ---
 # A pin is only a pin if a second, fresh environment resolves the same set.
@@ -1791,7 +1832,7 @@ def venv_python(venv_dir):
     return None
 
 def compare_records(left, right, label, mismatches):
-    '''Contract 6.3: exact equality, including preserved torch/triton.'''
+    '''Contract 6.3: exact equality for compared NON-PRESERVED dependency records.'''
     left_by_name = {item['name']: item for item in left}
     right_by_name = {item['name']: item for item in right}
     for name in sorted(set(left_by_name) | set(right_by_name)):
@@ -1815,6 +1856,10 @@ reproducibility = {
     ],
     'comparison': 'exact-string-equality-per-name',
     'dependency_set_hash': PASS_1_DEPENDENCY_SET_HASH,
+    'preserved_environment_facts': {
+        name: {'version': ver, 'source': 'environment-preserved'}
+        for name, ver in sorted(preserved_versions.items())
+    } if preserved_versions else {},
 }
 
 if not RUN_FRESH_ENV_REPRODUCTION:
@@ -1831,18 +1876,65 @@ else:
         if fresh_python is None:
             raise RuntimeError('could not locate the python executable inside the fresh venv')
 
-        # Same selected recipe and exact preserved versions in a clean interpreter.
+        # Pass 2 reproduces the NON-PRESERVED governed dependency records.
+        # Preserved Kaggle torch/triton are external runtime facts and are neither
+        # directly requested nor allowed to arrive transitively.
         fresh_plan = build_install_plan(['--python', fresh_python], fresh=True)
+
+        if PRESERVED:
+            for phase, cmd in fresh_plan:
+                if '--no-deps' not in cmd:
+                    raise RuntimeError(
+                        'pass 2 stage permits transitive runtime dependencies: %s' % phase)
+                if '--only-binary' not in cmd:
+                    raise RuntimeError(
+                        'pass 2 stage permits source-build dependencies: %s' % phase)
+                direct_preserved = [
+                    arg for arg in cmd
+                    if isinstance(arg, str) and any(
+                        re.match(r'^%s(?:$|[<>=!~@])' % re.escape(name), arg)
+                        for name in PRESERVED
+                    )
+                ]
+                if direct_preserved:
+                    raise RuntimeError(
+                        'pass 2 directly requests preserved dependency: %s'
+                        % ', '.join(direct_preserved))
+
         execute_install_plan(fresh_plan, timeout=FRESH_ENV_MAX_SECONDS)
 
-        fresh_targets = [{'name': d['name'], 'modules': d['modules']} for d in REPRODUCIBILITY_SPECS]
-        fresh_resolution = resolve_versions(fresh_python, fresh_targets, timeout=FRESH_ENV_MAX_SECONDS)
-        fresh_pinned = build_dependency_records(PINNED_DEPENDENCIES, fresh_resolution)
-        fresh_additional = build_dependency_records(ADDITIONAL_DEPENDENCIES + [HARMONY_SPEC],
+        fresh_repro_specs = [
+            d for d in REPRODUCIBILITY_SPECS if d['name'] not in PRESERVED
+        ]
+        fresh_targets = [
+            {'name': d['name'], 'modules': d['modules']}
+            for d in fresh_repro_specs
+        ]
+        fresh_resolution = resolve_versions(
+            fresh_python, fresh_targets, timeout=FRESH_ENV_MAX_SECONDS)
+
+        fresh_pinned_specs = [
+            d for d in PINNED_DEPENDENCIES if d['name'] not in PRESERVED
+        ]
+        fresh_pinned = build_dependency_records(
+            fresh_pinned_specs, fresh_resolution)
+        # Exclude HARMONY_SPEC from fresh_additional if it is already pinned
+        # in PINNED_DEPENDENCIES (prevents cross-list name duplication).
+        _fresh_extra_specs = [s for s in ADDITIONAL_DEPENDENCIES
+                               if s['name'] != HARMONY_SPEC['name']]
+        if not any(d['name'] == HARMONY_SPEC['name'] for d in PINNED_DEPENDENCIES):
+            _fresh_extra_specs = _fresh_extra_specs + [HARMONY_SPEC]
+        fresh_additional = build_dependency_records(_fresh_extra_specs,
                                                     fresh_resolution, mark_unpinned=True)
 
         mismatches = []
-        compare_records(dependencies, fresh_pinned, 'dependencies', mismatches)
+        # Pass 2 comparison: compare only NON-PRESERVED dependencies.
+        # Preserved torch/triton are environment-provided runtime facts,
+        # not PyPI-resolved versions — excluded from the fresh resolver
+        # comparison and recorded as preserved_environment_facts above.
+        non_preserved_pass1 = [d for d in dependencies if d['name'] not in PRESERVED]
+        non_preserved_pass2 = [d for d in fresh_pinned if d['name'] not in PRESERVED]
+        compare_records(non_preserved_pass1, non_preserved_pass2, 'dependencies', mismatches)
         compare_records(additional_dependencies, fresh_additional, 'additional_dependencies', mismatches)
 
         reproducibility['passes'].append({
@@ -2652,6 +2744,15 @@ def validate_qualification(candidate, pinned_names):
         if not any(all(name in entry for name in names) for entry in candidate.get('warnings', [])):
             error('warnings', 'additional_dependencies[] is non-empty but no warnings[] entry '
                               'names every package in it (4.5 / rule 18)')
+    # 18b - cross-list name uniqueness: a dependency name must appear in exactly
+    # ONE class. No duplicate names across dependencies[] and additional_dependencies[].
+    dep_names = [d['name'] for d in candidate.get('dependencies', [])]
+    extra_names = [d['name'] for d in extra]
+    duplicates = set(dep_names) & set(extra_names)
+    for dup in sorted(duplicates):
+        error('dependencies[%s]' % dup,
+              'dependency name appears in both dependencies[] and additional_dependencies[] '
+              '(cross-list name uniqueness violation)')
 
     # ---- 19-24: model compatibility (contract 14) ---------------------------
     model_compat = candidate.get('model_compatibility') or {}
