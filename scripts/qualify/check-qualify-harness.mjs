@@ -28,6 +28,10 @@
  *      an earlier cell (or earlier in the same cell) before the call — prevents
  *      the "probe_environment NameError" class of generated-notebook ordering
  *      defect.
+ * 11. install observability: the dependency-install step must capture full
+ *      stdout+stderr, persist a redacted diagnostic artifact on failure, and
+ *      include the resolver reason in the exception.  A dry-run probe must
+ *      run before mutating the environment.  No -qqq on install commands.
  *
  * Run: node scripts/qualify/check-qualify-harness.mjs
  * Exits 1 on any failing group; prints every failure it finds.
@@ -74,7 +78,7 @@ const REQUIRED_PINNED = [
   "bitsandbytes",
   "openai-harmony",
 ];
-const REQUIRED_ADDITIONAL = [];
+const REQUIRED_ADDITIONAL = ["torchao"];
 const REQUIRED_HARMONY_CANDIDATES = [];
 
 /** Contract §3: the top-level keys the emitted record must carry. */
@@ -650,6 +654,46 @@ for (const key of [...REQUIRED_TOP_LEVEL, "qualification_safety", "model_compati
 }
 
 // ---------------------------------------------------------------------------
+// 4a. Install observability + recipe alignment regression checks
+//     (prevents dependency-install failures from being reported without their
+//     real redacted resolver reason; enforces the upstream-aligned recipe)
+// ---------------------------------------------------------------------------
+
+const installChecks = [
+  // Observability: run_install_command captures full stdout+stderr
+  ["install observability wrapper", /def run_install_command\(cmd, timeout=None, phase='install'\):/],
+  ["full stdout capture on failure", /stdout_red = scrub_paths\(redact\(proc\.stdout or ''\)\)/],
+  ["full stderr capture on failure", /stderr_red = scrub_paths\(redact\(proc\.stderr or ''\)\)/],
+  ["diagnostic artifact persisted", /write_canonical\(INSTALL_DIAGNOSTIC_PATH, diagnostic\)/],
+  ["exception includes resolver reason", /stdout_trim,.*stderr_trim/s],
+  // Dry-run probe before mutating the environment
+  ["dry-run probe present", /--dry-run/],
+  ["dry-run probe uses run_install_command", /run_install_command\(\s*\[UV, 'pip', 'install', '--dry-run'/],
+  // No -qqq on the main install (only uv bootstrap and pass 2 may keep it)
+  ["main install has no -qqq", /run_install_command\(\s*\[UV, 'pip', 'install', \*TARGET_FLAGS, '--no-cache-dir', \*main_args\]/],
+  // Preinstalled torch/triton preservation
+  ["module_present helper", /def module_present\(modname\):/],
+  ["preserve_if_preinstalled flag checked", /dep\.get\('preserve_if_preinstalled'\)/],
+  ["torch preserve flag in inventory", /"preserve_if_preinstalled": true/],
+  // Force-upgrade step (matches upstream Unsloth Kaggle recipe)
+  ["force-upgrade no-deps step", /'--upgrade', '--no-deps',\s*\*FORCE_UPGRADE_SPECS/],
+  // torchao force-upgrade
+  ["torchao no-deps upgrade", /'--no-deps', '--upgrade',\s*'torchao>=0\.16\.0'/],
+  // torchao in additional_dependencies
+  ["torchao in import smoke modules", /"torchao"/],
+];
+for (const [label, re] of installChecks) {
+  if (!re.test(notebookSource)) fail("install", `missing: ${label}`);
+}
+
+// Regression: the main install command must NOT use -qqq (it hides resolver errors).
+// The only sanctioned -qqq uses are: uv bootstrap and pass-2 (throwaway venv).
+const qqqInstallRe = /run_install_command\([^)]*-qqq[^)]*\)/s;
+if (qqqInstallRe.test(notebookSource)) {
+  fail("install", "run_install_command must not use -qqq (it hides the resolver reason)");
+}
+
+// ---------------------------------------------------------------------------
 // 4b. Model compatibility (contract §14) — the real gpt-oss-20b sequence
 // ---------------------------------------------------------------------------
 
@@ -881,6 +925,7 @@ console.log(`  loader model    : ${modelCompatibility.loader_model ?? "(missing)
 console.log(`  dataset         : ${datasetInventory.id ?? "(missing)"} ${datasetInventory.version ?? ""} (${datasetInventory.example_count ?? "?"} examples)`);
 console.log(`  model-compat    : ${MISSION_STEPS.length} named steps, ${REQUIRED_MODEL_KEYS.length} mandated artifact keys`);
 console.log(`  cell-order      : ${allUserDefs.size} user-defined functions, ${cellSources.length} cells checked`);
+console.log(`  install         : ${installChecks.length} observability + recipe checks`);
 for (const note of notes) console.log(`  ${note}`);
 console.log(line);
 
