@@ -49,30 +49,13 @@ export const UNSLOTH_ENGINE_VERSION = "unsloth-freeze-2026.09.14";
 export const PINNED_ENGINE_DEPENDENCIES: EngineDependency[] = [
   { name: "torch", source: "pip", spec: "torch>=2.8.0", resolvedVersion: null, url: null },
   { name: "triton", source: "pip", spec: "triton>=3.4.0", resolvedVersion: null, url: null },
-  {
-    name: "unsloth_zoo",
-    source: "git",
-    spec: "@git+https://github.com/unslothai/unsloth-zoo",
-    resolvedVersion: null,
-    url: "https://github.com/unslothai/unsloth-zoo",
-  },
-  {
-    name: "unsloth",
-    source: "git",
-    spec: "@git+https://github.com/unslothai/unsloth",
-    resolvedVersion: null,
-    url: "https://github.com/unslothai/unsloth",
-  },
-  {
-    name: "transformers",
-    source: "git",
-    spec: "@git+https://github.com/huggingface/transformers",
-    resolvedVersion: null,
-    url: "https://github.com/huggingface/transformers",
-  },
+  { name: "unsloth_zoo", source: "pip", spec: "unsloth_zoo", resolvedVersion: null, url: null },
+  { name: "unsloth", source: "pip", spec: "unsloth", resolvedVersion: null, url: null },
+  { name: "transformers", source: "pip", spec: "transformers==4.56.2", resolvedVersion: null, url: null },
   {
     name: "triton_kernels",
     source: "git",
+    // Conditional: excluded from Kaggle qualification when torch is preserved.
     // The package lives in a subdirectory of the triton monorepo, so the
     // `#subdirectory=` fragment is required for the spec to be installable.
     spec: "@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels",
@@ -83,11 +66,11 @@ export const PINNED_ENGINE_DEPENDENCIES: EngineDependency[] = [
   // These are required by the gpt-oss-20b QLoRA+SFT recipe. They are pinned
   // here (pinned_in_package_ts = true) so the qualification harness records
   // them in `dependencies[]`, not `additional_dependencies[]`. The spec is
-  // the bare package name because the resolved version is not known until a
+  // an upstream constraint or bare name; the resolved version is not known until a
   // real Kaggle T4 run; the harness resolves it and records the frozen form
   // (name==version) into the manifest at run time. Nothing is invented.
   { name: "peft", source: "pip", spec: "peft", resolvedVersion: null, url: null },
-  { name: "trl", source: "pip", spec: "trl", resolvedVersion: null, url: null },
+  { name: "trl", source: "pip", spec: "trl==0.22.2", resolvedVersion: null, url: null },
   { name: "datasets", source: "pip", spec: "datasets", resolvedVersion: null, url: null },
   { name: "accelerate", source: "pip", spec: "accelerate", resolvedVersion: null, url: null },
   { name: "bitsandbytes", source: "pip", spec: "bitsandbytes", resolvedVersion: null, url: null },

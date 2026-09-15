@@ -315,15 +315,15 @@ const PINNED_INSTALL_DETAIL = {
   torch: { install: "torch>=2.8.0", modules: ["torch"], preserveIfPreinstalled: true },
   triton: { install: "triton>=3.4.0", modules: ["triton"], preserveIfPreinstalled: true },
   unsloth_zoo: {
-    install: "git+https://github.com/unslothai/unsloth-zoo",
+    install: "unsloth_zoo",
     modules: ["unsloth_zoo"],
   },
   unsloth: {
-    install: "git+https://github.com/unslothai/unsloth",
+    install: "unsloth",
     modules: ["unsloth"],
   },
   transformers: {
-    install: "git+https://github.com/huggingface/transformers",
+    install: "transformers==4.56.2",
     modules: ["transformers"],
   },
   triton_kernels: {
@@ -334,6 +334,7 @@ const PINNED_INSTALL_DETAIL = {
       "#subdirectory=python/triton_kernels",
     fragment: "#subdirectory=python/triton_kernels",
     noBuildIsolation: true,
+    skipIfKagglePreserved: true,
     modules: ["triton_kernels"],
   },
   // Direct recipe dependencies promoted into PINNED_ENGINE_DEPENDENCIES
@@ -341,7 +342,7 @@ const PINNED_INSTALL_DETAIL = {
   // because the resolved version is not known until a real Kaggle T4 run;
   // the harness resolves it and records the frozen form (name==version).
   peft: { install: "peft", modules: ["peft"] },
-  trl: { install: "trl", modules: ["trl"] },
+  trl: { install: "trl==0.22.2", modules: ["trl"] },
   datasets: { install: "datasets", modules: ["datasets"] },
   accelerate: { install: "accelerate", modules: ["accelerate"] },
   bitsandbytes: { install: "bitsandbytes", modules: ["bitsandbytes"] },
@@ -353,7 +354,8 @@ const PINNED_INSTALL_DETAIL = {
  *
  * After the §4.5 promotion, all six direct recipe deps (peft, trl, datasets,
  * accelerate, bitsandbytes, openai-harmony) are in PINNED_ENGINE_DEPENDENCIES
- * and are no longer listed here. This array is now empty. It is retained
+ * and are no longer listed here. This array holds qualification-only probes
+ * for tokenizers and torchao. It is retained
  * for the `additional_dependencies[]` contract extension, which remains
  * available for transitive or optional packages discovered at run time.
  */
@@ -362,6 +364,7 @@ const UNPINNED_QUALIFICATION_ENTRIES = [
   // Kaggle recipe force-upgrades it with --no-deps to >=0.16.0.  Recorded in
   // additional_dependencies[] because it is not in PINNED_ENGINE_DEPENDENCIES.
   { name: "torchao", install: "torchao>=0.16.0", modules: ["torchao"] },
+  { name: "tokenizers", install: "tokenizers>=0.22.0,<=0.23.0", modules: ["tokenizers"] },
 ];
 
 /**
@@ -393,13 +396,14 @@ const PINNED_INVENTORY = PINNED.map((dep) => {
     modules: detail.modules,
     pinned_in_package_ts: true,
     preserve_if_preinstalled: detail.preserveIfPreinstalled === true,
+    skip_if_kaggle_preserved: detail.skipIfKagglePreserved === true,
   };
 });
 
 const EXTRA_INVENTORY = UNPINNED_QUALIFICATION_ENTRIES.map((e) => ({
   name: e.name,
   source: "pip",
-  requested_spec: e.name,
+  requested_spec: e.install,
   url: null,
   install: e.install,
   fragment: null,
@@ -422,6 +426,7 @@ const IMPORT_SMOKE_MODULES = [
   "triton_kernels",
   "openai_harmony",
   "torchao",
+  "tokenizers",
 ];
 
 const INVENTORY_JSON = JSON.stringify(
@@ -1294,13 +1299,16 @@ print('(example content is never printed, logged or written to the artifact)')
 train_lines = None`,
 
   String.raw`# --- Section 4: Install the training stack via uv (reproducibility pass 1) ---
-# Follows the official Unsloth Kaggle T4 gpt-oss recipe:
+# Uses the supplied Unsloth Kaggle T4 gpt-oss recipe facts.
+# v2 root cause remains DEPENDENCY_INSTALL_FAILED_WITH_DIAGNOSTIC_SUPPRESSED;
+# preserving torch/triton is remediation, not a proven historical root cause.
+# Install stages:
 #   1. Bootstrap uv
-#   2. Dry-run probe — resolve without mutating the environment
+#   2. Build one plan; dry-run each exact stage immediately before installing it
 #   3. Conditional install — preserve preinstalled torch/triton on Kaggle
 #   4. --no-deps force-upgrade of critical packages (transformers, trl, etc.)
 #   5. --no-deps --upgrade torchao
-#   6. triton_kernels (no build isolation)
+#   6. triton_kernels only outside the Kaggle preserve-preinstalled path
 #
 # OBSERVABILITY: The main install commands do NOT use -qqq.  A specialised
 # run_install_command captures complete stdout + stderr, persists a small
@@ -1385,76 +1393,80 @@ TARGET_FLAGS = uv_target_flags()
 os.environ['TORCH_CUDA_ARCH_LIST'] = '7.5'
 os.environ.setdefault('CMAKE_CUDA_ARCHITECTURES', '75')
 
-# ---- Conditional install: preserve preinstalled torch/triton on Kaggle ----
-# Upstream Unsloth Kaggle T4 recipe preserves preinstalled torch (Branch B):
-# when torch is already importable, it is NOT reinstalled.  This avoids
-# resolver conflicts with Kaggle's preinstalled CUDA wheel (torch 2.10.0+cu128).
+# ---- Select the effective qualification recipe ----
+# Probe in fresh interpreters so the notebook does not retain stale imports.
 PRESERVED = []
-SKIPPED = []
-main_args = []
+preserved_versions = {}
 for dep in ALL_DEPENDENCIES:
-    if dep.get('preserve_if_preinstalled') and dep['modules']:
-        if module_present(dep['modules'][0]):
+    if os.path.isdir('/kaggle') and dep.get('preserve_if_preinstalled') and dep['modules']:
+        probe = probe_modules(sys.executable, dep['modules'])
+        if probe.get(dep['modules'][0], False):
+            raw = resolve_versions(sys.executable, [dep]).get(dep['name'], {})
+            if not raw.get('version'):
+                abort('Cannot record preserved version for %s' % dep['name'])
             PRESERVED.append(dep['name'])
-            SKIPPED.append(dep)
-            continue
-    if not dep['no_build_isolation']:
-        main_args.append(dep['install'])
+            preserved_versions[dep['name']] = raw['version']
 
-if PRESERVED:
-    print('Preserving preinstalled (already importable):', ', '.join(PRESERVED))
+KAGGLE_PRESERVE_PREINSTALLED = os.path.isdir('/kaggle') and 'torch' in PRESERVED
+SKIPPED = [d for d in ALL_DEPENDENCIES
+           if KAGGLE_PRESERVE_PREINSTALLED and d.get('skip_if_kaggle_preserved')]
+skipped_names = {d['name'] for d in SKIPPED}
+PINNED_DEPENDENCIES = [d for d in PINNED_DEPENDENCIES if d['name'] not in skipped_names]
+ALL_DEPENDENCIES = PINNED_DEPENDENCIES + ADDITIONAL_DEPENDENCIES
+IMPORT_SMOKE_MODULES = [m for m in IMPORT_SMOKE_MODULES
+                       if not any(m in d['modules'] for d in SKIPPED)]
+print('Preserved versions:', preserved_versions)
+print('Skipped on Kaggle preserve path:', sorted(skipped_names))
 
-# ---- Dry-run probe: resolve WITHOUT mutating the environment ----
-# uv pip install --dry-run runs the resolver but installs nothing.  If the
-# declared stack is unsolvable (e.g. version conflict), the probe fails with
-# the actual resolver reason — BEFORE the environment is mutated.
-print('Running resolver dry-run probe (--dry-run)...')
-for spec in main_args:
-    print('  ', redact(spec))
-run_install_command(
-    [UV, 'pip', 'install', '--dry-run', *TARGET_FLAGS, '--no-cache-dir', *main_args],
-    phase='dry-run')
-print('dry-run probe: PASS (resolver can satisfy the declared stack)')
-
-# ---- Actual install (NO -qqq — full observability) ----
-print('Installing %d specs:' % len(main_args))
-for spec in main_args:
-    print('  ', redact(spec))
-run_install_command(
-    [UV, 'pip', 'install', *TARGET_FLAGS, '--no-cache-dir', *main_args],
-    phase='install')
-
-# triton_kernels builds against the torch/triton already present -> no build isolation.
-for dep in ALL_DEPENDENCIES:
-    if not dep['no_build_isolation']:
-        continue
-    print('Installing (no build isolation):', redact(dep['install']))
-    run_install_command(
-        [UV, 'pip', 'install', *TARGET_FLAGS, '--no-cache-dir',
-         '--no-build-isolation', dep['install']],
-        phase='no-build-isolation')
-
-# ---- --no-deps force-upgrade (matches upstream Unsloth Kaggle recipe) ----
-# Force-upgrade critical packages without touching the dependency tree.
-# This pins transformers, trl, unsloth, and unsloth_zoo to the latest
-# versions while preserving the preinstalled torch/triton.
+# Exact constraints also prevent transitive dependencies from upgrading torch/triton.
+PRESERVE_CONSTRAINTS_PATH = WORKING / 'qualification-preserved-constraints.txt'
+PRESERVE_CONSTRAINTS_PATH.write_text(
+    ''.join('%s==%s\n' % item for item in sorted(preserved_versions.items())), encoding='utf-8')
+CONSTRAINT_FLAGS = ['--constraint', str(PRESERVE_CONSTRAINTS_PATH)] if PRESERVED else []
 FORCE_UPGRADE_SPECS = [
-    'transformers', 'trl', 'unsloth', 'unsloth_zoo',
+    'transformers==4.56.2', 'tokenizers>=0.22.0,<=0.23.0',
+    'trl==0.22.2', 'unsloth', 'unsloth_zoo',
 ]
-print('Force-upgrading (no-deps):', ', '.join(FORCE_UPGRADE_SPECS))
-run_install_command(
-    [UV, 'pip', 'install', *TARGET_FLAGS, '--upgrade', '--no-deps',
-     *FORCE_UPGRADE_SPECS],
-    phase='force-upgrade')
 
-# ---- torchao force-upgrade (upstream recipe Step 4) ----
-# torchao is a transitive dep of unsloth/transformers; force-upgrade it
-# with --no-deps so it doesn't disturb torch/triton.
-print('Force-upgrading (no-deps): torchao>=0.16.0')
-run_install_command(
-    [UV, 'pip', 'install', *TARGET_FLAGS, '--no-deps', '--upgrade',
-     'torchao>=0.16.0'],
-    phase='torchao-upgrade')
+def build_install_plan(target_flags, fresh=False):
+    main_args = [('%s==%s' % (d['name'], preserved_versions[d['name']]))
+                 if d['name'] in preserved_versions else d['install']
+                 for d in ALL_DEPENDENCIES
+                 if not d['no_build_isolation']
+                 and d['name'] not in ('torchao', 'transformers', 'tokenizers', 'trl', 'unsloth_zoo')
+                 and (fresh or d['name'] not in PRESERVED)]
+    if fresh and HARMONY_SPEC['install'] not in main_args:
+        main_args.append(HARMONY_SPEC['install'])
+    base = [UV, 'pip', 'install', *target_flags, '--no-cache-dir', *CONSTRAINT_FLAGS]
+    plan = [('install', [*base, *main_args]),
+            ('force-upgrade', [*base, '--upgrade', '--no-deps', *FORCE_UPGRADE_SPECS]),
+            ('torchao-upgrade', [*base, '--no-deps', '--upgrade', 'torchao>=0.16.0'])]
+    for dep in ALL_DEPENDENCIES:
+        if dep['no_build_isolation']:
+            plan.append(('no-build-isolation', [*base, '--no-build-isolation', dep['install']]))
+    return plan
+
+def execute_install_plan(plan, timeout=None):
+    # A stage dry-run checks these exact arguments, not the whole stack's compatibility.
+    # In particular --no-deps does not validate transitive dependency compatibility.
+    for phase, cmd in plan:
+        run_install_command([*cmd, '--dry-run'], timeout=timeout, phase=phase + '-dry-run')
+        run_install_command(cmd, timeout=timeout, phase=phase)
+
+INSTALL_PLAN = build_install_plan(TARGET_FLAGS)
+write_canonical(INSTALL_ARGS_PATH, {
+    'installer': 'uv',
+    'install_plan': [{'phase': phase, 'command': scrub_paths(redact(' '.join(cmd)))}
+                     for phase, cmd in INSTALL_PLAN],
+    'preserved_versions': preserved_versions,
+    'skipped_dependencies': [{'name': d['name'], 'reason': 'kaggle-preserve-preinstalled'}
+                             for d in SKIPPED],
+})
+execute_install_plan(INSTALL_PLAN)
+for name, version in preserved_versions.items():
+    actual = resolve_versions(sys.executable, [{'name': name, 'modules': [name]}])
+    if actual.get(name, {}).get('version') != version:
+        abort('Preserved dependency changed: %s' % name)
 
 freeze_listing = run_command([UV, 'pip', 'freeze', '--python', sys.executable]).stdout
 print('--- uv pip freeze (redacted) ---')
@@ -1734,8 +1746,8 @@ if harmony_dist is None:
     harmony_dist = HARMONY_CANDIDATES[0]['dist']
     print('No Harmony module found; installing candidate %s' % harmony_dist)
     try:
-        run_install_command([UV, 'pip', 'install', *TARGET_FLAGS, '--no-cache-dir', harmony_dist],
-                           phase='harmony')
+        execute_install_plan([('harmony', [UV, 'pip', 'install', *TARGET_FLAGS,
+                                         '--no-cache-dir', *CONSTRAINT_FLAGS, harmony_dist])])
     except Exception as exc:
         print('WARNING: could not install %s: %s' % (harmony_dist, redact(str(exc))))
     harmony_probe = probe_modules(sys.executable, [c['module'] for c in HARMONY_CANDIDATES])
@@ -1778,47 +1790,21 @@ def venv_python(venv_dir):
             return str(candidate)
     return None
 
-def compare_records(left, right, label, mismatches, preserved=None):
-    '''Contract 6.3: name sets equal; frozen spec string-equal; resolved_version
-    string-equal (including both-null); resolved_commit string-equal for source git.
-
-    When a dep was preserved in pass 1 (preinstalled, not reinstalled), its
-    version in pass 2 (fresh venv) may differ from the preinstalled version.
-    For such deps, a version difference is recorded as a WARNING (not a hard
-    mismatch) so the qualification is not failed solely because the preinstalled
-    torch differs from a fresh PyPI install.
-    '''
-    preserved = preserved or set()
+def compare_records(left, right, label, mismatches):
+    '''Contract 6.3: exact equality, including preserved torch/triton.'''
     left_by_name = {item['name']: item for item in left}
     right_by_name = {item['name']: item for item in right}
     for name in sorted(set(left_by_name) | set(right_by_name)):
-        a = left_by_name.get(name)
-        b = right_by_name.get(name)
+        a, b = left_by_name.get(name), right_by_name.get(name)
         if a is None or b is None:
             mismatches.append('%s: %s present in only one pass' % (label, name))
             continue
         if a.get('spec') != b.get('spec'):
-            if name in preserved:
-                print('  WARNING (preserved): %s frozen spec %s != pass-2 %s — preinstalled version differs from fresh install' % (name, a.get('spec'), b.get('spec')))
-            else:
-                mismatches.append('%s: %s frozen spec %s != pass-2 %s'
-                                  % (label, name, a.get('spec'), b.get('spec')))
-        if a.get('resolved_version') != b.get('resolved_version'):
-            if name in preserved:
-                print('  WARNING (preserved): %s resolved_version %s != pass-2 %s — preinstalled version differs from fresh install' % (name, a.get('resolved_version'), b.get('resolved_version')))
-            else:
-                mismatches.append('%s: %s resolved_version frozen %s != pass-2 %s'
-                                  % (label, name, a.get('resolved_version'), b.get('resolved_version')))
-        if a['source'] == 'git' and a.get('resolved_commit') != b.get('resolved_commit'):
-            mismatches.append('%s: %s resolved_commit frozen %s != pass-2 %s'
-                              % (label, name, a.get('resolved_commit'), b.get('resolved_commit')))
-
-install_args = [d['install'] for d in ALL_DEPENDENCIES] + [HARMONY_SPEC['install']]
-write_canonical(INSTALL_ARGS_PATH, {
-    'install_args': install_args,
-    'no_build_isolation': [d['install'] for d in ALL_DEPENDENCIES if d['no_build_isolation']],
-    'installer': 'uv',
-})
+            mismatches.append('%s: %s frozen spec %s != pass-2 %s'
+                              % (label, name, a.get('spec'), b.get('spec')))
+        for key in ('resolved_version', 'source', 'resolved_commit'):
+            if a.get(key) != b.get(key):
+                mismatches.append('%s: %s %s differs between passes' % (label, name, key))
 
 reproducibility = {
     'assertion': 'NOT_RUN',
@@ -1845,22 +1831,9 @@ else:
         if fresh_python is None:
             raise RuntimeError('could not locate the python executable inside the fresh venv')
 
-        main_fresh = [d['install'] for d in ALL_DEPENDENCIES if not d['no_build_isolation']]
-        main_fresh.append(HARMONY_SPEC['install'])
-        run_command([UV, 'pip', 'install', '--python', fresh_python, '--no-cache-dir', '-qqq',
-                     *main_fresh], timeout=FRESH_ENV_MAX_SECONDS)
-        for dep in ALL_DEPENDENCIES:
-            if not dep['no_build_isolation']:
-                continue
-            run_command([UV, 'pip', 'install', '--python', fresh_python, '--no-cache-dir', '-qqq',
-                         '--no-build-isolation', dep['install']], timeout=FRESH_ENV_MAX_SECONDS)
-        # Force-upgrade + torchao (must match pass 1 recipe).
-        run_command([UV, 'pip', 'install', '--python', fresh_python, '--no-cache-dir', '-qqq',
-                     '--upgrade', '--no-deps', 'transformers', 'trl', 'unsloth', 'unsloth_zoo'],
-                    timeout=FRESH_ENV_MAX_SECONDS)
-        run_command([UV, 'pip', 'install', '--python', fresh_python, '--no-cache-dir', '-qqq',
-                     '--no-deps', '--upgrade', 'torchao>=0.16.0'],
-                    timeout=FRESH_ENV_MAX_SECONDS)
+        # Same selected recipe and exact preserved versions in a clean interpreter.
+        fresh_plan = build_install_plan(['--python', fresh_python], fresh=True)
+        execute_install_plan(fresh_plan, timeout=FRESH_ENV_MAX_SECONDS)
 
         fresh_targets = [{'name': d['name'], 'modules': d['modules']} for d in REPRODUCIBILITY_SPECS]
         fresh_resolution = resolve_versions(fresh_python, fresh_targets, timeout=FRESH_ENV_MAX_SECONDS)
@@ -1869,8 +1842,7 @@ else:
                                                     fresh_resolution, mark_unpinned=True)
 
         mismatches = []
-        preserved_set = set(PRESERVED)
-        compare_records(dependencies, fresh_pinned, 'dependencies', mismatches, preserved=preserved_set)
+        compare_records(dependencies, fresh_pinned, 'dependencies', mismatches)
         compare_records(additional_dependencies, fresh_additional, 'additional_dependencies', mismatches)
 
         reproducibility['passes'].append({
@@ -2826,10 +2798,19 @@ snippet_lines = [
     '// GENERATED by scripts/qualify/qualify-kaggle-env.ipynb - do not hand-edit.',
     '// Paste over PINNED_ENGINE_DEPENDENCIES in apps/web/lib/training/package.ts.',
     '// Source: env-qualification.json @ %s (status %s)' % (record['captured_at'], record['status']),
-    '// Contract 11.1: spec is the FROZEN pin (4.0); resolvedVersion comes from resolved_version.',
+    '// Contract 11.1: measured pins except environment-preserved or conditionally skipped entries.',
+    '// Kaggle torch/triton versions are runtime facts, never universal GHARIBO pins.',
     'export const PINNED_ENGINE_DEPENDENCIES: EngineDependency[] = [',
 ]
-for dep in record['dependencies']:
+resolved_by_name = {d['name']: d for d in record['dependencies']}
+for requested in INVENTORY['pinned_dependencies']:
+    # Keep the complete general inventory and original requests for runtime-only facts.
+    if requested['name'] in PRESERVED or requested['name'] in skipped_names:
+        dep = {'name': requested['name'], 'source': requested['source'],
+               'spec': requested['requested_spec'], 'resolved_version': None,
+               'url': requested['url']}
+    else:
+        dep = resolved_by_name[requested['name']]
     snippet_lines.append('  { name: %s, source: %s, spec: %s, resolvedVersion: %s, url: %s },'
                          % (ts_literal(dep['name']), ts_literal(dep['source']),
                             ts_literal(dep['spec']), ts_literal(dep['resolved_version']),

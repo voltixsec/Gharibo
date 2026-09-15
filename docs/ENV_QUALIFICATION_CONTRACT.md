@@ -94,8 +94,8 @@
 
 The Training Package pins an engine dependency set, but the package builder can only record what a
 real install resolves. Today `PINNED_ENGINE_DEPENDENCIES` carries `resolvedVersion: null` for every
-entry, and the `unsloth` / `unsloth_zoo` / `transformers` git specs track upstream default branches
-with no commit SHA. **Exact versions cannot be known without performing a real install.**
+entry. Unsloth packages use PyPI requests; Transformers and TRL use the supplied upstream pins.
+**Actual resolved versions remain unmeasured until a real install.**
 
 This contract closes that gap honestly, in **two parts**:
 
@@ -270,7 +270,8 @@ Extensions are allowed and are **ignored** by the package consumer (forward-comp
 ### 4.3 Rules
 
 1. **One record per pinned dependency.** The set of `name` values in `dependencies[]` must equal the
-   set of `name` values in `PINNED_ENGINE_DEPENDENCIES`, with no additions and no omissions. A
+   set of `name` values in `PINNED_ENGINE_DEPENDENCIES`, except the explicitly recorded conditional
+   `triton_kernels` exclusion on the Kaggle preserve-preinstalled path (§4.6). A
    mismatch is a contract violation (§10). Packages the recipe imports directly MUST be pinned (see
    §4.5); only transitive or optional packages belong in `additional_dependencies[]`.
 2. **`spec` is the frozen form, not the request** (§4.0). `pip` → `name==version`; `git` →
@@ -298,12 +299,12 @@ The names the harness must emit, matching `PINNED_ENGINE_DEPENDENCIES` exactly:
 |---|---|---|---|
 | `torch` | pip | `torch>=2.8.0` | `torch==<resolved version>` |
 | `triton` | pip | `triton>=3.4.0` | `triton==<resolved version>` |
-| `unsloth_zoo` | git | `@git+https://github.com/unslothai/unsloth-zoo` | `git+https://github.com/unslothai/unsloth-zoo@<40-hex commit>` |
-| `unsloth` | git | `@git+https://github.com/unslothai/unsloth` | `git+https://github.com/unslothai/unsloth@<40-hex commit>` |
-| `transformers` | git | `@git+https://github.com/huggingface/transformers` | `git+https://github.com/huggingface/transformers@<40-hex commit>` |
+| `unsloth_zoo` | pip | `unsloth_zoo` | `unsloth_zoo==<resolved version>` |
+| `unsloth` | pip | `unsloth` | `unsloth==<resolved version>` |
+| `transformers` | pip | `transformers==4.56.2` | `transformers==<resolved version>` |
 | `triton_kernels` | git | `@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels` | `git+https://github.com/triton-lang/triton.git@<40-hex commit>#subdirectory=python/triton_kernels` |
 | `peft` | pip | `peft` | `peft==<resolved version>` |
-| `trl` | pip | `trl` | `trl==<resolved version>` |
+| `trl` | pip | `trl==0.22.2` | `trl==<resolved version>` |
 | `datasets` | pip | `datasets` | `datasets==<resolved version>` |
 | `accelerate` | pip | `accelerate` | `accelerate==<resolved version>` |
 | `bitsandbytes` | pip | `bitsandbytes` | `bitsandbytes==<resolved version>` |
@@ -334,7 +335,8 @@ Harmony package (`openai-harmony`). **These 6 packages have been promoted to
 `PINNED_ENGINE_DEPENDENCIES` during the M3A autonomous work session** — they are now in
 `dependencies[]` (pinned_in_package_ts = true), not `additional_dependencies[]`. The harness picks
 them up automatically because it derives its inventory from that constant.
-`UNPINNED_QUALIFICATION_ENTRIES` in the harness is now empty (all 6 promoted).
+Qualification-only checks also record `tokenizers>=0.22.0,<=0.23.0` and `torchao>=0.16.0`
+in `additional_dependencies[]`; `requested_spec` must retain these actual constraints.
 
 A bare name (e.g. `peft`) is an admissible `requested_spec`: it is a *request*, and the harness
 freezes the resolved `peft==<version>`. Writing the request invents no version.
@@ -354,6 +356,29 @@ freezes the resolved `peft==<version>`. Writing the request invents no version.
 | When empty | The block may be empty or absent; if absent, no warning is required (§10 rule 18) |
 
 ---
+
+### 4.6 Kaggle T4 qualification install selection
+
+On Kaggle with detected preinstalled torch, preserve its measured distribution version
+and any detected preinstalled triton version. Apply exact constraints to dependency-resolving
+commands and verify these versions after installation. A conflict must fail visibly.
+Exclude the explicit triton_kernels Git install, required import probe, and dependency record
+on this path; record the exclusion and reason in qualification-install-args.json. This is
+an exclusion of one recipe requirement, not permission to ignore a required import failure.
+Use the same selected dependency names in pass 2; its fresh environment requests the measured
+torch/triton versions. Equality remains strict, including for preserved packages. These measured
+versions are environment-preserved runtime facts, not universal GHARIBO dependency pins.
+The TypeScript paste output retains the original requested specs with unresolved versions for
+preserved packages and includes the original triton_kernels entry even when this path skips it.
+
+Both passes build their commands through one install-plan function. Each stage runs its exact
+command with --dry-run immediately before the actual command. A --no-deps dry-run validates
+that stage's requests, not transitive compatibility or later stages. Import and hardware gates
+remain mandatory. Preserve the existing diagnostic capture and qualification safety gates.
+
+The v2 failure remains DEPENDENCY_INSTALL_FAILED_WITH_DIAGNOSTIC_SUPPRESSED. Preservation is
+an evidence-based remediation, not a measured historical root cause.
+
 
 ## 5. Environment record
 
@@ -546,8 +571,7 @@ frozen_ok = (status == "QUALIFIED") AND (unknowns is empty)
 - `frozen_ok = false` → the package may still be built and exported, but its engine record is
   `UNQUALIFIED`; the manifest keeps `resolved_version: null` and the run is not a reproducibility
   claim. This is the **current state**: the M2 freeze is incomplete, `resolved_version` is `null`
-  for every dependency, and the `unsloth` / `unsloth_zoo` / `transformers` git specs track upstream
-  default branches with no commit SHA. That is recorded as an open item, not papered over.
+  for every dependency. Requested PyPI specs and constraints are not measured resolutions.
 
 ### 7.4 Forbidden
 
@@ -655,7 +679,13 @@ model-compatibility failure is allowed to bend, and only in the specific, declar
 
 ## 11. The paste transform (harness output → package)
 
+> Historical M2 example below: its Git requests predate the Kaggle recipe correction.
+> Current requested specs are in §4.4 and selection rules in §4.6.
+
+
 This is the only sanctioned way to move values into `apps/web/lib/training/package.ts`.
+For the Kaggle path, §4.6 takes precedence for environment-preserved and skipped entries:
+the general inventory and original requests are retained, rather than promoting runtime facts.
 
 ### 11.1 `EngineConfig.dependencies[]`
 

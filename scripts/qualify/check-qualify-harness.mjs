@@ -78,7 +78,7 @@ const REQUIRED_PINNED = [
   "bitsandbytes",
   "openai-harmony",
 ];
-const REQUIRED_ADDITIONAL = ["torchao"];
+const REQUIRED_ADDITIONAL = ["torchao", "tokenizers"];
 const REQUIRED_HARMONY_CANDIDATES = [];
 
 /** Contract §3: the top-level keys the emitted record must carry. */
@@ -563,7 +563,7 @@ const contractChecks = [
   ["§10 filesystem-path scan", /filesystem path found in the artifact/],
   ["§7.3 freeze gate", /frozen_ok = \(record\['status'\] == 'QUALIFIED'\) and \(len\(record\['unknowns'\]\) == 0\)/],
   ["uv install (not pip)", /'-m', 'pip', 'install', '--upgrade', '-qqq', 'uv'/],
-  ["uv pip install with an explicit target", /UV, 'pip', 'install', \*TARGET_FLAGS/],
+  ["uv pip install with an explicit target", /UV, 'pip', 'install', \*target_flags/],
   ["redaction applied to output", /def redact\(/],
   // §13 Qualification Safety — runtime tripwires + evidence block.
   ["§13 QUALIFICATION_ONLY asserted", /assert QUALIFICATION_ONLY is True/],
@@ -668,11 +668,11 @@ const installChecks = [
   ["exception includes resolver reason", /stdout_trim,.*stderr_trim/s],
   // Dry-run probe before mutating the environment
   ["dry-run probe present", /--dry-run/],
-  ["dry-run probe uses run_install_command", /run_install_command\(\s*\[UV, 'pip', 'install', '--dry-run'/],
+  ["dry-run uses exact stage command", /run_install_command\(\[\*cmd, '--dry-run'\], timeout=timeout, phase=phase \+ '-dry-run'\)/],
   // No -qqq on the main install (only uv bootstrap and pass 2 may keep it)
-  ["main install has no -qqq", /run_install_command\(\s*\[UV, 'pip', 'install', \*TARGET_FLAGS, '--no-cache-dir', \*main_args\]/],
+  ["install uses same stage command", /run_install_command\(cmd, timeout=timeout, phase=phase\)/],
   // Preinstalled torch/triton preservation
-  ["module_present helper", /def module_present\(modname\):/],
+  ["preservation uses a fresh interpreter", /probe_modules\(sys\.executable, dep\['modules'\]\)/],
   ["preserve_if_preinstalled flag checked", /dep\.get\('preserve_if_preinstalled'\)/],
   ["torch preserve flag in inventory", /"preserve_if_preinstalled": true/],
   // Force-upgrade step (matches upstream Unsloth Kaggle recipe)
@@ -681,10 +681,36 @@ const installChecks = [
   ["torchao no-deps upgrade", /'--no-deps', '--upgrade',\s*'torchao>=0\.16\.0'/],
   // torchao in additional_dependencies
   ["torchao in import smoke modules", /"torchao"/],
+  ["transitive preservation constraints", /'--constraint', str\(PRESERVE_CONSTRAINTS_PATH\)/],
+  ["preserved versions rechecked", /abort\('Preserved dependency changed: %s' % name\)/],
+  ["Kaggle kernel exclusion", /KAGGLE_PRESERVE_PREINSTALLED and d\.get\('skip_if_kaggle_preserved'\)/],
+  ["skips recorded", /'skipped_dependencies':/],
+  ["export retains general inventory", /for requested in INVENTORY\['pinned_dependencies'\]:/],
+  ["export retains runtime-only requests", /requested\['name'\] in PRESERVED or requested\['name'\] in skipped_names/],
+  ["pass 2 uses shared plan", /fresh_plan = build_install_plan\(\['--python', fresh_python\], fresh=True\)/],
 ];
 for (const [label, re] of installChecks) {
   if (!re.test(notebookSource)) fail("install", `missing: ${label}`);
 }
+
+const expectedRecipe = new Map([
+  ['unsloth', 'unsloth'], ['unsloth_zoo', 'unsloth_zoo'],
+  ['transformers', 'transformers==4.56.2'], ['trl', 'trl==0.22.2'],
+  ['tokenizers', 'tokenizers>=0.22.0,<=0.23.0'], ['torchao', 'torchao>=0.16.0'],
+]);
+const recipeByName = new Map([...inventory.pinned_dependencies, ...inventory.additional_dependencies]
+  .map(dep => [dep.name, dep]));
+for (const [name, spec] of expectedRecipe) {
+  const entry = recipeByName.get(name);
+  if (!entry || entry.source !== 'pip' || entry.requested_spec !== spec || entry.install !== spec || entry.url !== null) {
+    fail('install', name + ': recipe source/spec/install metadata drift');
+  }
+}
+if (tritonKernels?.skip_if_kaggle_preserved !== true) fail('install', 'triton_kernels must be conditional');
+for (const name of ['torch', 'triton']) {
+  if (pinnedByName.get(name)?.preserve_if_preinstalled !== true) fail('install', name + ': preservation required');
+}
+if (/WARNING \(preserved\)/.test(notebookSource)) fail('install', 'preserved version mismatches must fail equality');
 
 // Regression: the main install command must NOT use -qqq (it hides resolver errors).
 // The only sanctioned -qqq uses are: uv bootstrap and pass-2 (throwaway venv).
