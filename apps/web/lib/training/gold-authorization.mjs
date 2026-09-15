@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 /** Pure governance checks shared by preview, master validation and M3A. No I/O. */
 export const ACCEPTED_GOLD_HASHES = Object.freeze({
   dataset: "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
@@ -79,4 +80,51 @@ export function isAcceptedGoldPreviewState(state) {
     experiment.recipeHash === RECIPE &&
     experiment.authorizationQualificationHash === ACCEPTED_QUALIFICATION_HASH &&
     experiment.authorizationEngineFreeze === FREEZE;
+}
+
+/** Issued state is a second exact checkpoint, never a generic authorization boolean. */
+export function isIssuedGoldState(state) {
+  const receipt = state?.training?.issuance;
+  const authorization = state?.training?.authorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  const readiness = "ISSUED_AWAITING_EXPLICIT_EXECUTION_AUTHORIZATION";
+  if (!receipt || !authorization || state.masterStateVersion !== "1.6.0" ||
+      authorization.status !== readiness || authorization.packageIssued !== true ||
+      authorization.runIssued !== true || authorization.executionStarted !== false ||
+      experiment?.readinessStatus !== readiness || experiment?.runStatus !== "DRAFT" ||
+      receipt.status !== "ISSUED_DRAFT" || receipt.decisionId !== "DEC-0025" ||
+      receipt.runStatus !== "DRAFT" || receipt.packageCount !== 1 || receipt.runCount !== 1 ||
+      receipt.executionAuthorized !== false || receipt.executionStarted !== false ||
+      !/^[0-9a-f]{64}$/.test(receipt.packageId ?? "") || receipt.packageId === PREVIEW ||
+      !/^[0-9a-f-]{36}$/.test(receipt.runId ?? "") ||
+      receipt.packageId !== experiment.packageId || receipt.runId !== experiment.trainingRunId ||
+      !/^[0-9a-f]{64}$/.test(receipt.manifestSha256 ?? "") ||
+      !/^[0-9a-f]{64}$/.test(receipt.bundleSha256 ?? "") ||
+      !/^[0-9a-f]{64}$/.test(receipt.checksumsSha256 ?? "")) return false;
+  const binding = receipt.binding;
+  if (!binding || binding.decisionId !== "DEC-0025" || binding.authorizedCodeSnapshot !== SNAPSHOT ||
+      binding.authorizedPreviewPackageId !== PREVIEW || binding.recipeHash !== RECIPE ||
+      binding.qualificationHash !== ACCEPTED_QUALIFICATION_HASH || binding.engineFreeze !== FREEZE ||
+      binding.datasetHash !== ACCEPTED_GOLD_HASHES.dataset ||
+      ["train", "validation", "test"].some((split) => binding.splitHashes?.[split] !== ACCEPTED_GOLD_HASHES[split]) ||
+      binding.recordFormat !== "harmony-messages-v1" || binding.testUsage !== "HASH_INTEGRITY_ONLY" ||
+      binding.executionAuthorized !== false || binding.executionStarted !== false ||
+      !/^[0-9a-f]{64}$/.test(binding.sourceFilesHash ?? "")) return false;
+  const sorted = (value) => Array.isArray(value) ? value.map(sorted) :
+    value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted(value[key])])) : value;
+  const { receiptHash, ...body } = receipt;
+  if (createHash("sha256").update(JSON.stringify(sorted(body))).digest("hex") !== receiptHash) return false;
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.5.0";
+  before.training.authorization.status = READINESS;
+  before.training.authorization.packageIssued = false;
+  before.training.authorization.runIssued = false;
+  before.experiments["GHARIBO-exp-001"].readinessStatus = READINESS;
+  before.experiments["GHARIBO-exp-001"].packageId = null;
+  before.experiments["GHARIBO-exp-001"].trainingRunId = null;
+  return isAcceptedGoldPreviewState(before);
+}
+
+export function isAcceptedGoldGovernanceState(state) {
+  return isAcceptedGoldPreviewState(state) || isIssuedGoldState(state);
 }

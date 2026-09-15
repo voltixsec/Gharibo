@@ -42,7 +42,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-import { isAcceptedGoldPreviewState } from "@/lib/training/gold-authorization.mjs";
+import { isAcceptedGoldGovernanceState } from "@/lib/training/gold-authorization.mjs";
 import { canonicalJson, sha256Canonical, sha256Hex } from "@/lib/training/hash";
 import {
   CANONICAL_RECORD_FIELDS,
@@ -1245,7 +1245,7 @@ function gateKaggleDependent(): Gate {
   try {
     const master = JSON.parse(fs.readFileSync(masterStatePath, "utf8"));
     const candidate = master?.training?.qualification;
-    previewStateAccepted = isAcceptedGoldPreviewState(master);
+    previewStateAccepted = isAcceptedGoldGovernanceState(master);
     issuanceAuthorized = master?.experiments?.["GHARIBO-exp-001"]?.trainingAuthorized === true;
 
     if (candidate && typeof candidate === "object") {
@@ -1301,11 +1301,11 @@ function gateKaggleDependent(): Gate {
       ? pending(
           "training execution (not started ? STOP condition)",
           issuanceAuthorized
-            ? "DEC-0025 authorizes issuance only. No package/run is issued; training has not started."
+            ? "DEC-0025 issuance binding verified. Any issued run is DRAFT; execution is not authorized and training has not started."
             : "Qualification does not authorize training. Separate explicit authorization is required.",
         )
       : expect("training execution governance binding", false,
-          "Invalid preview/DEC-0025 binding or execution is no longer NOT_STARTED and unissued."),
+          "Invalid preview/DEC-0025 binding or execution is no longer NOT_STARTED with the exact issuance state."),
   );
 
   checks.push(

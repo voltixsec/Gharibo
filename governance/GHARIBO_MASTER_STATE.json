@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.5.0",
+  "masterStateVersion": "1.6.0",
   "updatedAt": "2026-09-15",
   "project": {
     "id": "GHARIBO",
@@ -19,7 +19,7 @@
     "trainingInvariant": "TRAINING HAS NOT STARTED",
     "currentMilestone": "M3C",
     "milestoneStatus": "COMPLETE",
-    "blockerSummary": "GHARIBO-exp-001 is explicitly authorized to proceed from the governed PREVIEW_ONLY state to immutable Training Package / Training Run issuance using the exact authorized snapshot and identities recorded in DEC-0025. No package or run has yet been issued and TRAINING HAS NOT STARTED.",
+    "blockerSummary": "DEC-0025 immutable Training Package and one DRAFT Training Run have been issued and independently re-read from SQLite. Execution remains unauthorized and sealed. A separate explicit execution authorization checkpoint is required before the run may transition from DRAFT to QUEUED. TRAINING HAS NOT STARTED.",
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
       "exampleCount": 800,
@@ -779,7 +779,7 @@
       }
     },
     "authorization": {
-      "status": "AUTHORIZED_AWAITING_PACKAGE_ISSUANCE",
+      "status": "ISSUED_AWAITING_EXPLICIT_EXECUTION_AUTHORIZATION",
       "decisionId": "DEC-0025",
       "authorizedAt": "2026-09-15",
       "scope": "PACKAGE_AND_RUN_ISSUANCE_ONLY",
@@ -796,10 +796,45 @@
       },
       "recordFormat": "harmony-messages-v1",
       "testUsage": "HASH_INTEGRITY_ONLY",
-      "packageIssued": false,
-      "runIssued": false,
+      "packageIssued": true,
+      "runIssued": true,
       "executionStarted": false,
       "note": "The authorization checkpoint commit necessarily has a different Git SHA. That does not change the executable code snapshot being authorized, which remains ad1e011c55729f5447b324d35b4ad88d0a47d10f."
+    },
+    "issuance": {
+      "binding": {
+        "authorizedCodeSnapshot": "ad1e011c55729f5447b324d35b4ad88d0a47d10f",
+        "authorizedPreviewPackageId": "f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c",
+        "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+        "decisionId": "DEC-0025",
+        "engineFreeze": "unsloth-freeze-2026.09.15",
+        "executionAuthorized": false,
+        "executionStarted": false,
+        "qualificationHash": "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0",
+        "recipeHash": "c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd",
+        "recordFormat": "harmony-messages-v1",
+        "sourceFilesHash": "3dde70ef7401452f5374c5cb3d004f207f9699b84d6cd47d52750c5bd4c5ea3c",
+        "splitHashes": {
+          "test": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+          "train": "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2",
+          "validation": "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787"
+        },
+        "testUsage": "HASH_INTEGRITY_ONLY"
+      },
+      "bundleSha256": "6ef55db62d35455e9f7df80b63b9c886bf826e1fd24110c8f9d3566b8d552ea9",
+      "checksumsSha256": "df660357e121deffad2c98c4149fe88385803a7420852a5bbea974bf2a6f5660",
+      "decisionId": "DEC-0025",
+      "executionAuthorized": false,
+      "executionStarted": false,
+      "issuedAt": "2026-09-15T16:47:40.513Z",
+      "manifestSha256": "7e0dbd3ef89a6436692b330b6b6e5b36744a71205fde202446e204ad469361c4",
+      "packageCount": 1,
+      "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
+      "receiptHash": "878b961f03ba069b82b4eb82530e7ebdfa4f8644ab159beff0a9adc7935f99bd",
+      "runCount": 1,
+      "runId": "ea6e30f2-ce26-4323-b35a-3436ee867eaf",
+      "runStatus": "DRAFT",
+      "status": "ISSUED_DRAFT"
     }
   },
   "datasets": {
@@ -859,11 +894,11 @@
       "method": "QLoRA + SFT",
       "engine": "Unsloth Core",
       "worker": "KaggleTrainingWorker",
-      "trainingRunId": null,
-      "packageId": null,
+      "trainingRunId": "ea6e30f2-ce26-4323-b35a-3436ee867eaf",
+      "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "AUTHORIZED_AWAITING_PACKAGE_ISSUANCE",
+      "readinessStatus": "ISSUED_AWAITING_EXPLICIT_EXECUTION_AUTHORIZATION",
       "engineDependencyCount": 12,
       "resolvedEngineDependencies": 9,
       "promotionTarget": "GHARIBO-V0.1",
@@ -882,7 +917,8 @@
       "authorizedPreviewPackageId": "f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c",
       "recipeHash": "c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd",
       "authorizationQualificationHash": "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0",
-      "authorizationEngineFreeze": "unsloth-freeze-2026.09.15"
+      "authorizationEngineFreeze": "unsloth-freeze-2026.09.15",
+      "runStatus": "DRAFT"
     }
   },
   "models": {
@@ -1372,31 +1408,31 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Issue one immutable GHARIBO-exp-001 Training Package and Training Run from DEC-0025 using the authorized code snapshot, recipe, Gold identity, qualification and engine freeze. Issuance only; do not execute training.",
-      "requires": "DEC-0025",
+      "action": "Create a separate explicit execution authorization checkpoint bound to the issued package, DRAFT run, DEC-0025 receipt, authorized code snapshot, recipe, qualification, engine freeze and Gold identities.",
+      "requires": "DEC-0025 immutable issuance",
       "references": [
         "docs/TRAINING_STRATEGY.md",
-        "docs/adr/ADR-0019-governed-gold-package-preview.md"
+        "governance/GHARIBO_MASTER_STATE.json"
       ]
     },
     {
       "id": "ACT-0002",
       "priority": "P0",
-      "action": "Verify the issued package/run identities against DEC-0025, including dataset/split hashes, recipe hash, qualification hash, engine freeze, authorized code snapshot and TEST holdout policy.",
+      "action": "Only after explicit execution authorization, remove the DEC-0025 DRAFT execution seal through a governed migration, transition the exact issued run from DRAFT to QUEUED, and prepare the approved Kaggle execution bundle.",
       "requires": "ACT-0001",
       "references": [
         "docs/TRAINING_STRATEGY.md",
-        "docs/ENV_QUALIFICATION_CONTRACT.md"
+        "docs/ARCHITECTURE_MILESTONE_2.md"
       ]
     },
     {
       "id": "ACT-0003",
       "priority": "P0",
-      "action": "Only after ACT-0002 passes, launch GHARIBO-exp-001 on the approved free Kaggle worker. Preserve immutable package/run/result identities and do not access TEST beyond its governed integrity policy.",
-      "requires": "ACT-0002, explicit execution step",
+      "action": "Launch the exact authorized run on the approved free Kaggle worker only after ACT-0002. Preserve TEST as HASH_INTEGRITY_ONLY and record real execution evidence.",
+      "requires": "ACT-0002",
       "references": [
         "docs/TRAINING_STRATEGY.md",
-        "docs/ARCHITECTURE_MILESTONE_2.md"
+        "docs/ENV_QUALIFICATION_CONTRACT.md"
       ]
     }
   ],
@@ -1516,6 +1552,24 @@
         "set GHARIBO-exp-001 trainingAuthorized=true",
         "kept packageId/trainingRunId null",
         "kept training execution NOT_STARTED"
+      ],
+      "trainingExecuted": false
+    },
+    {
+      "revision": "1.6.0",
+      "date": "2026-09-15",
+      "summary": "Executed DEC-0025 issuance authorization: persisted exactly one immutable GHARIBO-exp-001 Training Package and one linked DRAFT Training Run, independently reopened and verified them, and retained a separate execution-authorization boundary.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "The issued package remains bound to the authorized executable snapshot ad1e011c55729f5447b324d35b4ad88d0a47d10f. This later governance/code commit records issuance and does not replace that authorized snapshot.",
+      "changes": [
+        "issued package 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
+        "issued DRAFT run ea6e30f2-ce26-4323-b35a-3436ee867eaf",
+        "persisted immutable DEC-0025 receipt",
+        "verified package/run after database reopen",
+        "kept executionAuthorized=false",
+        "kept executionStarted=false",
+        "kept training status NOT_STARTED"
       ],
       "trainingExecuted": false
     }

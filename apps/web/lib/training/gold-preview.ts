@@ -11,7 +11,7 @@ import { finalizePackage, pinnedEngineConfig, serializeManifest } from "./packag
 import { formatIssues, hasBlockingErrors, validatePackage } from "./validate";
 import { createZip } from "./zip";
 
-import { ACCEPTED_GOLD_HASHES, ACCEPTED_QUALIFICATION_HASH, isAcceptedGoldPreviewState } from "./gold-authorization.mjs";
+import { ACCEPTED_GOLD_HASHES, ACCEPTED_QUALIFICATION_HASH, isAcceptedGoldGovernanceState } from "./gold-authorization.mjs";
 export { ACCEPTED_GOLD_HASHES, ACCEPTED_QUALIFICATION_HASH } from "./gold-authorization.mjs";
 
 /** Full physical policy, without manufacturing a Data Factory minimum. */
@@ -57,7 +57,7 @@ export function buildGoldPackagePreview(options: {
 }) {
   const { repoRoot } = options;
   const state = JSON.parse(fs.readFileSync(path.join(repoRoot, "governance/GHARIBO_MASTER_STATE.json"), "utf8"));
-  if (!isAcceptedGoldPreviewState(state)) {
+  if (!isAcceptedGoldGovernanceState(state)) {
     throw new Error("Gold preview requires exact legacy preauthorization or DEC-0025 binding and NOT_STARTED / unissued state");
   }
   const source = loadGovernedGoldSource(options.dataDir ?? path.join(repoRoot,

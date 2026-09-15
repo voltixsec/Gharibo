@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -20,9 +20,9 @@ vi.mock("@/lib/db/index", () => ({ db: () => { throw new Error("SQLite must not 
 
 const repoRoot = path.resolve(__dirname, "../../../..");
 const options = { repoRoot };
-const statePath = path.join(repoRoot, "governance/GHARIBO_MASTER_STATE.json");
 const read = fs.readFileSync;
-const authorizedState = JSON.parse(read(statePath, "utf8"));
+const authorizedState = JSON.parse(execFileSync("git", ["show",
+  "6810a63e42a939858a6cbb2cfb6775c1091adbfe:governance/GHARIBO_MASTER_STATE.json"], { cwd: repoRoot, encoding: "utf8" }));
 function mockGovernanceState(state: any) {
   vi.spyOn(fs, "readFileSync").mockImplementation(((p: any, ...args: any[]) =>
     String(p).endsWith("GHARIBO_MASTER_STATE.json") ? JSON.stringify(state) : (read as any)(p, ...args)) as any);
@@ -51,6 +51,7 @@ function syntheticSource(): gold.GovernedGoldSource {
   };
 }
 
+beforeEach(() => mockGovernanceState(authorizedState));
 afterEach(() => vi.restoreAllMocks());
 
 describe("B3 governed Gold package preview", () => {
