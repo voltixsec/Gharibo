@@ -125,6 +125,114 @@ export function isIssuedGoldState(state) {
   return isAcceptedGoldPreviewState(before);
 }
 
+const ISSUED_PACKAGE =
+  "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2";
+const ISSUED_RUN = "ea6e30f2-ce26-4323-b35a-3436ee867eaf";
+const ISSUANCE_RECEIPT =
+  "878b961f03ba069b82b4eb82530e7ebdfa4f8644ab159beff0a9adc7935f99bd";
+const EXECUTION_READINESS =
+  "EXECUTION_AUTHORIZED_QUEUED_AWAITING_KAGGLE_START";
+
+/** Exact DEC-0026 checkpoint: QUEUED is authorized, RUNNING is not. */
+export function isExecutionAuthorizedGoldState(state) {
+  const training = state?.training;
+  const authorization = training?.authorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  const issuance = training?.issuance;
+  const execution = training?.executionAuthorization;
+
+  if (!execution || !issuance || !authorization ||
+      state?.masterStateVersion !== "1.7.0" ||
+      training?.status !== "NOT_STARTED" ||
+      training?.hasStarted !== false ||
+      state?.currentState?.trainingStatus !== "NOT_STARTED" ||
+      state?.currentState?.trainingHasStarted !== false ||
+      authorization?.status !== EXECUTION_READINESS ||
+      authorization?.packageIssued !== true ||
+      authorization?.runIssued !== true ||
+      authorization?.executionAuthorized !== true ||
+      authorization?.executionStarted !== false ||
+      experiment?.readinessStatus !== EXECUTION_READINESS ||
+      experiment?.runStatus !== "QUEUED" ||
+      experiment?.packageId !== ISSUED_PACKAGE ||
+      experiment?.trainingRunId !== ISSUED_RUN ||
+      issuance?.packageId !== ISSUED_PACKAGE ||
+      issuance?.runId !== ISSUED_RUN ||
+      issuance?.receiptHash !== ISSUANCE_RECEIPT ||
+      issuance?.executionAuthorized !== false ||
+      issuance?.executionStarted !== false ||
+      execution?.status !== "EXECUTION_AUTHORIZED_QUEUED" ||
+      execution?.decisionId !== "DEC-0026" ||
+      execution?.packageId !== ISSUED_PACKAGE ||
+      execution?.runId !== ISSUED_RUN ||
+      execution?.issuanceReceiptHash !== ISSUANCE_RECEIPT ||
+      execution?.authorizedCodeSnapshot !== SNAPSHOT ||
+      execution?.authorizedPreviewPackageId !== PREVIEW ||
+      execution?.recipeHash !== RECIPE ||
+      execution?.qualificationHash !== ACCEPTED_QUALIFICATION_HASH ||
+      execution?.engineFreeze !== FREEZE ||
+      execution?.datasetHash !== ACCEPTED_GOLD_HASHES.dataset ||
+      ["train", "validation", "test"].some(
+        (split) =>
+          execution?.splitHashes?.[split] !== ACCEPTED_GOLD_HASHES[split],
+      ) ||
+      execution?.recordFormat !== "harmony-messages-v1" ||
+      execution?.testUsage !== "HASH_INTEGRITY_ONLY" ||
+      execution?.worker !== "kaggle" ||
+      execution?.fromStatus !== "DRAFT" ||
+      execution?.toStatus !== "QUEUED" ||
+      execution?.executionAuthorized !== true ||
+      execution?.kaggleStartAuthorized !== false ||
+      execution?.executionStarted !== false ||
+      execution?.trainingHasStarted !== false ||
+      !/^[0-9a-f]{64}$/.test(execution?.authorizationHash ?? "")) {
+    return false;
+  }
+
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  const checkpoints = decisions.filter((decision) => decision?.id === "DEC-0026");
+
+  if (checkpoints.length !== 1 ||
+      checkpoints[0].status !== "ACCEPTED" ||
+      checkpoints[0].supersededBy !== null) {
+    return false;
+  }
+
+  const sorted = (value) =>
+    Array.isArray(value)
+      ? value.map(sorted)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.keys(value).sort().map((key) => [key, sorted(value[key])]),
+          )
+        : value;
+
+  const { authorizationHash, ...body } = execution;
+  const computed = createHash("sha256")
+    .update(JSON.stringify(sorted(body)))
+    .digest("hex");
+
+  if (computed !== authorizationHash) return false;
+
+  // Reconstruct the immediately previous issued-but-sealed checkpoint.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.6.0";
+  before.training.authorization.status =
+    "ISSUED_AWAITING_EXPLICIT_EXECUTION_AUTHORIZATION";
+  before.training.authorization.executionAuthorized = false;
+  before.training.authorization.executionStarted = false;
+  before.experiments["GHARIBO-exp-001"].readinessStatus =
+    "ISSUED_AWAITING_EXPLICIT_EXECUTION_AUTHORIZATION";
+  before.experiments["GHARIBO-exp-001"].runStatus = "DRAFT";
+  delete before.training.executionAuthorization;
+
+  return isIssuedGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
-  return isAcceptedGoldPreviewState(state) || isIssuedGoldState(state);
+  return (
+    isAcceptedGoldPreviewState(state) ||
+    isIssuedGoldState(state) ||
+    isExecutionAuthorizedGoldState(state)
+  );
 }

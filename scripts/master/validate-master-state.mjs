@@ -322,8 +322,8 @@ function runChecks(state, rawText) {
     if (t.checkpointsProduced !== 0) fail('training-invariant', 'training.checkpointsProduced must be 0');
     if (t.evaluationResults !== 0) fail('training-invariant', 'training.evaluationResults must be 0');
     for (const [key, e] of Object.entries(state.experiments || {})) {
-      if (e.trainingRunId !== null && !(key === "GHARIBO-exp-001" && isIssuedGoldState(state))) fail('training-invariant', `${key}: trainingRunId must be null`);
-      if (e.packageId !== null && !(key === "GHARIBO-exp-001" && isIssuedGoldState(state))) fail('training-invariant', `${key}: packageId must be null`);
+      if (e.trainingRunId !== null && !(key === "GHARIBO-exp-001" && isAcceptedGoldGovernanceState(state))) fail('training-invariant', `${key}: trainingRunId must be null`);
+      if (e.packageId !== null && !(key === "GHARIBO-exp-001" && isAcceptedGoldGovernanceState(state))) fail('training-invariant', `${key}: packageId must be null`);
       if (e.evaluationStatus !== 'NOT_RUN') fail('training-invariant', `${key}: evaluationStatus must be "NOT_RUN"`);
     }
     for (const m of state.models?.derivedModels || []) {
@@ -331,7 +331,7 @@ function runChecks(state, rawText) {
         fail('training-invariant', `${m.id}: derived model with status ${m.status} is claimed as produced`);
       }
     }
-    if (!failedUnder('training-invariant')) pass('training-invariant', 'training has not started; issued IDs require exact DEC-0025 DRAFT evidence; no evaluation, weights or model artifacts');
+    if (!failedUnder('training-invariant')) pass('training-invariant', 'training has not started; issued/queued IDs require exact governed DEC-0025/DEC-0026 evidence; no evaluation, weights or model artifacts');
   }
 
   // -------------------------------------------------------------- 12. generated markdown sync
@@ -462,7 +462,7 @@ function runChecks(state, rawText) {
   if (state.training?.authorization !== undefined || state.training?.packagePreview ||
       state.experiments?.['GHARIBO-exp-001']?.trainingAuthorized === true) {
     if (!isAcceptedGoldGovernanceState(state)) {
-      fail('gold-preview', 'requires exact legacy preauthorization or valid non-executed DEC-0025 binding');
+      fail('gold-preview', 'requires exact legacy preauthorization, DEC-0025 issuance, or DEC-0026 queued authorization binding');
     }
   }
 
@@ -476,7 +476,7 @@ function runChecks(state, rawText) {
         preview.declaredMinimumRecordsPerSplit !== null || !hash(preview.recipeHash) ||
         preview.qualificationHash !== state.training.qualification?.qualificationHash ||
         preview.engineFreeze !== state.training.engine?.freezeLabel ||
-        (!isIssuedGoldState(state) && (experiment?.packageId !== null || experiment?.trainingRunId !== null)) ||
+        (!isAcceptedGoldGovernanceState(state) && (experiment?.packageId !== null || experiment?.trainingRunId !== null)) ||
         state.training.hasStarted !== false) {
       fail('gold-preview', 'preview must preserve accepted provenance and remain unissued and non-executable');
     }

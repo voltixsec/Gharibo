@@ -1241,12 +1241,15 @@ function gateKaggleDependent(): Gate {
   let qualification: Record<string, unknown> | null = null;
   let previewStateAccepted = false;
   let issuanceAuthorized = false;
+  let executionAuthorized = false;
 
   try {
     const master = JSON.parse(fs.readFileSync(masterStatePath, "utf8"));
     const candidate = master?.training?.qualification;
     previewStateAccepted = isAcceptedGoldGovernanceState(master);
     issuanceAuthorized = master?.experiments?.["GHARIBO-exp-001"]?.trainingAuthorized === true;
+    executionAuthorized =
+      master?.training?.executionAuthorization?.executionAuthorized === true;
 
     if (candidate && typeof candidate === "object") {
       qualification = candidate as Record<string, unknown>;
@@ -1300,12 +1303,14 @@ function gateKaggleDependent(): Gate {
     previewStateAccepted
       ? pending(
           "training execution (not started ? STOP condition)",
-          issuanceAuthorized
-            ? "DEC-0025 issuance binding verified. Any issued run is DRAFT; execution is not authorized and training has not started."
-            : "Qualification does not authorize training. Separate explicit authorization is required.",
+          executionAuthorized
+            ? "DEC-0026 execution authorization verified. Exact issued run is QUEUED; Kaggle start/RUNNING remains sealed and training has not started."
+            : issuanceAuthorized
+              ? "DEC-0025 issuance binding verified. Any issued run is DRAFT; execution is not authorized and training has not started."
+              : "Qualification does not authorize training. Separate explicit authorization is required.",
         )
       : expect("training execution governance binding", false,
-          "Invalid preview/DEC-0025 binding or execution is no longer NOT_STARTED with the exact issuance state."),
+          "Invalid preview/DEC-0025/DEC-0026 binding or execution is no longer NOT_STARTED with the exact governed state."),
   );
 
   checks.push(
