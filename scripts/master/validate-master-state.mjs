@@ -457,6 +457,31 @@ function runChecks(state, rawText) {
     if (!failedUnder('supersession')) pass('supersession', 'supersedes / supersededBy relationships are reciprocal and consistent');
   }
 
+  // Preview metadata is evidence only; it must never issue/authorize an experiment.
+  if (state.training?.packagePreview) {
+    const preview = state.training.packagePreview;
+    const experiment = state.experiments?.['GHARIBO-exp-001'];
+    const hash = (value) => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+    if (preview.status !== 'PREVIEW_ONLY' || preview.persisted !== false ||
+        preview.trainingAuthorized !== false || preview.testUsage !== 'HASH_INTEGRITY_ONLY' ||
+        preview.declaredMinimumRecordsPerSplit !== null || !hash(preview.recipeHash) ||
+        preview.qualificationHash !== state.training.qualification?.qualificationHash ||
+        preview.engineFreeze !== state.training.engine?.freezeLabel ||
+        experiment?.packageId !== null || experiment?.trainingRunId !== null ||
+        experiment?.trainingAuthorized !== false || state.training.hasStarted !== false) {
+      fail('gold-preview', 'preview must preserve accepted provenance and the unissued, unauthorized state');
+    }
+    const evidence = preview.evidence;
+    if (!evidence || !hash(evidence.packageId) || !hash(evidence.sourceFilesHash) ||
+        !hash(evidence.manifestSha256) || !hash(evidence.bundleSha256) || !hash(evidence.checksumsSha256) ||
+        !/^[0-9a-f]{40}$/.test(evidence.gitCommitSha ?? '') ||
+        typeof evidence.workingTreeDirty !== 'boolean' || evidence.independentBuilds !== 2 ||
+        evidence.byteForByteIdentical !== true) {
+      fail('gold-preview', 'preview must record two-build byte-identical evidence with an explicit Git context');
+    }
+    if (!failedUnder('gold-preview')) pass('gold-preview', 'preview evidence is bound to provenance without issuance or authorization');
+  }
+
   // -------------------------------------------------------------- 18. reference path existence
   {
     const checkRefs = (group, id, refs) => {

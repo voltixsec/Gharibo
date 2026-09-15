@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Architecture |
 | **Status** | Frozen |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-09-15 |
 
 > **Incremental design for Milestone 2.** This document is **additive** to the frozen
 > `docs/ARCHITECTURE.md` v1.0.0 (M1). It introduces the Training Package contract, the
@@ -174,6 +174,19 @@ export const TRAINING_WORKERS: readonly TrainingWorker[];                  // re
 ---
 
 ## 3. The Canonical Training Package
+
+### 3.0 Governed Gold preview extension (schema 1.1.0, ADR-0019)
+
+The writer now emits 1.1.0 with explicit `dataset.record_format`. Gold carries its physical
+audit-quarantine policy and a nullable declared minimum, independently of the Data Factory
+policy. `preview` provenance binds the candidate recipe, accepted qualification, current Git
+commit and preview source hash; engine and Gold hashes remain part of the manifest identity.
+`npm run preview:gold` builds twice in memory, compares manifest/bundle/checksum bytes, and
+prints metadata only. TEST is opaque hash-integrity input and is absent from the preview bundle.
+Preview packages cannot be persisted or rendered as executable notebooks. No run or authorization
+is created. [ADR-0019](adr/ADR-0019-governed-gold-package-preview.md) defines this extension;
+`packages/shared/src/types/training-package.ts` defines the complete current types. The original
+1.0.0 examples below document the legacy issued-package contract, which retains its identity.
 
 ### 3.1 TypeScript type (camelCase, in `@gharibo/shared`)
 

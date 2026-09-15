@@ -5,17 +5,21 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Architecture |
 | **Status** | Frozen |
-| **Version** | 1.1.3 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-09-15 |
 | **Project Name** | `gharibo_ai_lab` |
 | **Based On** | `docs/PRD.md` (v1.0.0) |
-| **Extended By** | `docs/ARCHITECTURE_MILESTONE_2.md` (v1.0.0) — M2 zero-cost training pipeline (ADR-0011..0014) |
+| **Extended By** | `docs/ARCHITECTURE_MILESTONE_2.md` (v1.1.0) — M2 pipeline and governed Gold preview (ADR-0011..0014, ADR-0019) |
 
 > **Baseline freeze — 2026-09-14.** This document is the frozen architecture baseline for
 > Milestone 1 (the vertical slice). It reflects what was actually built, not what was planned.
 > From this point, changing it requires an ADR and a version bump per
 > `docs/DOCUMENTATION_GOVERNANCE.md` §5. The countable claims in §2.7 are machine-checked by
 > `npm run docs:validate` — update that block whenever the code changes.
+
+> **v1.2.0 (2026-09-15).** ADR-0019 adds a deterministic, in-memory Gold package preview
+> with explicit recipe/provenance and TEST isolation. The M2 extension is v1.1.0; ADR count is 19.
+> Training and experiment authorization remain closed.
 
 > **v1.1.3 — ADR count moved to 18 (2026-09-14).** ADR-0018 (real model-compatibility qualification
 > before the engine freeze) was accepted. It extends the qualification contract to a second part that
@@ -329,7 +333,7 @@ change with it** — that is what keeps the frozen baseline honest.
 | api_handlers | 53 |
 | sqlite_tables | 17 |
 | dashboard_pages | 11 |
-| adrs | 18 |
+| adrs | 19 |
 <!-- /docs:facts -->
 
 | Metric | Meaning |

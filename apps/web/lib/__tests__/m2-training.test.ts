@@ -255,12 +255,37 @@ describe("package.ts — content addressing", () => {
 
   it("toManifest is snake_case and self-describing", () => {
     const m = toManifest(makeValidPackage());
-    expect(m).toHaveProperty("schema_version", "1.0.0");
+    expect(m).toHaveProperty("schema_version", "1.1.0");
     expect(m).toHaveProperty("package_id");
     expect(m).toHaveProperty("base_model_revision");
+    expect((m as any).dataset).toHaveProperty(
+      "record_format",
+      "canonical-record-v1",
+    );
     expect((m as any).dataset).toHaveProperty("split_hashes.train");
     expect((m as any).checkpoint_policy).toHaveProperty("save_strategy", "steps");
     expect((m as any).evaluation_config).toHaveProperty("status", "NOT_RUN");
+  });
+
+  it("preserves legacy 1.0 package content addressing", () => {
+    const current = makeValidPackage();
+
+    const legacy = finalizePackage({
+      ...current,
+      schemaVersion: "1.0.0",
+    });
+
+    const serialized = serializeManifest(legacy);
+
+    expect(serialized).not.toContain("record_format");
+
+    const parsed = parseManifest(serialized);
+
+    expect(parsed.dataset.recordFormat).toBe(
+      "canonical-record-v1",
+    );
+    expect(parsed.packageId).toBe(legacy.packageId);
+    expect(isPackageIdValid(parsed)).toBe(true);
   });
 
   it("computePackageId ignores the stored package_id", () => {
@@ -334,6 +359,22 @@ describe("validate.ts", () => {
     const issues = validatePackage(makeValidPackage());
     expect(hasBlockingErrors(issues)).toBe(false);
     expect(issues.filter((i) => i.level === "ERROR")).toEqual([]);
+  });
+
+  it("rejects an unsupported dataset record format", () => {
+    const base = makeValidPackage();
+
+    const pkg = makeValidPackage({
+      dataset: {
+        ...base.dataset,
+        recordFormat: "unsupported-format" as any,
+      },
+    });
+
+    const issues = validatePackage(pkg);
+
+    expect(hasBlockingErrors(issues)).toBe(true);
+    expect(formatIssues(issues)).toContain("dataset.record_format");
   });
 
   it("rejects a package whose package_id was tampered with", () => {

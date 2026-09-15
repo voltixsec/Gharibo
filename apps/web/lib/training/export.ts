@@ -19,7 +19,10 @@ import type {
   TrainingRun,
   TrainingWorkerId,
 } from "@gharibo/shared";
-import { HttpError } from "@gharibo/shared";
+import {
+  HttpError,
+  TRAINING_PACKAGE_SCHEMA_VERSION,
+} from "@gharibo/shared";
 import {
   canonicalLine,
   datasetHashFromLines,
@@ -223,6 +226,7 @@ export function buildPackageForRun(opts: BuildPackageOptions): BuildPackageResul
 
   const datasetRef: DatasetRef = {
     datasetId: version.id,
+    recordFormat: "canonical-record-v1",
     datasetVersion: version.version,
     datasetVersionId: computedHash,
     datasetHash: computedHash,
@@ -236,7 +240,7 @@ export function buildPackageForRun(opts: BuildPackageOptions): BuildPackageResul
   };
 
   const draft = {
-    schemaVersion: "1.0.0",
+    schemaVersion: TRAINING_PACKAGE_SCHEMA_VERSION,
     experimentId: opts.experimentId,
     gitCommitSha: resolveGitCommitSha(),
     baseModel: BASE_MODEL_IDENTITY,

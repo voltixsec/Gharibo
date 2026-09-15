@@ -72,13 +72,16 @@ export const trainingPackagesRepository = {
     bundlePath: string | null;
     workerId?: string;
   }): TrainingPackageRow {
+    const parsed = safeJsonParse<Record<string, unknown>>(input.manifest, {});
+    if (Object.prototype.hasOwnProperty.call(parsed, "preview")) {
+      throw new Error("PREVIEW packages cannot be persisted or issued");
+    }
     const id = computePackageIdFromManifest(input.manifest);
 
     // Packages are immutable: an identical content address is a no-op (never replaced).
     const existing = this.get(id);
     if (existing) return existing;
 
-    const parsed = safeJsonParse<Record<string, unknown>>(input.manifest, {});
     const schemaVersion =
       typeof parsed.schema_version === "string" ? parsed.schema_version : TRAINING_PACKAGE_SCHEMA_VERSION;
     const ts = now();

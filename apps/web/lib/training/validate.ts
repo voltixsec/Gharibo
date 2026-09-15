@@ -66,6 +66,7 @@ export function validatePackage(
     ["loader_model_id", pkg.loaderModelId],
     ["created_at", pkg.createdAt],
     ["dataset.dataset_id", pkg.dataset.datasetId],
+    ["dataset.record_format", pkg.dataset.recordFormat],
     ["dataset.dataset_version", pkg.dataset.datasetVersion],
     ["dataset.dataset_version_id", pkg.dataset.datasetVersionId],
     ["dataset.dataset_hash", pkg.dataset.datasetHash],
@@ -111,12 +112,54 @@ export function validatePackage(
     }
   }
 
-  // --- Rule 5: no split below minimum_records_per_split (needs ctx) ---
+  // Dataset physical representation must be explicit.
+  if (
+    pkg.dataset.recordFormat !== "canonical-record-v1" &&
+    pkg.dataset.recordFormat !== "harmony-messages-v1"
+  ) {
+    err(
+      "dataset.record_format",
+      'record_format must be "canonical-record-v1" or "harmony-messages-v1"',
+    );
+  }
+
+  const policy = pkg.dataset.splitPolicy;
+  const gold = policy.algorithm === "seeded-sha256-content-hash-with-audit-quarantine";
+  if (gold !== (pkg.dataset.recordFormat === "harmony-messages-v1")) {
+    err("dataset.split_policy", "Record format and split algorithm disagree");
+  }
+  if (!gold && policy.algorithm !== "seeded-shuffle-sha256") {
+    err("dataset.split_policy", "Unsupported split algorithm");
+  }
+  const minimum = policy.minimumRecordsPerSplit;
+  if (!(gold && minimum === null) &&
+      (typeof minimum !== "number" || !Number.isInteger(minimum) || minimum < 1)) {
+    err("split_policy.minimum_records_per_split", "A declared minimum must be a positive integer");
+  }
+  if (gold && (policy.testHeldOut !== true || !policy.testPolicy ||
+      !policy.method || !policy.lineHashAlgorithm || !policy.splitHashAlgorithm ||
+      policy.auditQuarantine?.testAudited !== 0 ||
+      JSON.stringify(policy.auditQuarantine?.quarantinedInto) !== '["train","validation"]')) {
+    err("dataset.split_policy", "Gold requires its physical policy and TEST audit quarantine");
+  }
+  if (pkg.schemaVersion === "1.0.0" && (gold || pkg.preview)) {
+    err("schema_version", "Gold and preview provenance require schema 1.1.0");
+  }
+  if (pkg.preview && (pkg.preview.status !== "PREVIEW" ||
+      pkg.preview.trainingAuthorized !== false || pkg.preview.trainingHasStarted !== false ||
+      pkg.preview.testUsage !== "HASH_INTEGRITY_ONLY" ||
+      !isSha256Hex(pkg.preview.qualificationHash) || !isSha256Hex(pkg.preview.recipeHash) ||
+      !isSha256Hex(pkg.preview.sourceFilesHash) || !isGitSha(pkg.gitCommitSha) ||
+      typeof pkg.preview.workingTreeDirty !== "boolean")) {
+    err("preview", "Invalid or executable preview provenance");
+  }
+
+  // --- Rule 5: nonempty splits and any physically declared minimum (needs ctx) ---
   if (ctx.splitCounts) {
     const min = pkg.dataset.splitPolicy.minimumRecordsPerSplit;
     for (const name of ["train", "validation", "test"] as const) {
       const count = ctx.splitCounts[name];
-      if (!isNumber(count) || count < min) {
+      if (!Number.isInteger(count) || count < 1 || (min !== null && count < min)) {
         err(
           `split_policy.${name}`,
           `Split "${name}" has ${count ?? "?"} record(s), below minimum_records_per_split=${min}`,

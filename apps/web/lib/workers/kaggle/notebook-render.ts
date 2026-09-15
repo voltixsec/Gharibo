@@ -68,6 +68,7 @@ function toLines(source: string): string[] {
 
 /** Renders the deterministic notebook for a package. */
 export function renderNotebook(pkg: TrainingPackage): NotebookArtifact {
+  if (pkg.preview) throw new Error("PREVIEW packages cannot render an executable notebook");
   const template = loadNotebookTemplate();
 
   // The notebook reads snake_case keys, so embed the canonical manifest.

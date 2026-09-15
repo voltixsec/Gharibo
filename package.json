@@ -15,6 +15,7 @@
     "docs:validate": "node scripts/validate-docs.mjs && node scripts/master/validate-master-state.mjs",
     "master:generate": "node scripts/master/generate-master-state.mjs",
     "master:validate": "node scripts/master/validate-master-state.mjs",
+    "preview:gold": "vite-node --config apps/web/vitest.config.ts scripts/training/preview-gold.ts",
     "verify:m2": "node scripts/verify-m2.mjs",
     "verify:m3a": "node scripts/verify-m3a.mjs --check",
     "verify:all": "npm run verify:m2 -- --check && npm run verify:m3a && npm run qualify:check",

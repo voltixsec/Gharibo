@@ -193,6 +193,12 @@ export function renderMasterStateMarkdown(state) {
       ['Evaluation results', tr.evaluationResults],
       ['Environment qualification', tr.qualification?.status ?? 'UNRECORDED'],
       ['Qualification hash', tr.qualification?.qualificationHash ?? null],
+      ['Package preview', tr.packagePreview?.status ?? 'NOT_PREPARED'],
+      ['Candidate recipe hash', tr.packagePreview?.recipeHash ?? null],
+      ['Preview evidence package ID', tr.packagePreview?.evidence?.packageId ?? null],
+      ['Preview evidence Git commit', tr.packagePreview?.evidence?.gitCommitSha ?? null],
+      ['Preview evidence working tree dirty', tr.packagePreview?.evidence?.workingTreeDirty ?? null],
+      ['Preview evidence byte-identical builds', tr.packagePreview?.evidence?.independentBuilds ?? null],
       ['Qualification accepted by CTO', tr.qualification?.ctoAccepted ?? false],
       ['Engine freeze',
         tr.engine.freezeLabel

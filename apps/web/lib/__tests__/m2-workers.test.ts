@@ -79,6 +79,22 @@ describe("notebook-render.ts", () => {
     expect(cell0).toContain(PACKAGE_SENTINEL);
   });
 
+  it("supports governed harmony-messages-v1 JSONL records", () => {
+    const template = loadNotebookTemplate();
+
+    const source = template.cells
+      .map((cell) =>
+        Array.isArray(cell.source)
+          ? cell.source.join("")
+          : String(cell.source),
+      )
+      .join("\n");
+
+    expect(source).toContain("harmony-messages-v1");
+    expect(source).toContain("record.get('messages')");
+    expect(source).toContain("tokenizer.apply_chat_template");
+  });
+
   it("renders deterministically (same package → byte-identical content + sha256)", () => {
     const pkg = makeValidPackage();
     const a = renderNotebook(pkg);

@@ -30,6 +30,10 @@ import type {
   TrainingRun,
   VerificationStatus,
 } from "@gharibo/shared";
+
+import {
+  TRAINING_PACKAGE_SCHEMA_VERSION,
+} from "@gharibo/shared";
 import {
   dataFactoryRepository,
   datasetsRepository,
@@ -202,7 +206,9 @@ describe("training-packages repository", () => {
     });
     expect(row.id).toBe(pkg.packageId);
     expect(row.manifestHash).toBe(pkg.packageId);
-    expect(row.schemaVersion).toBe("1.0.0");
+    expect(row.schemaVersion).toBe(
+      TRAINING_PACKAGE_SCHEMA_VERSION,
+    );
   });
 });
 

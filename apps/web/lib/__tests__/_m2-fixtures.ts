@@ -5,6 +5,7 @@
  * every downstream assertion exercises the real serializer/content-addressing.
  */
 import type { DataFactoryRecord, TrainingPackage } from "@gharibo/shared";
+import { TRAINING_PACKAGE_SCHEMA_VERSION } from "@gharibo/shared";
 import {
   BASE_MODEL_IDENTITY,
   BASE_MODEL_REVISION,
@@ -29,7 +30,7 @@ export function fakeHash(seed: string): string {
 /** Builds a valid, finalized Training Package. */
 export function makeValidPackage(overrides: Partial<TrainingPackage> = {}): TrainingPackage {
   const draft: Omit<TrainingPackage, "packageId"> = {
-    schemaVersion: "1.0.0",
+    schemaVersion: TRAINING_PACKAGE_SCHEMA_VERSION,
     experimentId: "GHARIBO-exp-001",
     gitCommitSha: TEST_GIT_SHA,
     baseModel: BASE_MODEL_IDENTITY,
@@ -37,6 +38,7 @@ export function makeValidPackage(overrides: Partial<TrainingPackage> = {}): Trai
     loaderModelId: LOADER_MODEL_ID,
     dataset: {
       datasetId: "ds-001",
+      recordFormat: "canonical-record-v1",
       datasetVersion: "v1",
       datasetVersionId: fakeHash("1"),
       datasetHash: fakeHash("2"),

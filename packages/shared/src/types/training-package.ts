@@ -11,7 +11,7 @@ import type { BenchmarkCategory, ResearchMetric } from "./evaluation";
 import type { SplitHashes, SplitPolicy } from "./dataset";
 
 /** The package contract version this reader/writer supports. */
-export const TRAINING_PACKAGE_SCHEMA_VERSION = "1.0.0";
+export const TRAINING_PACKAGE_SCHEMA_VERSION = "1.1.0";
 
 /**
  * Harmony channels that must NEVER be shown to end users. `analysis` is
@@ -137,28 +137,76 @@ export interface EnvironmentMetadata {
   cuda: string | null;
 }
 
+/**
+ * Physical JSONL representation carried by the package.
+ *
+ * canonical-record-v1:
+ *   canonical Data Factory record JSONL.
+ *
+ * harmony-messages-v1:
+ *   governed Gold JSONL with a top-level messages[] array.
+ *   The physical JSONL lines remain the content identity.
+ */
+export type DatasetRecordFormat =
+  | "canonical-record-v1"
+  | "harmony-messages-v1";
+
+/** Physical Gold policy; absence of a declared minimum is not a zero/default. */
+export interface GovernedGoldPackageSplitPolicy {
+  algorithm: "seeded-sha256-content-hash-with-audit-quarantine";
+  seed: number;
+  ratios: { train: number; validation: number; test: number };
+  minimumRecordsPerSplit: number | null;
+  method: string | null;
+  lineHashAlgorithm: string | null;
+  splitHashAlgorithm: string | null;
+  auditQuarantine: {
+    auditSeed: number | null;
+    auditCohortSize: number | null;
+    quarantinedInto: Array<"train" | "validation">;
+    testAudited: number | null;
+  };
+  testHeldOut: true;
+  testPolicy: string;
+}
+
+/** A preview is never an issued package or permission to execute. */
+export interface PackagePreviewProvenance {
+  status: "PREVIEW";
+  qualificationHash: string;
+  recipeHash: string;
+  sourceFilesHash: string;
+  workingTreeDirty: boolean;
+  trainingAuthorized: false;
+  trainingHasStarted: false;
+  testUsage: "HASH_INTEGRITY_ONLY";
+}
+
 /** The dataset version the package trains on (content-addressed). */
 export interface DatasetRef {
   datasetId: string;
+  /** Physical JSONL representation; part of package identity. */
+  recordFormat: DatasetRecordFormat;
   /** Human version label, e.g. "v1". */
   datasetVersion: string;
   /** Content-addressed id = datasetHash. */
   datasetVersionId: string;
   datasetHash: string;
   splitHashes: SplitHashes;
-  splitPolicy: SplitPolicy;
+  splitPolicy: SplitPolicy | GovernedGoldPackageSplitPolicy;
   recordCount: number;
 }
 
 /** The canonical, immutable, self-describing Training Package (camelCase). */
 export interface TrainingPackage {
-  /** "1.0.0" */
+  /** Current writer emits TRAINING_PACKAGE_SCHEMA_VERSION. */
   schemaVersion: string;
   /** sha256 of the canonical manifest — content address. */
   packageId: string;
   /** e.g. "GHARIBO-exp-001"; immutable. */
   experimentId: string;
   gitCommitSha: string;
+  preview?: PackagePreviewProvenance;
   /** "openai/gpt-oss-20b" (identity / lineage). */
   baseModel: string;
   /** Pinned revision of the base model. */
