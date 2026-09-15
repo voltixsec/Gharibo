@@ -7,18 +7,12 @@ import { TRAINING_PACKAGE_SCHEMA_VERSION } from "@gharibo/shared";
 import { loadGovernedGoldSource, type GovernedGoldSource } from "./governed-gold";
 import { goldCandidateRecipe, goldCandidateRecipeHash } from "./gold-recipe";
 import { canonicalJson, sha256Bytes, sha256Canonical, sha256Hex } from "./hash";
-import { finalizePackage, pinnedEngineConfig, serializeManifest, UNSLOTH_ENGINE_VERSION } from "./package";
+import { finalizePackage, pinnedEngineConfig, serializeManifest } from "./package";
 import { formatIssues, hasBlockingErrors, validatePackage } from "./validate";
 import { createZip } from "./zip";
 
-export const ACCEPTED_GOLD_HASHES = {
-  dataset: "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
-  train: "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2",
-  validation: "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787",
-  test: "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
-};
-export const ACCEPTED_QUALIFICATION_HASH =
-  "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0";
+import { ACCEPTED_GOLD_HASHES, ACCEPTED_QUALIFICATION_HASH, isAcceptedGoldPreviewState } from "./gold-authorization.mjs";
+export { ACCEPTED_GOLD_HASHES, ACCEPTED_QUALIFICATION_HASH } from "./gold-authorization.mjs";
 
 /** Full physical policy, without manufacturing a Data Factory minimum. */
 export function goldDatasetRef(source: GovernedGoldSource): DatasetRef {
@@ -41,6 +35,7 @@ export function previewGitContext(repoRoot: string) {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
   }).trim();
   const sourcePaths = [
+    "apps/web/lib/training/gold-authorization.mjs",
     "apps/web/lib/training/gold-preview.ts", "apps/web/lib/training/gold-recipe.ts",
     "apps/web/lib/training/governed-gold.ts", "apps/web/lib/training/package.ts",
     "apps/web/lib/training/validate.ts", "apps/web/lib/training/hash.ts",
@@ -62,16 +57,8 @@ export function buildGoldPackagePreview(options: {
 }) {
   const { repoRoot } = options;
   const state = JSON.parse(fs.readFileSync(path.join(repoRoot, "governance/GHARIBO_MASTER_STATE.json"), "utf8"));
-  const experiment = state.experiments["GHARIBO-exp-001"];
-  if (state.training.hasStarted !== false || state.training.status !== "NOT_STARTED" ||
-      state.currentState.trainingHasStarted !== false || state.currentState.trainingStatus !== "NOT_STARTED" ||
-      experiment.trainingAuthorized !== false || experiment.trainingRunId !== null || experiment.packageId !== null ||
-      state.training.qualification.ctoAccepted !== true ||
-      state.training.qualification.qualificationHash !== ACCEPTED_QUALIFICATION_HASH ||
-      state.training.engine.freezeApplied !== true ||
-      state.training.engine.freezeSourceQualificationHash !== ACCEPTED_QUALIFICATION_HASH ||
-      state.training.engine.freezeLabel !== UNSLOTH_ENGINE_VERSION) {
-    throw new Error("Gold preview requires the accepted qualification/freeze and NOT_AUTHORIZED / NOT_STARTED state");
+  if (!isAcceptedGoldPreviewState(state)) {
+    throw new Error("Gold preview requires exact legacy preauthorization or DEC-0025 binding and NOT_STARTED / unissued state");
   }
   const source = loadGovernedGoldSource(options.dataDir ?? path.join(repoRoot,
     "data/processed/gharibo-research-gold-v0.1"));
@@ -109,7 +96,7 @@ export function buildGoldPackagePreview(options: {
     file("recipe.json", canonicalJson(recipe)),
     file("dataset/train.jsonl", source.contents.train.join("\n") + "\n"),
     file("dataset/validation.jsonl", source.contents.validation.join("\n") + "\n"),
-    file("PREVIEW.txt", "PREVIEW ONLY\nGHARIBO-exp-001 NOT AUTHORIZED\nTRAINING HAS NOT STARTED\nTEST: hash integrity only; no payload included.\n"),
+    file("PREVIEW.txt", "PREVIEW ONLY\nTHIS PREVIEW DOES NOT AUTHORIZE ISSUANCE OR EXECUTION\nTRAINING HAS NOT STARTED\nTEST: hash integrity only; no payload included.\n"),
   ].sort((a, b) => a.relativePath < b.relativePath ? -1 : 1);
   const checksums = files.map((f) => `${f.sha256}  ${f.relativePath}`).join("\n") + "\n";
   files.push(file("CHECKSUMS.sha256", checksums));

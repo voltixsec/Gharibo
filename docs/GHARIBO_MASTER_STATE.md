@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.4.0 |
+| **Version** | 1.5.0 |
 | **Last Updated** | 2026-09-15 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | NOT_STARTED |
 | Training invariant | TRAINING HAS NOT STARTED |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | M3C remains COMPLETE. Bridge A+B3 prepares an explicit Gold candidate recipe and deterministic in-memory package preview bound to the accepted qualification and freeze. No issued package, run, authorization or training is created. GHARIBO-exp-001 still requires separate explicit CTO authorization before execution. |
+| Blocker summary | GHARIBO-exp-001 is explicitly authorized to proceed from the governed PREVIEW_ONLY state to immutable Training Package / Training Run issuance using the exact authorized snapshot and identities recorded in DEC-0025. No package or run has yet been issued and TRAINING HAS NOT STARTED. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -70,16 +70,22 @@
 | Environment qualification | QUALIFIED |
 | Qualification hash | 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 |
 | Package preview | PREVIEW_ONLY |
+| Authorization status | AUTHORIZED_AWAITING_PACKAGE_ISSUANCE |
+| Authorization decision | DEC-0025 |
+| Authorized code snapshot | ad1e011c55729f5447b324d35b4ad88d0a47d10f |
+| Authorized preview package ID | f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c |
+| Authorized recipe hash | c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd |
+| Authorization execution started | false |
 | Candidate recipe hash | c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd |
-| Preview evidence package ID | 3bbe5626119fa5f8d58a362f722775a0cc3a5a019e8bc5a5324bb033cb1faa76 |
-| Preview evidence Git commit | 29efdff8c337d280fd845cdd4a6b7ffd5b03e6a7 |
+| Historical preview evidence package ID | 3bbe5626119fa5f8d58a362f722775a0cc3a5a019e8bc5a5324bb033cb1faa76 |
+| Historical preview evidence Git commit | 29efdff8c337d280fd845cdd4a6b7ffd5b03e6a7 |
 | Preview evidence working tree dirty | true |
 | Preview evidence byte-identical builds | 2 |
 | Qualification accepted by CTO | true |
 | Engine freeze | unsloth-freeze-2026.09.15 (applied) |
 | Executed harness content address | 8dc7b26363b82b25522ebcfa128da6cccdbbc3699aed65bb0ae3e60d4d9ee50a |
 | Post-freeze harness content address | e7ff550c0c2e174a20a52d0a8f64ac78356cb63e4b699fb5b1e5ea92d1eb80dc |
-| Experiment authorized | false |
+| Experiment authorized | true |
 
 ## Datasets
 
@@ -116,7 +122,7 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | — | NOT_RUN | ENV_QUALIFIED_AWAITING_EXPLICIT_AUTHORIZATION | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | — | NOT_RUN | AUTHORIZED_AWAITING_PACKAGE_ISSUANCE | 9/12 | GHARIBO-V0.1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** Promotion requires at least one evaluation result and a training-run reference; neither exists.
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -317,6 +323,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0022 | 2026-09-14 | CTO governance corrections: TRAIN-ONLY fixture, generic GPU, output hygiene, no auto-freeze | ACCEPTED | `docs/adr/ADR-0018-real-model-compatibility-qualification.md` |
 | DEC-0023 | 2026-09-15 | Accept Kaggle v6 qualification and apply the measured engine freeze | ACCEPTED | `docs/adr/ADR-0018-real-model-compatibility-qualification.md` |
 | DEC-0024 | 2026-09-15 | Governed physical Gold package preview with explicit candidate recipe | ACCEPTED | `docs/adr/ADR-0019-governed-gold-package-preview.md` |
+| DEC-0025 | 2026-09-15 | Explicitly authorize GHARIBO-exp-001 for immutable package and run issuance | ACCEPTED | `docs/adr/ADR-0019-governed-gold-package-preview.md` |
 
 ## Validation
 
@@ -367,9 +374,9 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Recompute the non-executable Gold preview on the current clean commit with npm run preview:gold and review its candidate identity before any separately governed authorization. The committed evidence is explicitly a pre-checkpoint preview; its Git commit and dirty flag are recorded. No training execution is part of preview verification. | M3C COMPLETE | docs/ENV_QUALIFICATION_CONTRACT.md, docs/ARCHITECTURE_MILESTONE_2.md, docs/adr/ADR-0019-governed-gold-package-preview.md |
-| ACT-0002 | P0 | Issue a separate explicit governed CTO authorization for GHARIBO-exp-001 only after the final Training Package identity and pre-execution invariants are verified. | ACT-0001, CTO authorization | docs/TRAINING_STRATEGY.md, docs/MODEL_REGISTRY.md |
-| ACT-0003 | P1 | Only after ACT-0002 is explicitly accepted, execute STAGE-1 (GHARIBO-exp-001) on the approved free Kaggle worker and preserve its immutable run/package/result identities. | ACT-0002 | docs/TRAINING_STRATEGY.md, docs/ARCHITECTURE_MILESTONE_2.md |
+| ACT-0001 | P0 | Issue one immutable GHARIBO-exp-001 Training Package and Training Run from DEC-0025 using the authorized code snapshot, recipe, Gold identity, qualification and engine freeze. Issuance only; do not execute training. | DEC-0025 | docs/TRAINING_STRATEGY.md, docs/adr/ADR-0019-governed-gold-package-preview.md |
+| ACT-0002 | P0 | Verify the issued package/run identities against DEC-0025, including dataset/split hashes, recipe hash, qualification hash, engine freeze, authorized code snapshot and TEST holdout policy. | ACT-0001 | docs/TRAINING_STRATEGY.md, docs/ENV_QUALIFICATION_CONTRACT.md |
+| ACT-0003 | P0 | Only after ACT-0002 passes, launch GHARIBO-exp-001 on the approved free Kaggle worker. Preserve immutable package/run/result identities and do not access TEST beyond its governed integrity policy. | ACT-0002, explicit execution step | docs/TRAINING_STRATEGY.md, docs/ARCHITECTURE_MILESTONE_2.md |
 
 ## History
 
@@ -380,6 +387,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.2.0 | 2026-09-14 | CTO governance corrections to the M3C qualification harness: TRAIN-ONLY fixture (only train.jsonl attached), generic GPU detection (no hardcoded T4 x2), output hygiene guard, and no auto-freeze enforcement. Bumped harness to v2.1.0 and contract doc to v1.4.0. | — | PENDING_CHECKPOINT |
 | 1.3.0 | 2026-09-15 | M3C closure: accepted the real Kaggle v6 qualification artifact, applied the measured engine freeze, recorded qualification provenance and safety evidence, closed the two environment/model-compatibility blockers, and moved GHARIBO-exp-001 to qualified-but-not-authorized. Training has not started. | — | PENDING_CHECKPOINT |
 | 1.4.0 | 2026-09-15 | Bridge A+B3: explicit candidate recipe, physical Gold policy and deterministic in-memory package preview. TEST remains hash-integrity-only. Training and authorization remain closed. | — | PENDING_CHECKPOINT |
+| 1.5.0 | 2026-09-15 | Explicit GHARIBO-exp-001 authorization checkpoint: bound package/run issuance to the verified code snapshot, deterministic preview, recipe, qualification, engine freeze and Gold identities. No package/run was issued and training remains NOT_STARTED. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -444,4 +452,15 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - added two-build in-memory preview and execution/persistence rejection
 - kept experiment packageId/trainingRunId null and trainingAuthorized=false
 - The containing commit cannot embed its own SHA. Stored preview evidence references baseline HEAD with workingTreeDirty=true; recompute after checkpoint for the clean-commit identity.
+- Training executed: false
+
+**1.5.0 — changes**
+- added DEC-0025 explicit issuance authorization
+- authorized code snapshot ad1e011c55729f5447b324d35b4ad88d0a47d10f
+- authorized preview package identity f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c
+- authorized recipe hash c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd
+- set GHARIBO-exp-001 trainingAuthorized=true
+- kept packageId/trainingRunId null
+- kept training execution NOT_STARTED
+- The authorization commit cannot be its own authorized executable snapshot. DEC-0025 intentionally authorizes snapshot ad1e011c55729f5447b324d35b4ad88d0a47d10f; the containing governance checkpoint receives a later Git SHA.
 - Training executed: false

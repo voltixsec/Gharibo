@@ -30,6 +30,7 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isAcceptedGoldPreviewState } from '../../apps/web/lib/training/gold-authorization.mjs';
 import { renderMasterStateMarkdown } from './generate-master-state.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -457,6 +458,14 @@ function runChecks(state, rawText) {
     if (!failedUnder('supersession')) pass('supersession', 'supersedes / supersededBy relationships are reciprocal and consistent');
   }
 
+  // Check the transition even if preview metadata has been removed.
+  if (state.training?.authorization !== undefined || state.training?.packagePreview ||
+      state.experiments?.['GHARIBO-exp-001']?.trainingAuthorized === true) {
+    if (!isAcceptedGoldPreviewState(state)) {
+      fail('gold-preview', 'requires exact legacy preauthorization or valid non-executed DEC-0025 binding');
+    }
+  }
+
   // Preview metadata is evidence only; it must never issue/authorize an experiment.
   if (state.training?.packagePreview) {
     const preview = state.training.packagePreview;
@@ -468,9 +477,10 @@ function runChecks(state, rawText) {
         preview.qualificationHash !== state.training.qualification?.qualificationHash ||
         preview.engineFreeze !== state.training.engine?.freezeLabel ||
         experiment?.packageId !== null || experiment?.trainingRunId !== null ||
-        experiment?.trainingAuthorized !== false || state.training.hasStarted !== false) {
-      fail('gold-preview', 'preview must preserve accepted provenance and the unissued, unauthorized state');
+        state.training.hasStarted !== false) {
+      fail('gold-preview', 'preview must preserve accepted provenance and remain unissued and non-executable');
     }
+
     const evidence = preview.evidence;
     if (!evidence || !hash(evidence.packageId) || !hash(evidence.sourceFilesHash) ||
         !hash(evidence.manifestSha256) || !hash(evidence.bundleSha256) || !hash(evidence.checksumsSha256) ||

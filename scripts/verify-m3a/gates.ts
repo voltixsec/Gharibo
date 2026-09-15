@@ -42,6 +42,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+import { isAcceptedGoldPreviewState } from "@/lib/training/gold-authorization.mjs";
 import { canonicalJson, sha256Canonical, sha256Hex } from "@/lib/training/hash";
 import {
   CANONICAL_RECORD_FIELDS,
@@ -1238,10 +1239,14 @@ function gateKaggleDependent(): Gate {
   );
 
   let qualification: Record<string, unknown> | null = null;
+  let previewStateAccepted = false;
+  let issuanceAuthorized = false;
 
   try {
     const master = JSON.parse(fs.readFileSync(masterStatePath, "utf8"));
     const candidate = master?.training?.qualification;
+    previewStateAccepted = isAcceptedGoldPreviewState(master);
+    issuanceAuthorized = master?.experiments?.["GHARIBO-exp-001"]?.trainingAuthorized === true;
 
     if (candidate && typeof candidate === "object") {
       qualification = candidate as Record<string, unknown>;
@@ -1276,7 +1281,6 @@ function gateKaggleDependent(): Gate {
     qualification?.autoFreezeApplied === false &&
     qualification?.manualFreezeApplied === true &&
     qualification?.freezeApplied === true &&
-    qualification?.experimentAuthorized === false &&
     /^[0-9a-f]{64}$/.test(qualificationHash) &&
     /^[0-9a-f]{64}$/.test(executedHarness);
 
@@ -1293,10 +1297,15 @@ function gateKaggleDependent(): Gate {
   );
 
   checks.push(
-    pending(
-      "training execution (not started ? STOP condition)",
-      "No training has been executed. Qualification and dependency freeze do not authorize training; GHARIBO-exp-001 requires a separate explicit CTO authorization.",
-    ),
+    previewStateAccepted
+      ? pending(
+          "training execution (not started ? STOP condition)",
+          issuanceAuthorized
+            ? "DEC-0025 authorizes issuance only. No package/run is issued; training has not started."
+            : "Qualification does not authorize training. Separate explicit authorization is required.",
+        )
+      : expect("training execution governance binding", false,
+          "Invalid preview/DEC-0025 binding or execution is no longer NOT_STARTED and unissued."),
   );
 
   checks.push(

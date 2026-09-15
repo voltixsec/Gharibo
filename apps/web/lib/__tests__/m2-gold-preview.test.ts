@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
+import * as recipeModule from "@/lib/training/gold-recipe";
+import { isAcceptedGoldPreviewState } from "@/lib/training/gold-authorization.mjs";
 import * as gold from "@/lib/training/governed-gold";
 import { goldCandidateRecipe, goldCandidateRecipeHash } from "@/lib/training/gold-recipe";
 import { ACCEPTED_GOLD_HASHES, buildGoldPackagePreview, goldDatasetRef,
@@ -17,6 +20,13 @@ vi.mock("@/lib/db/index", () => ({ db: () => { throw new Error("SQLite must not 
 
 const repoRoot = path.resolve(__dirname, "../../../..");
 const options = { repoRoot };
+const statePath = path.join(repoRoot, "governance/GHARIBO_MASTER_STATE.json");
+const read = fs.readFileSync;
+const authorizedState = JSON.parse(read(statePath, "utf8"));
+function mockGovernanceState(state: any) {
+  vi.spyOn(fs, "readFileSync").mockImplementation(((p: any, ...args: any[]) =>
+    String(p).endsWith("GHARIBO_MASTER_STATE.json") ? JSON.stringify(state) : (read as any)(p, ...args)) as any);
+}
 
 /** Synthetic reader output: production physical verification is covered separately. */
 function syntheticSource(): gold.GovernedGoldSource {
@@ -74,6 +84,9 @@ describe("B3 governed Gold package preview", () => {
     vi.spyOn(gold, "loadGovernedGoldSource").mockReturnValue(syntheticSource());
     const preview = buildGoldPackagePreview(options);
     const parsed = policy.parseManifest(preview.manifest);
+    expect(authorizedState.experiments["GHARIBO-exp-001"].trainingAuthorized).toBe(true);
+    expect(parsed.preview).toMatchObject({ trainingAuthorized: false, trainingHasStarted: false,
+      testUsage: "HASH_INTEGRITY_ONLY" });
     expect(parsed).toEqual(preview.pkg);
     expect(policy.serializeManifest(parsed)).toBe(preview.manifest);
     expect(policy.computePackageIdFromManifest(preview.manifest)).toBe(preview.pkg.packageId);
@@ -122,19 +135,69 @@ describe("B3 governed Gold package preview", () => {
     expect(() => buildGoldPackagePreview(options)).toThrow(/accepted content hashes/);
   });
 
-  it("rejects changed qualification or authorization state", () => {
-    const read = fs.readFileSync;
-    for (const mutation of [
-      (s: any) => { s.training.qualification.qualificationHash = "0".repeat(64); },
-      (s: any) => { s.experiments["GHARIBO-exp-001"].trainingAuthorized = true; },
-    ]) {
-      const state = JSON.parse(read(path.join(repoRoot, "governance/GHARIBO_MASTER_STATE.json"), "utf8"));
+  it("rejects partial, altered or executed DEC-0025 states before reading data", () => {
+    const changed = (value: unknown) => typeof value === "boolean" ? !value : "changed";
+    const mutations: ((s: any) => void)[] = [];
+    for (const field of Object.keys(authorizedState.training.authorization).filter((f) => f !== "note")) {
+      if (field === "splitHashes") {
+        for (const split of ["train", "validation", "test"]) {
+          mutations.push((s) => { s.training.authorization.splitHashes[split] = "0".repeat(64); });
+        }
+      } else {
+        mutations.push((s) => { s.training.authorization[field] = changed(s.training.authorization[field]); });
+        mutations.push((s) => { delete s.training.authorization[field]; });
+      }
+    }
+    for (const field of ["trainingAuthorized", "readinessStatus", "authorizationDecisionId",
+      "authorizedCodeSnapshot", "authorizedPreviewPackageId", "recipeHash",
+      "authorizationQualificationHash", "authorizationEngineFreeze", "packageId", "trainingRunId"]) {
+      mutations.push((s) => { s.experiments["GHARIBO-exp-001"][field] = changed(s.experiments["GHARIBO-exp-001"][field]); });
+    }
+    mutations.push(
+      (s) => { delete s.training.authorization; },
+      (s) => { s.decisions = s.decisions.filter((d: any) => d.id !== "DEC-0025"); },
+      (s) => { s.decisions.find((d: any) => d.id === "DEC-0025").status = "PROPOSED"; },
+      (s) => { s.training.qualification.qualificationHash = "0".repeat(64); },
+      (s) => { s.training.qualification.experimentAuthorized = false; },
+      (s) => { s.training.qualification.trainingLoopExecuted = true; },
+      (s) => { s.training.engine.freezeLabel = "changed"; },
+      (s) => { s.training.packagePreview.recipeHash = "0".repeat(64); },
+      (s) => { s.training.packagePreview.testUsage = "TUNING"; },
+      (s) => { s.training.packagePreview.persisted = true; },
+      (s) => { s.training.packagePreview.trainingAuthorized = true; },
+      (s) => { delete s.training.packagePreview; },
+      (s) => { s.training.hasStarted = true; },
+      (s) => { s.training.status = "RUNNING"; },
+      (s) => { s.currentState.trainingHasStarted = true; },
+      (s) => { s.currentState.trainingStatus = "RUNNING"; },
+    );
+    for (const mutation of mutations) {
+      const state = structuredClone(authorizedState);
       mutation(state);
-      vi.spyOn(fs, "readFileSync").mockImplementation(((p: any, ...args: any[]) =>
-        String(p).endsWith("GHARIBO_MASTER_STATE.json") ? JSON.stringify(state) : (read as any)(p, ...args)) as any);
-      expect(() => buildGoldPackagePreview(options)).toThrow(/NOT_AUTHORIZED/);
+      mockGovernanceState(state);
+      const reader = vi.spyOn(gold, "loadGovernedGoldSource");
+      expect(isAcceptedGoldPreviewState(state)).toBe(false);
+      expect(() => buildGoldPackagePreview(options)).toThrow(/DEC-0025/);
+      expect(reader).not.toHaveBeenCalled();
       vi.restoreAllMocks();
     }
+  });
+
+  it("still accepts the exact legacy preauthorization snapshot", () => {
+    const legacy = JSON.parse(execFileSync("git", ["show",
+      "ad1e011c55729f5447b324d35b4ad88d0a47d10f:governance/GHARIBO_MASTER_STATE.json"],
+    { cwd: repoRoot, encoding: "utf8" }));
+    mockGovernanceState(legacy);
+    vi.spyOn(gold, "loadGovernedGoldSource").mockReturnValue(syntheticSource());
+    expect(buildGoldPackagePreview(options).pkg.preview?.trainingAuthorized).toBe(false);
+    legacy.experiments["GHARIBO-exp-001"].trainingAuthorized = true;
+    expect(() => buildGoldPackagePreview(options)).toThrow(/DEC-0025/);
+  });
+
+  it("rejects changed runtime recipe bytes after authorization", () => {
+    vi.spyOn(gold, "loadGovernedGoldSource").mockReturnValue(syntheticSource());
+    vi.spyOn(recipeModule, "goldCandidateRecipeHash").mockReturnValue("0".repeat(64));
+    expect(() => buildGoldPackagePreview(options)).toThrow(/recipe identity/);
   });
 
   it("binds recipe, qualification, source bytes and commit to the package identity", () => {
@@ -164,6 +227,9 @@ describe("B3 governed Gold package preview", () => {
     source.splitPolicy.declaredMinimumRecordsPerSplit = -1;
     const invalid = policy.finalizePackage({ ...pkg, dataset: goldDatasetRef(source) });
     expect(hasBlockingErrors(validatePackage(invalid))).toBe(true);
+    const badTestPolicy = structuredClone(pkg);
+    badTestPolicy.preview!.testUsage = "TUNING" as any;
+    expect(hasBlockingErrors(validatePackage(badTestPolicy))).toBe(true);
     const wire = JSON.parse(manifest);
     delete wire.dataset.record_format;
     expect(hasBlockingErrors(validatePackage(policy.parseManifest(JSON.stringify(wire))))).toBe(true);

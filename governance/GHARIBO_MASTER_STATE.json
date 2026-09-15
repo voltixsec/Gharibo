@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.4.0",
+  "masterStateVersion": "1.5.0",
   "updatedAt": "2026-09-15",
   "project": {
     "id": "GHARIBO",
@@ -19,7 +19,7 @@
     "trainingInvariant": "TRAINING HAS NOT STARTED",
     "currentMilestone": "M3C",
     "milestoneStatus": "COMPLETE",
-    "blockerSummary": "M3C remains COMPLETE. Bridge A+B3 prepares an explicit Gold candidate recipe and deterministic in-memory package preview bound to the accepted qualification and freeze. No issued package, run, authorization or training is created. GHARIBO-exp-001 still requires separate explicit CTO authorization before execution.",
+    "blockerSummary": "GHARIBO-exp-001 is explicitly authorized to proceed from the governed PREVIEW_ONLY state to immutable Training Package / Training Run issuance using the exact authorized snapshot and identities recorded in DEC-0025. No package or run has yet been issued and TRAINING HAS NOT STARTED.",
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
       "exampleCount": 800,
@@ -536,6 +536,27 @@
       "supersedes": null,
       "supersededBy": null,
       "architectureChanging": true
+    },
+    {
+      "id": "DEC-0025",
+      "date": "2026-09-15",
+      "title": "Explicitly authorize GHARIBO-exp-001 for immutable package and run issuance",
+      "status": "ACCEPTED",
+      "decision": "Authorize GHARIBO-exp-001 to proceed from PREVIEW_ONLY preparation to immutable Training Package and Training Run issuance using code snapshot ad1e011c55729f5447b324d35b4ad88d0a47d10f, preview identity f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c, recipe hash c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd, accepted qualification 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0, engine freeze unsloth-freeze-2026.09.15, and the governed Gold dataset/split identities. This authorization does not itself issue a package or run and does not execute training.",
+      "rationale": "The user, acting as CTO and decision authority, explicitly authorized completion of DEC-0025 while prohibiting package/run issuance and execution in this checkpoint. The deterministic preview, recipe, real-Kaggle qualification, measured engine freeze, Gold identity and execution/persistence guards have all been verified. Authorization is therefore granted for issuance only while preserving a separate execution boundary.",
+      "scope": [
+        "training",
+        "experiments",
+        "roadmap"
+      ],
+      "references": [
+        "docs/TRAINING_STRATEGY.md",
+        "docs/adr/ADR-0019-governed-gold-package-preview.md",
+        "governance/GHARIBO_MASTER_STATE.json"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
     }
   ],
   "roadmap": {
@@ -720,7 +741,7 @@
       "manualFreezeApplied": true,
       "freezeApplied": true,
       "freezeLabel": "unsloth-freeze-2026.09.15",
-      "experimentAuthorized": false,
+      "experimentAuthorized": true,
       "engineDependencyCount": 12,
       "packageResolvedEngineDependencies": 9,
       "environmentPreservedDependencies": [
@@ -754,8 +775,31 @@
         "checksumsSha256": "498d85712b1aea145026a9f9321d8dab4aa058058abf67fad370ca66166365b9",
         "independentBuilds": 2,
         "byteForByteIdentical": true,
-        "scope": "PRE_CHECKPOINT_WORKING_TREE; recompute on clean HEAD after commit"
+        "scope": "HISTORICAL_PRE_CHECKPOINT_WORKING_TREE at baseline 29efdff8c337d280fd845cdd4a6b7ffd5b03e6a7; not the DEC-0025 authorized preview. Current verification previews retain their actual Git/source identity."
       }
+    },
+    "authorization": {
+      "status": "AUTHORIZED_AWAITING_PACKAGE_ISSUANCE",
+      "decisionId": "DEC-0025",
+      "authorizedAt": "2026-09-15",
+      "scope": "PACKAGE_AND_RUN_ISSUANCE_ONLY",
+      "authorizedCodeSnapshot": "ad1e011c55729f5447b324d35b4ad88d0a47d10f",
+      "authorizedPreviewPackageId": "f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c",
+      "recipeHash": "c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd",
+      "qualificationHash": "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0",
+      "engineFreeze": "unsloth-freeze-2026.09.15",
+      "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+      "splitHashes": {
+        "train": "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2",
+        "validation": "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787",
+        "test": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b"
+      },
+      "recordFormat": "harmony-messages-v1",
+      "testUsage": "HASH_INTEGRITY_ONLY",
+      "packageIssued": false,
+      "runIssued": false,
+      "executionStarted": false,
+      "note": "The authorization checkpoint commit necessarily has a different Git SHA. That does not change the executable code snapshot being authorized, which remains ad1e011c55729f5447b324d35b4ad88d0a47d10f."
     }
   },
   "datasets": {
@@ -819,7 +863,7 @@
       "packageId": null,
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "ENV_QUALIFIED_AWAITING_EXPLICIT_AUTHORIZATION",
+      "readinessStatus": "AUTHORIZED_AWAITING_PACKAGE_ISSUANCE",
       "engineDependencyCount": 12,
       "resolvedEngineDependencies": 9,
       "promotionTarget": "GHARIBO-V0.1",
@@ -832,7 +876,13 @@
       "qualificationHash": "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0",
       "engineFreezeLabel": "unsloth-freeze-2026.09.15",
       "environmentQualified": true,
-      "trainingAuthorized": false
+      "trainingAuthorized": true,
+      "authorizationDecisionId": "DEC-0025",
+      "authorizedCodeSnapshot": "ad1e011c55729f5447b324d35b4ad88d0a47d10f",
+      "authorizedPreviewPackageId": "f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c",
+      "recipeHash": "c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd",
+      "authorizationQualificationHash": "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0",
+      "authorizationEngineFreeze": "unsloth-freeze-2026.09.15"
     }
   },
   "models": {
@@ -1322,29 +1372,28 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Recompute the non-executable Gold preview on the current clean commit with npm run preview:gold and review its candidate identity before any separately governed authorization. The committed evidence is explicitly a pre-checkpoint preview; its Git commit and dirty flag are recorded. No training execution is part of preview verification.",
-      "requires": "M3C COMPLETE",
+      "action": "Issue one immutable GHARIBO-exp-001 Training Package and Training Run from DEC-0025 using the authorized code snapshot, recipe, Gold identity, qualification and engine freeze. Issuance only; do not execute training.",
+      "requires": "DEC-0025",
       "references": [
-        "docs/ENV_QUALIFICATION_CONTRACT.md",
-        "docs/ARCHITECTURE_MILESTONE_2.md",
+        "docs/TRAINING_STRATEGY.md",
         "docs/adr/ADR-0019-governed-gold-package-preview.md"
       ]
     },
     {
       "id": "ACT-0002",
       "priority": "P0",
-      "action": "Issue a separate explicit governed CTO authorization for GHARIBO-exp-001 only after the final Training Package identity and pre-execution invariants are verified.",
-      "requires": "ACT-0001, CTO authorization",
+      "action": "Verify the issued package/run identities against DEC-0025, including dataset/split hashes, recipe hash, qualification hash, engine freeze, authorized code snapshot and TEST holdout policy.",
+      "requires": "ACT-0001",
       "references": [
         "docs/TRAINING_STRATEGY.md",
-        "docs/MODEL_REGISTRY.md"
+        "docs/ENV_QUALIFICATION_CONTRACT.md"
       ]
     },
     {
       "id": "ACT-0003",
-      "priority": "P1",
-      "action": "Only after ACT-0002 is explicitly accepted, execute STAGE-1 (GHARIBO-exp-001) on the approved free Kaggle worker and preserve its immutable run/package/result identities.",
-      "requires": "ACT-0002",
+      "priority": "P0",
+      "action": "Only after ACT-0002 passes, launch GHARIBO-exp-001 on the approved free Kaggle worker. Preserve immutable package/run/result identities and do not access TEST beyond its governed integrity policy.",
+      "requires": "ACT-0002, explicit execution step",
       "references": [
         "docs/TRAINING_STRATEGY.md",
         "docs/ARCHITECTURE_MILESTONE_2.md"
@@ -1449,6 +1498,24 @@
         "locked candidate recipe and source policy defaults",
         "added two-build in-memory preview and execution/persistence rejection",
         "kept experiment packageId/trainingRunId null and trainingAuthorized=false"
+      ],
+      "trainingExecuted": false
+    },
+    {
+      "revision": "1.5.0",
+      "date": "2026-09-15",
+      "summary": "Explicit GHARIBO-exp-001 authorization checkpoint: bound package/run issuance to the verified code snapshot, deterministic preview, recipe, qualification, engine freeze and Gold identities. No package/run was issued and training remains NOT_STARTED.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "The authorization commit cannot be its own authorized executable snapshot. DEC-0025 intentionally authorizes snapshot ad1e011c55729f5447b324d35b4ad88d0a47d10f; the containing governance checkpoint receives a later Git SHA.",
+      "changes": [
+        "added DEC-0025 explicit issuance authorization",
+        "authorized code snapshot ad1e011c55729f5447b324d35b4ad88d0a47d10f",
+        "authorized preview package identity f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c",
+        "authorized recipe hash c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd",
+        "set GHARIBO-exp-001 trainingAuthorized=true",
+        "kept packageId/trainingRunId null",
+        "kept training execution NOT_STARTED"
       ],
       "trainingExecuted": false
     }
