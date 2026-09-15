@@ -15,11 +15,24 @@ const state = JSON.parse(
   ),
 );
 
-describe("DEC-0026 execution authorization", () => {
-  it("accepts only the exact QUEUED checkpoint while training remains NOT_STARTED", () => {
+/**
+ * DEC-0026 authorized the QUEUED transition. It is an ACCEPTED checkpoint in the
+ * governance chain; later checkpoints (DEC-0027, DEC-0028) build on it, so it is no
+ * longer the tip. These assertions are deliberately tip-agnostic: they pin the
+ * DEC-0026 layer's own invariants and require the current tip to remain accepted,
+ * whatever the tip happens to be.
+ */
+describe("DEC-0026 execution authorization (accepted chain checkpoint)", () => {
+  it("keeps its own invariants while later checkpoints remain the tip", () => {
+    // DEC-0026 is neither the tip nor the DEC-0025 issuance layer any more.
     expect(isIssuedGoldState(state)).toBe(false);
-    expect(isExecutionAuthorizedGoldState(state)).toBe(true);
+    expect(isExecutionAuthorizedGoldState(state)).toBe(false);
+    // ...but the chain as a whole is still an accepted governance state.
     expect(isAcceptedGoldGovernanceState(state)).toBe(true);
+
+    const dec0026 = (state.decisions as any[]).filter((d) => d.id === "DEC-0026");
+    expect(dec0026).toHaveLength(1);
+    expect(["ACCEPTED", "SUPERSEDED"]).toContain(dec0026[0].status);
 
     expect(state.experiments["GHARIBO-exp-001"].runStatus).toBe("QUEUED");
     expect(state.training.executionAuthorization.executionAuthorized).toBe(true);

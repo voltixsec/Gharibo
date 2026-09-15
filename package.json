@@ -26,7 +26,8 @@
     "dev:trainer": "cd services/trainer && python -m uvicorn main:app --port 8100 --reload",
     "dev:inference": "cd services/inference && python -m uvicorn main:app --port 8101 --reload",
     "dev:research": "cd services/research && python -m uvicorn main:app --port 8102 --reload",
-    "issue:gold": "node scripts/training/issue-gold.mjs"
+    "issue:gold": "node scripts/training/issue-gold.mjs",
+    "kaggle:prepare": "node scripts/training/prepare-kaggle-start.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

@@ -9,15 +9,21 @@
  *   │   ├── dataset.json              # DatasetRef (redundant, self-describing)
  *   │   ├── train.jsonl               # canonical lines
  *   │   ├── validation.jsonl
- *   │   └── test.jsonl
+ *   │   └── test.jsonl                # ONLY when the split policy does NOT hold TEST out
  *   └── notebook/
  *       └── <experiment_id>.ipynb
+ *
+ * TEST-payload policy: when `dataset.splitPolicy.testHeldOut` is true the TEST payload
+ * is permanently held out (`HASH_INTEGRITY_ONLY`), so `dataset/test.jsonl` is NOT
+ * emitted and supplying TEST records is a hard error. Only the TEST hash travels, as
+ * metadata inside `dataset.json` / `manifest.json`. See `./test-policy`.
  */
 import type { BundleFile, TrainingPackage } from "@gharibo/shared";
 import { artifactRollup, sha256Hex } from "@/lib/training/hash";
 import { serializeManifest } from "@/lib/training/package";
 import { renderNotebook } from "./notebook-render";
 import { instructions, renderReadme } from "./instructions";
+import { bundlePayloadSplits } from "./test-policy";
 
 /** The bundle root directory name. */
 export function bundleRoot(pkg: TrainingPackage): string {
@@ -60,15 +66,29 @@ export function buildBundle(
   const notebook = renderNotebook(pkg);
   const instr = instructions(pkg);
 
+  // The TEST payload must never reach a bundle when the split policy holds it out.
+  const payloadSplits = bundlePayloadSplits(pkg);
+  if (!payloadSplits.includes("test") && splitContents.test.length > 0) {
+    throw new Error(
+      "TEST payload is held out by the package split policy, but TEST records were supplied: " +
+        "refusing to build a bundle that would leak held-out TEST data",
+    );
+  }
+
   const files: BundleFile[] = [
     file(`${root}/manifest.json`, serializeManifest(pkg)),
     file(`${root}/README.md`, renderReadme(pkg, instr)),
     file(`${root}/dataset/dataset.json`, JSON.stringify(pkg.dataset, null, 1) + "\n"),
     file(`${root}/dataset/train.jsonl`, jsonl(splitContents.train)),
     file(`${root}/dataset/validation.jsonl`, jsonl(splitContents.validation)),
-    file(`${root}/dataset/test.jsonl`, jsonl(splitContents.test)),
-    file(`${root}/notebook/${notebook.filename}`, notebook.content),
   ];
+
+  // TEST is written only when the split policy permits its payload to travel.
+  if (payloadSplits.includes("test")) {
+    files.push(file(`${root}/dataset/test.jsonl`, jsonl(splitContents.test)));
+  }
+
+  files.push(file(`${root}/notebook/${notebook.filename}`, notebook.content));
 
   // CHECKSUMS.sha256 is computed over the files above (it cannot hash itself).
   files.push(file(`${root}/CHECKSUMS.sha256`, buildChecksumsFile(files)));

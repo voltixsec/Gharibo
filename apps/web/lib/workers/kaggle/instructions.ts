@@ -3,6 +3,7 @@
  * No secrets, no personal paths. Zero-cost only.
  */
 import type { TrainingPackage, WorkerInstructions } from "@gharibo/shared";
+import { isTestPayloadHeldOut, payloadSplitLabel } from "./test-policy";
 
 /** The stable Kaggle secret name used for the optional HF token (NAME only). */
 export const HF_TOKEN_SECRET_NAME = "HF_TOKEN";
@@ -11,9 +12,11 @@ export const HF_TOKEN_SECRET_NAME = "HF_TOKEN";
 export function instructions(pkg: TrainingPackage): WorkerInstructions {
   const exp = pkg.experimentId;
   const dest = pkg.artifactDestination;
+  const testHeldOut = isTestPayloadHeldOut(pkg);
+  const splitLabel = payloadSplitLabel(pkg);
   const steps: string[] = [
     "In GHARIBO, open Training → Export Training Package and download the bundle ZIP.",
-    "Unzip it: you get manifest.json, dataset/{train,validation,test}.jsonl, " +
+    `Unzip it: you get manifest.json, dataset/{${splitLabel.replace(/ /g, "")}}.jsonl, ` +
       `notebook/${exp}.ipynb, README.md and CHECKSUMS.sha256.`,
     "Create a Kaggle Dataset and upload the unzipped folder (or attach the files).",
     "Create a new Kaggle Notebook (Python).",
@@ -21,6 +24,14 @@ export function instructions(pkg: TrainingPackage): WorkerInstructions {
     "Enable Internet: Notebook Settings → Internet → On (required for pinned installs and model download).",
     "Select accelerator: GPU T4 x2. The recipe uses a SINGLE device (device 0 only) — no multi-GPU is required.",
   ];
+
+  if (testHeldOut) {
+    steps.push(
+      "TEST POLICY: the TEST payload is permanently held out (HASH_INTEGRITY_ONLY). " +
+        `Upload only ${splitLabel}. Never upload, attach or open a test.jsonl — ` +
+        "the notebook hard-fails if a TEST payload is present in the bundle.",
+    );
+  }
 
   if (dest && dest.kind === "hf") {
     steps.push(
@@ -66,6 +77,13 @@ export function renderReadme(pkg: TrainingPackage, instr: WorkerInstructions): s
   lines.push(`- **Method:** ${pkg.method} (${pkg.quantization})`);
   lines.push(`- **dtype / seq length:** ${pkg.dtype} / ${pkg.sequenceLength}`);
   lines.push(`- **Dataset hash:** ${pkg.dataset.datasetHash}`);
+  lines.push(`- **Dataset splits carried:** ${payloadSplitLabel(pkg)}`);
+  if (isTestPayloadHeldOut(pkg)) {
+    lines.push(
+      `- **TEST policy:** HELD OUT — ${pkg.dataset.splitHashes.test} ` +
+        "(HASH_INTEGRITY_ONLY; the payload is never uploaded, attached or read)",
+    );
+  }
   lines.push(`- **Evaluation:** NOT_RUN (declared intent only — no metrics are claimed)`);
   lines.push("");
   lines.push("## Steps");

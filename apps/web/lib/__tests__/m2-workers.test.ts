@@ -12,7 +12,14 @@
 import { describe, it, expect } from "vitest";
 
 import { TRAINING_WORKERS, getTrainingWorker, type BundleDatasetContents } from "@/lib/workers";
-import { kaggleTrainingWorker, KAGGLE_CAPABILITIES, planResume } from "@/lib/workers/kaggle";
+import {
+  kaggleTrainingWorker,
+  KAGGLE_CAPABILITIES,
+  planResume,
+  bundleCarriesTestPayload,
+  bundlePayloadSplits,
+  isTestPayloadHeldOut,
+} from "@/lib/workers/kaggle";
 import {
   PACKAGE_SENTINEL,
   loadNotebookTemplate,
@@ -24,8 +31,9 @@ import { instructions, renderReadme, HF_TOKEN_SECRET_NAME } from "@/lib/workers/
 import { deriveCheckpointPolicy } from "@/lib/training/package";
 import { artifactRollup } from "@/lib/training/hash";
 import { validatePackage, hasBlockingErrors } from "@/lib/training/validate";
+import type { TrainingPackage } from "@gharibo/shared";
 import type { TrainingRun } from "@gharibo/shared";
-import { makeValidPackage } from "./_m2-fixtures";
+import { makeValidPackage, fakeHash } from "./_m2-fixtures";
 
 const HF_DESTINATION_PKG = makeValidPackage({
   artifactDestination: {
@@ -37,10 +45,49 @@ const HF_DESTINATION_PKG = makeValidPackage({
   },
 });
 
+/**
+ * A governed Gold package: `harmony-messages-v1` + the audit-quarantine split policy,
+ * which by construction declares `testHeldOut: true` (the validator couples the two).
+ */
+const HELD_OUT_PKG: TrainingPackage = makeValidPackage({
+  dataset: {
+    datasetId: "GHARIBO-Research-Gold-v0.1",
+    recordFormat: "harmony-messages-v1",
+    datasetVersion: "0.1.0",
+    datasetVersionId: fakeHash("2"),
+    datasetHash: fakeHash("2"),
+    splitHashes: { train: fakeHash("3"), validation: fakeHash("4"), test: fakeHash("5") },
+    splitPolicy: {
+      algorithm: "seeded-sha256-content-hash-with-audit-quarantine",
+      seed: 20260914,
+      ratios: { train: 0.8, validation: 0.1, test: 0.1 },
+      minimumRecordsPerSplit: null,
+      method: "Deterministic hash-keyed assignment.",
+      lineHashAlgorithm: "sha256 of raw line bytes",
+      splitHashAlgorithm: "sha256 of sorted line hashes",
+      auditQuarantine: {
+        auditSeed: 3407,
+        auditCohortSize: 100,
+        quarantinedInto: ["train", "validation"],
+        testAudited: 0,
+      },
+      testHeldOut: true,
+      testPolicy: "TEST is permanently held out.",
+    },
+    recordCount: 800,
+  },
+});
+
 const CONTENTS: BundleDatasetContents = {
   train: ['{"input":"q1"}', '{"input":"q2"}'],
   validation: ['{"input":"v1"}'],
   test: ['{"input":"t1"}'],
+};
+
+const HELD_OUT_CONTENTS: BundleDatasetContents = {
+  train: ['{"input":"q1"}'],
+  validation: ['{"input":"v1"}'],
+  test: [],
 };
 
 // ============================================================
@@ -196,6 +243,129 @@ describe("bundle.ts", () => {
     for (const f of buildBundle(HF_DESTINATION_PKG, CONTENTS)) {
       expect(f.content).not.toMatch(/hf_[A-Za-z0-9]{20,}/);
     }
+  });
+});
+
+// ============================================================
+// Governed TEST-payload policy
+// (regression: incident GHARIBO-exp-001, first governed Kaggle launch)
+// ============================================================
+
+describe("governed TEST-payload policy", () => {
+  it("reads the held-out flag from the package split policy", () => {
+    expect(isTestPayloadHeldOut(makeValidPackage())).toBe(false);
+    expect(isTestPayloadHeldOut(HELD_OUT_PKG)).toBe(true);
+    expect(bundlePayloadSplits(makeValidPackage())).toEqual(["train", "validation", "test"]);
+    expect(bundlePayloadSplits(HELD_OUT_PKG)).toEqual(["train", "validation"]);
+  });
+
+  it("the governed Gold fixture itself passes validation", () => {
+    expect(hasBlockingErrors(validatePackage(HELD_OUT_PKG))).toBe(false);
+  });
+
+  it("omits dataset/test.jsonl from a held-out bundle", () => {
+    const files = buildBundle(HELD_OUT_PKG, HELD_OUT_CONTENTS);
+    const paths = files.map((f) => f.relativePath);
+    expect(paths).not.toContain(`${bundleRoot(HELD_OUT_PKG)}/dataset/test.jsonl`);
+    expect(paths).toContain(`${bundleRoot(HELD_OUT_PKG)}/dataset/train.jsonl`);
+    expect(paths).toContain(`${bundleRoot(HELD_OUT_PKG)}/dataset/validation.jsonl`);
+    expect(files).toHaveLength(7);
+    expect(bundleCarriesTestPayload(HELD_OUT_PKG)).toBe(false);
+  });
+
+  it("refuses to build a bundle that would leak a held-out TEST payload", () => {
+    expect(() => buildBundle(HELD_OUT_PKG, CONTENTS)).toThrow(
+      /held out by the package split policy.*refusing to build a bundle that would leak/i,
+    );
+  });
+
+  it("still carries TEST for a package whose policy does not hold it out", () => {
+    const plain = makeValidPackage();
+    const files = buildBundle(plain, CONTENTS);
+    expect(files.map((f) => f.relativePath)).toContain(`${bundleRoot(plain)}/dataset/test.jsonl`);
+    expect(bundleCarriesTestPayload(plain)).toBe(true);
+    expect(files).toHaveLength(8);
+  });
+
+  it("never writes held-out TEST records into any bundle file", () => {
+    for (const f of buildBundle(HELD_OUT_PKG, HELD_OUT_CONTENTS)) {
+      expect(f.content).not.toContain('"input":"t1"');
+    }
+  });
+
+  it("tells the operator not to upload TEST and records the policy in the README", () => {
+    const instr = instructions(HELD_OUT_PKG);
+    const joined = instr.steps.join(" ");
+    expect(joined).toContain("TEST POLICY");
+    expect(joined).toContain("train,validation");
+    expect(joined).not.toContain("{train,validation,test}");
+    expect(joined).toContain("HASH_INTEGRITY_ONLY");
+
+    const readme = renderReadme(HELD_OUT_PKG, instr);
+    expect(readme).toContain("HELD OUT");
+    expect(readme).toContain(HELD_OUT_PKG.dataset.splitHashes.test);
+    expect(readme).toContain("HASH_INTEGRITY_ONLY");
+  });
+
+  it("leaves the operator steps for a non-held-out package unchanged", () => {
+    const joined = instructions(makeValidPackage()).steps.join(" ");
+    expect(joined).toContain("train,validation,test");
+    expect(joined).not.toContain("TEST POLICY");
+  });
+});
+
+// ============================================================
+// Notebook template — incident regression guards
+// ============================================================
+
+describe("notebook template regression guards", () => {
+  const templateSource = () =>
+    loadNotebookTemplate()
+      .cells.map((cell) => (Array.isArray(cell.source) ? cell.source.join("") : String(cell.source)))
+      .join("\n");
+
+  it("installs with full observability — the suppressed-output shape is gone", () => {
+    const s = templateSource();
+    expect(s).not.toContain("'-qqq', *install_args");
+    expect(s).toContain("def run_install_command(cmd, phase, timeout=None):");
+    expect(s).toContain("install-diagnostic.json");
+    expect(s).toContain("capture_output=True");
+  });
+
+  it("dry-runs every install stage with its exact arguments before executing it", () => {
+    expect(templateSource()).toContain(
+      "run_install_command([*_cmd, '--dry-run'], _phase + '-dry-run')",
+    );
+  });
+
+  it("preserves the Kaggle-provided torch/triton instead of re-resolving them from PyPI", () => {
+    const s = templateSource();
+    expect(s).toContain("KAGGLE_PRESERVED_CANDIDATES = ('torch', 'triton')");
+    expect(s).toContain("SKIP_WHEN_PRESERVED = ('triton_kernels',)");
+    expect(s).toContain("preserved-constraints.txt");
+    expect(s).toContain("'--constraint'");
+  });
+
+  it("verifies TRAIN + VALIDATION and hard-fails on a held-out TEST payload", () => {
+    const s = templateSource();
+    expect(s).toContain("TEST_HELD_OUT");
+    expect(s).toContain("TEST POLICY VIOLATION");
+    expect(s).toContain("split_names = ('train', 'validation')");
+    expect(s).toContain("HASH_INTEGRITY_ONLY");
+    expect(s).not.toContain("for name in ('train', 'validation', 'test'):");
+  });
+
+  it("locates an attached Kaggle Dataset under the Kaggle input root", () => {
+    const s = templateSource();
+    expect(s).toContain("pathlib.Path('/kaggle/input')");
+    expect(s).toContain("def locate_dataset_dir():");
+  });
+
+  it("compares dependency floors numerically, not as strings", () => {
+    const s = templateSource();
+    expect(s).toContain("def release_tuple(value):");
+    expect(s).toContain("def satisfies_floor(installed, floor):");
+    expect(s).toContain("not satisfies_floor(installed, floor)");
   });
 });
 

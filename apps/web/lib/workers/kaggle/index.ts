@@ -22,6 +22,13 @@ import { buildBundle as buildBundleImpl } from "./bundle";
 import { instructions as instructionsImpl } from "./instructions";
 import { normalizeStatus as normalizeStatusImpl } from "./status";
 
+export {
+  bundleCarriesTestPayload,
+  bundlePayloadSplits,
+  isTestPayloadHeldOut,
+  payloadSplitLabel,
+} from "./test-policy";
+
 /** Kaggle free-tier capabilities (m2-stack-facts.md §1). */
 export const KAGGLE_CAPABILITIES: WorkerCapabilities = {
   gpuClass: "NVIDIA T4 (16 GB, sm_75)",
