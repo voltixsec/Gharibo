@@ -8,7 +8,7 @@
 | **Version** | 1.5.0 |
 | **Last Updated** | 2026-09-15 |
 
-> **v1.5.0 ? Kaggle v3 measured dependency/reproducibility corrections (2026-09-15).**
+> **v1.5.0 — Kaggle v3 measured dependency/reproducibility corrections (2026-09-15).**
 > The qualification-only resolver now explicitly constrains `huggingface-hub>=0.34.0,<1.0`.
 > `openai-harmony` remains exclusively in the governed pinned dependency set.
 > On the Kaggle preserve-preinstalled path, `torch` and `triton` are recorded and verified as
@@ -527,7 +527,7 @@ Two passes agree iff, for every `name`:
 
 A name present in one pass and absent in the other is a `MISMATCH`. A pass that failed to install is
 recorded with `resolved_version: null` for the failed names and makes the assertion `MISMATCH`.
-`additional_dependencies[]` (?4.5) is compared with the same four rules and reported separately; a
+`additional_dependencies[]` (§4.5) is compared with the same four rules and reported separately; a
 mismatch there is a `MISMATCH` for the run.
 
 On the Kaggle preserve-preinstalled path, this comparison scope excludes preserved `torch` and
