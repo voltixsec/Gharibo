@@ -1443,9 +1443,27 @@ function gateQualificationSafety(): Gate {
   checks.push(
     expect(
       "the forward-only dry run runs under no_grad and receives no labels",
-      /with torch\.no_grad\(\):/.test(notebookSource) &&
-        /model_inputs = \{'input_ids': BATCH\['input_ids'\], 'attention_mask': BATCH\['attention_mask'\]\}/.test(notebookSource),
-      "exactly one forward pass, in an inference-safe context, with no labels supplied so no loss is computed",
+      (() => {
+        const match = notebookSource.match(
+          /def forward_dry_run\(\):([\s\S]*?)def probe_artifact_destination\(\):/,
+        );
+        if (!match) return false;
+
+        const body = match[1];
+        const modelForwardCount =
+          (notebookSource.match(/outputs = MODEL\(\*\*model_inputs\)/g) ?? []).length;
+
+        return (
+          /with torch\.no_grad\(\):/.test(body) &&
+          /'attention_mask': attention_mask_mapping/.test(body) &&
+          /'use_cache': False/.test(body) &&
+          /'output_router_logits': False/.test(body) &&
+          /outputs = MODEL\(\*\*model_inputs\)/.test(body) &&
+          !/'labels'\s*:/.test(body) &&
+          modelForwardCount === 1
+        );
+      })(),
+      "exactly one forward pass, under no_grad, using the prepared GPT-OSS attention-mask mapping, with no labels supplied so no loss is computed",
     ),
   );
 

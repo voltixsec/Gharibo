@@ -26,7 +26,7 @@
  * CONTRACT
  * --------
  * The emitted artifact is `env-qualification.json`, shaped by
- * `docs/ENV_QUALIFICATION_CONTRACT.md` v1.4.0 (§3 top level, §4 dependency records,
+ * `docs/ENV_QUALIFICATION_CONTRACT.md` v1.5.0 (§3 top level, §4 dependency records,
  * §5 environment, §6 reproducibility, §7 unknowns, §8 status, §9 content address,
  * §10 validation). The harness self-validates against §10 before it finishes.
  *
@@ -442,7 +442,7 @@ const INVENTORY_JSON = JSON.stringify(
     harmony_candidates: HARMONY_CANDIDATES,
     import_smoke_modules: IMPORT_SMOKE_MODULES,
     contract_schema_version: "1.1.0",
-    harness_version: "2.2.0",
+    harness_version: "2.3.0",
     experiment_id: "GHARIBO-exp-001",
     // ---- Model-compatibility qualification (contract §14) -------------------
     model_compatibility: {
@@ -1447,8 +1447,15 @@ def build_install_plan(target_flags, fresh=False):
     # When Kaggle runtime facts are preserved, --no-deps prevents runtime
     # dependency resolution from pulling torch/triton transitively, while
     # --only-binary prevents source-build dependency resolution from doing so.
-    fresh_isolation_flags = (
-        ['--no-deps', '--only-binary', ':all:']
+    # v5: split the fresh-environment isolation flags so stages that already
+    # carry --no-deps never receive a duplicate copy. uv rejects duplicate
+    # --no-deps flags, which was the measured v4 pass-2 blocker.
+    fresh_binary_flags = (
+        ['--only-binary', ':all:']
+        if fresh and PRESERVED else []
+    )
+    fresh_no_deps_flags = (
+        ['--no-deps']
         if fresh and PRESERVED else []
     )
     main_args = [('%s==%s' % (d['name'], preserved_versions[d['name']]))
@@ -1460,16 +1467,23 @@ def build_install_plan(target_flags, fresh=False):
     if fresh and HARMONY_SPEC['install'] not in main_args:
         main_args.append(HARMONY_SPEC['install'])
     base = [UV, 'pip', 'install', *target_flags, '--no-cache-dir', *constraint_flags]
-    plan = [('install', [*base, *fresh_isolation_flags, *main_args]),
-            ('force-upgrade', [*base, *fresh_isolation_flags,
-                               '--upgrade', '--no-deps', *FORCE_UPGRADE_SPECS]),
-            ('torchao-upgrade', [*base, *fresh_isolation_flags,
-                                 '--no-deps', '--upgrade', 'torchao>=0.16.0'])]
+    plan = [
+        ('install',
+         [*base, *fresh_binary_flags, *fresh_no_deps_flags, *main_args]),
+        ('force-upgrade',
+         [*base, *fresh_binary_flags,
+          '--upgrade', '--no-deps', *FORCE_UPGRADE_SPECS]),
+        ('torchao-upgrade',
+         [*base, *fresh_binary_flags,
+          '--no-deps', '--upgrade', 'torchao>=0.16.0']),
+    ]
     for dep in ALL_DEPENDENCIES:
         if dep['no_build_isolation']:
-            plan.append(('no-build-isolation',
-                         [*base, *fresh_isolation_flags,
-                          '--no-build-isolation', dep['install']]))
+            plan.append((
+                'no-build-isolation',
+                [*base, *fresh_binary_flags, *fresh_no_deps_flags,
+                 '--no-build-isolation', dep['install']]
+            ))
     return plan
 
 def execute_install_plan(plan, timeout=None):
@@ -1883,12 +1897,14 @@ else:
 
         if PRESERVED:
             for phase, cmd in fresh_plan:
-                if '--no-deps' not in cmd:
+                if cmd.count('--no-deps') != 1:
                     raise RuntimeError(
-                        'pass 2 stage permits transitive runtime dependencies: %s' % phase)
-                if '--only-binary' not in cmd:
+                        'pass 2 stage permits transitive runtime dependencies or has duplicate '
+                        '--no-deps: %s' % phase)
+                if cmd.count('--only-binary') != 1 or cmd.count(':all:') != 1:
                     raise RuntimeError(
-                        'pass 2 stage permits source-build dependencies: %s' % phase)
+                        'pass 2 stage permits source-build dependencies or has a duplicate '
+                        'binary-only guard: %s' % phase)
                 direct_preserved = [
                     arg for arg in cmd
                     if isinstance(arg, str) and any(
@@ -2155,25 +2171,118 @@ def collate_batch():
                            % (int(input_ids.shape[0]), BATCH_SIZE))
     return {'input_ids': input_ids, 'attention_mask': attention_mask, 'labels': labels}
 
-def forward_dry_run():
-    '''Exactly ONE forward pass under torch.no_grad().
+def prepare_gpt_oss_attention_masks():
+    '''Prepare the GPT-OSS full/sliding 4D causal-mask mapping.
 
-    ONLY input_ids and attention_mask are passed. The collated labels are deliberately
-    never supplied, so the model computes no loss at all and there is nothing to
-    differentiate.
+    v4 measured that the Unsloth-patched GPT-OSS attention path received the raw
+    2D padding mask and failed while indexing it as a 4D causal mask. Transformers
+    4.56.2 normally converts that 2D padding mask into a mapping containing
+    full_attention and sliding_attention masks before the decoder layers run.
+
+    This helper performs that same official mask preparation explicitly. It does
+    not run the model, compute a loss, enable gradients, or update parameters.
     '''
     import torch
-    model_inputs = {'input_ids': BATCH['input_ids'], 'attention_mask': BATCH['attention_mask']}
+    from transformers.masking_utils import (
+        create_causal_mask,
+        create_sliding_window_causal_mask,
+    )
+
+    input_ids = BATCH['input_ids']
+    padding_mask = BATCH['attention_mask']
+
+    base_model = MODEL.get_base_model() if hasattr(MODEL, 'get_base_model') else MODEL
+    config = getattr(base_model, 'config', None)
+    if config is None:
+        raise RuntimeError('the live model exposes no config for GPT-OSS mask preparation')
+
+    hidden_size = int(getattr(config, 'hidden_size', 0) or 0)
+    if hidden_size <= 0:
+        raise RuntimeError('GPT-OSS config exposes no valid hidden_size')
+
+    batch_size = int(input_ids.shape[0])
+    sequence_length = int(input_ids.shape[1])
+    cache_position = torch.arange(sequence_length, device=input_ids.device)
+    position_ids = cache_position.unsqueeze(0).expand(batch_size, -1)
+
+    # The mask helpers use input_embeds only for batch/sequence shape, device and
+    # dtype. No embedding/model forward is executed here, preserving the exactly-one
+    # model-forward qualification rule.
+    mask_dtype = torch.float16 if DTYPE == 'fp16' else torch.bfloat16
+    input_embeds_meta = torch.empty(
+        (batch_size, sequence_length, hidden_size),
+        device=input_ids.device,
+        dtype=mask_dtype,
+    )
+
+    mask_kwargs = {
+        'config': config,
+        'input_embeds': input_embeds_meta,
+        'attention_mask': padding_mask,
+        'cache_position': cache_position,
+        'past_key_values': None,
+        'position_ids': position_ids,
+    }
+    full_mask = create_causal_mask(**mask_kwargs)
+    sliding_mask = create_sliding_window_causal_mask(**mask_kwargs)
+
+    attention_mask_mapping = {
+        'full_attention': full_mask,
+        'sliding_attention': sliding_mask,
+    }
+
+    for name, mask in attention_mask_mapping.items():
+        if mask is None:
+            raise RuntimeError(
+                'GPT-OSS %s mask preparation returned None; a concrete 4D mask is '
+                'required for the measured Unsloth path' % name)
+        if getattr(mask, 'ndim', None) != 4:
+            raise RuntimeError(
+                'GPT-OSS %s mask has ndim=%s, expected 4'
+                % (name, getattr(mask, 'ndim', None)))
+
+    return attention_mask_mapping, position_ids, cache_position
+
+def forward_dry_run():
+    '''Exactly ONE model forward pass under torch.no_grad().
+
+    The 2D padding mask is converted to GPT-OSS's official full/sliding 4D causal
+    mask mapping first. Labels are deliberately never supplied, so the model
+    computes no loss and there is nothing to differentiate.
+    '''
+    import torch
+
+    attention_mask_mapping, position_ids, cache_position = (
+        prepare_gpt_oss_attention_masks()
+    )
+
+    model_inputs = {
+        'input_ids': BATCH['input_ids'],
+        'attention_mask': attention_mask_mapping,
+        'position_ids': position_ids,
+        'cache_position': cache_position,
+        'use_cache': False,
+        'output_router_logits': False,
+    }
+
     with torch.no_grad():
         outputs = MODEL(**model_inputs)
+
     logits = getattr(outputs, 'logits', None)
     if logits is None:
         raise RuntimeError('the forward pass returned no logits')
     if not bool(torch.isfinite(logits).all()):
         raise RuntimeError('the forward pass produced non-finite logits')
-    return {'logits_shape': [int(dim) for dim in logits.shape],
-            'logits_dtype': str(logits.dtype),
-            'logits_finite': True}
+
+    return {
+        'logits_shape': [int(dim) for dim in logits.shape],
+        'logits_dtype': str(logits.dtype),
+        'logits_finite': True,
+        'attention_mask_shapes': {
+            name: [int(dim) for dim in mask.shape]
+            for name, mask in attention_mask_mapping.items()
+        },
+    }
 
 def probe_artifact_destination():
     writable, error = verify_artifact_destination(WORKING)
@@ -2373,7 +2482,7 @@ def collect_unknowns(record):
         'vram_after_adapter_init': 'the adapters were not initialised, so there is no VRAM reading',
         'peak_vram': 'the forward-only dry run did not complete, so there is no peak VRAM reading',
         'parameter_digest_before': 'no model was loaded, so no parameter digest exists',
-        'parameter_digest_after': 'no model was loaded, so no parameter digest exists',
+        'parameter_digest_after': 'the post-forward parameter digest did not run because the forward-only dry run failed or an earlier model-compatibility step failed',
         'model_parameters_updated': 'no parameter digest pair exists, so the comparison could not be made',
         'batch_shapes': 'no batch was collated',
         'example_token_count': 'the real GHARIBO example was not tokenised',

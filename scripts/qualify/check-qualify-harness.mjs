@@ -623,14 +623,21 @@ const contractChecks = [
   ["§14.3 parameter counts", /def count_parameters\(model\):/],
   ["§14.3 batch collation", /def collate_batch\(\):/],
   ["§14.3 forward-only dry run under no_grad", /with torch\.no_grad\(\):/],
-  ["§14.3 forward receives no labels",
-    /model_inputs = \{'input_ids': BATCH\['input_ids'\], 'attention_mask': BATCH\['attention_mask'\]\}/],
+  ["v5 GPT-OSS mask preparation helper", /def prepare_gpt_oss_attention_masks\(\):/],
+  ["v5 GPT-OSS official full causal mask", /create_causal_mask/],
+  ["v5 GPT-OSS official sliding causal mask", /create_sliding_window_causal_mask/],
+  ["v5 GPT-OSS full attention mapping", /'full_attention': full_mask/],
+  ["v5 GPT-OSS sliding attention mapping", /'sliding_attention': sliding_mask/],
+  ["v5 forward receives prepared mask mapping", /'attention_mask': attention_mask_mapping/],
+  ["v5 forward disables cache", /'use_cache': False/],
+  ["v5 forward suppresses router auxiliary output", /'output_router_logits': False/],
   ["§14.3 VRAM reading after the adapter init", /VRAM_AFTER_ADAPTER_INIT = vram_allocated_bytes\(\)/],
   ["§14.3 peak VRAM reading", /PEAK_VRAM_DURING_FORWARD = vram_peak_bytes\(\)/],
   ["§14.3 artifact destination probe", /def probe_artifact_destination\(\):/],
   ["§14.4 parameter digest over the trainable parameters", /def parameter_digest\(model\):/],
   ["§14.4 digest before and after the dry run",
     /digest_before = run_model_step\('parameter_digest_before'/],
+  ["v5 truthful post-forward digest unknown reason", /parameter_digest_after': 'the post-forward parameter digest did not run because/],
   ["§14.5 measured-failure status", /return 'QUALIFICATION_FAILED_MEASURED'/],
   ["§14.5 failing step is named", /FAILED_STEP = name/],
   ["§14.6 QUALIFIED requires a complete part B", /and model_compatibility_complete\(\)\):/],
@@ -675,6 +682,23 @@ const contractChecks = [
 ];
 for (const [label, re] of contractChecks) {
   if (!re.test(notebookSource)) fail("contract", `missing: ${label}`);
+}
+
+// v5 regression: isolate the dry-run body and prove that labels are never
+// supplied to the single qualification forward pass.
+{
+  const match = notebookSource.match(
+    /def forward_dry_run\(\):([\s\S]*?)def probe_artifact_destination\(\):/
+  );
+
+  if (!match) {
+    fail("model-compat", "could not isolate forward_dry_run for the no-labels check");
+  } else if (/'labels'\s*:/.test(match[1])) {
+    fail(
+      "model-compat",
+      "forward_dry_run supplies labels; qualification must compute no loss"
+    );
+  }
 }
 if (engineVersion && !notebookSource.includes(`ENGINE_VERSION = '${engineVersion}'`)) {
   fail("contract", `ENGINE_VERSION was not injected from package.ts (expected ${engineVersion})`);
@@ -726,10 +750,12 @@ const installChecks = [
   // v4 regression: build_install_plan always excludes PRESERVED (not just fresh=False)
   ["build_install_plan always excludes preserved", /and d\['name'\] not in PRESERVED\]/],
   ["constraint flags skipped in fresh pass", /constraint_flags = \[\] if fresh else CONSTRAINT_FLAGS/],
-  ["fresh pass disables transitive runtime deps", /fresh_isolation_flags = \([\s\S]*?'--no-deps'[\s\S]*?if fresh and PRESERVED else \[\]/],
-  ["fresh pass requires binary wheels", /'--only-binary', ':all:'/],
-  ["pass 2 rejects missing no-deps", /pass 2 stage permits transitive runtime dependencies/],
-  ["pass 2 rejects source builds", /pass 2 stage permits source-build dependencies/],
+  ["fresh pass disables transitive runtime deps", /fresh_no_deps_flags = \(/],
+  ["fresh pass requires binary wheels", /fresh_binary_flags = \(/],
+  ["pass 2 requires exactly one no-deps", /cmd\.count\('--no-deps'\) != 1/],
+  ["pass 2 rejects missing or duplicate no-deps", /pass 2 stage permits transitive runtime dependencies or has duplicate/],
+  ["pass 2 requires exactly one binary guard", /cmd\.count\('--only-binary'\) != 1/],
+  ["pass 2 rejects source builds", /pass 2 stage permits source-build dependencies or has a duplicate/],
   ["pass 2 rejects direct preserved requests", /pass 2 directly requests preserved dependency/],
   ["fresh resolution excludes preserved", /fresh_repro_specs = \[[\s\S]*?d\['name'\] not in PRESERVED/],
   ["fresh pinned records exclude preserved", /fresh_pinned_specs = \[[\s\S]*?d\['name'\] not in PRESERVED/],
