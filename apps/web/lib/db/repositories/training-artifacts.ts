@@ -4,6 +4,17 @@
  */
 import { db } from "@/lib/db/index";
 import { genId, now } from "@/lib/utils";
+import { HttpError } from "@gharibo/shared";
+
+/**
+ * Path prefixes that are produced by the engine but are NOT model artifacts.
+ *
+ * Unsloth writes a compiled-cache tree next to the adapter on the worker. It is
+ * build output, not a result: it is not reproducible, it is not content-addressed
+ * as an artifact, and registering it would pollute the manifest-of-hashes with
+ * machine-specific bytes. It must never enter the artifact registry.
+ */
+export const NON_ARTIFACT_PREFIXES: readonly string[] = ["unsloth_compiled_cache/"];
 
 export interface TrainingArtifactRow {
   id: string;
@@ -47,6 +58,15 @@ export const trainingArtifactsRepository = {
     rows: Array<{ relativePath: string; kind: string; sha256: string; sizeBytes: number }>,
     rollupHash: string,
   ): void {
+    const rejected = rows.find((r) =>
+      NON_ARTIFACT_PREFIXES.some((prefix) => r.relativePath.startsWith(prefix)),
+    );
+    if (rejected) {
+      throw new HttpError(
+        400,
+        `${rejected.relativePath} is engine build output, not a model artifact, and must not be registered`,
+      );
+    }
     const run = db().transaction(() => {
       db().prepare("DELETE FROM training_artifacts WHERE package_id = ?").run(packageId);
       const insert = db().prepare(

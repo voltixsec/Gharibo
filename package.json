@@ -27,7 +27,9 @@
     "dev:inference": "cd services/inference && python -m uvicorn main:app --port 8101 --reload",
     "dev:research": "cd services/research && python -m uvicorn main:app --port 8102 --reload",
     "issue:gold": "node scripts/training/issue-gold.mjs",
-    "kaggle:prepare": "node scripts/training/prepare-kaggle-start.mjs"
+    "kaggle:prepare": "node scripts/training/prepare-kaggle-start.mjs",
+    "build:dec0030": "node scripts/training/build-dec0030-acceptance.mjs --check",
+    "verify:result": "python scripts/training/verify-kaggle-result.py"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

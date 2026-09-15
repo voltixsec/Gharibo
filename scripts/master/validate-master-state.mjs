@@ -312,26 +312,87 @@ function runChecks(state, rawText) {
     if (!failedUnder('consistency')) pass('consistency', 'currentState matches project/training/datasets and the ADR count matches disk');
   }
 
-  // -------------------------------------------------------------- 11. TRAINING HAS NOT STARTED
+  // ------------------------------------------------- 11. POST-TRAINING EXECUTION INVARIANTS
+  //
+  // The historical invariant was "TRAINING HAS NOT STARTED". DEC-0030 accepted a real,
+  // externally evidenced execution, so that invariant is obsolete — but it is REPLACED,
+  // not removed. The checks below are strictly stronger than the old ones: completion is
+  // accepted only with real, internally coherent evidence, TEST isolation is re-asserted,
+  // the fp16 -> float32 runtime deviation must be recorded rather than absorbed, the two
+  // pre-training ERROR attempts must survive, and neither evaluation nor promotion may be
+  // claimed as a side effect of training having finished.
   {
     const t = state.training;
-    if (t.hasStarted !== false) fail('training-invariant', 'training.hasStarted must be false');
-    if (t.status !== 'NOT_STARTED') fail('training-invariant', 'training.status must be "NOT_STARTED"');
-    if (t.weightsDownloaded !== false) fail('training-invariant', 'training.weightsDownloaded must be false');
-    if (t.adaptersProduced !== 0) fail('training-invariant', 'training.adaptersProduced must be 0');
-    if (t.checkpointsProduced !== 0) fail('training-invariant', 'training.checkpointsProduced must be 0');
-    if (t.evaluationResults !== 0) fail('training-invariant', 'training.evaluationResults must be 0');
+    const completion = t?.executionCompletion;
+
+    if (t.hasStarted !== true) fail('training-invariant', 'training.hasStarted must be true — DEC-0030 accepted a completed execution');
+    if (t.status !== 'COMPLETED') fail('training-invariant', 'training.status must be "COMPLETED"');
+    if (t.weightsDownloaded !== true) fail('training-invariant', 'training.weightsDownloaded must be true — the completed run loaded real weights');
+    if (!(t.adaptersProduced >= 1)) fail('training-invariant', 'training.adaptersProduced must be >= 1');
+    if (!(t.checkpointsProduced >= 1)) fail('training-invariant', 'training.checkpointsProduced must be >= 1');
+    if (t.evaluationResults !== 0) fail('training-invariant', 'training.evaluationResults must be 0 — no evaluation has executed');
+    if (!completion) fail('training-invariant', 'a COMPLETED training state requires an executionCompletion record');
+
     for (const [key, e] of Object.entries(state.experiments || {})) {
-      if (e.trainingRunId !== null && !(key === "GHARIBO-exp-001" && isAcceptedGoldGovernanceState(state))) fail('training-invariant', `${key}: trainingRunId must be null`);
-      if (e.packageId !== null && !(key === "GHARIBO-exp-001" && isAcceptedGoldGovernanceState(state))) fail('training-invariant', `${key}: packageId must be null`);
-      if (e.evaluationStatus !== 'NOT_RUN') fail('training-invariant', `${key}: evaluationStatus must be "NOT_RUN"`);
+      if (e.evaluationStatus !== 'NOT_RUN') {
+        fail('training-invariant', `${key}: evaluationStatus must be "NOT_RUN" until a real evaluation executes`);
+      }
+      if (e.promotable === true && e.evaluationStatus === 'NOT_RUN') {
+        fail('training-invariant', `${key}: promotable cannot be true while evaluationStatus is NOT_RUN`);
+      }
+      if (e.runStatus === 'COMPLETED' &&
+          !(completion && completion.decisionId === 'DEC-0030' &&
+            completion.runId === e.trainingRunId && completion.experimentId === key)) {
+        fail('training-invariant', `${key}: runStatus COMPLETED requires DEC-0030 completion evidence bound to this exact run`);
+      }
     }
+
+    if (completion) {
+      const a = completion.artifacts || {};
+      const tr = completion.training || {};
+      if (a.checksumMismatches !== 0) fail('training-invariant', 'completion artifacts report checksum mismatches');
+      if (a.rollupRecomputedMatches !== true) fail('training-invariant', 'completion artifact rollup did not recompute');
+      if (!/^[0-9a-f]{64}$/.test(a.rollupHash ?? '')) fail('training-invariant', 'completion artifact rollup hash is not a sha256 hex digest');
+      if (!/^[0-9a-f]{64}$/.test(a.finalAdapterSha256 ?? '')) fail('training-invariant', 'completion final adapter sha256 is not a sha256 hex digest');
+      if (tr.globalStep !== tr.totalSteps) fail('training-invariant', 'completion globalStep must equal totalSteps');
+      if (tr.epoch !== tr.numEpochs) fail('training-invariant', 'completion epoch must equal numEpochs');
+      if (tr.completionMarker !== 'COMPLETED') fail('training-invariant', 'completion marker must be COMPLETED');
+      if (!(tr.trainRuntimeSeconds > 0)) fail('training-invariant', 'completion trainRuntimeSeconds must be positive');
+      if (!(tr.trainLoss > 0)) fail('training-invariant', 'completion trainLoss must be positive');
+
+      const tp = completion.testPolicy || {};
+      if (tp.testPayloadUploaded !== false) fail('training-invariant', 'completion must record testPayloadUploaded=false');
+      if (tp.testPayloadAccessed !== false) fail('training-invariant', 'completion must record testPayloadAccessed=false');
+      if (tp.testUsage !== 'HASH_INTEGRITY_ONLY') fail('training-invariant', 'completion must record testUsage=HASH_INTEGRITY_ONLY');
+
+      const dev = completion.runtimeDeviation || {};
+      if (dev.declaredDtype && dev.effectiveDtype && dev.declaredDtype !== dev.effectiveDtype) {
+        if (dev.classification !== 'MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION') {
+          fail('training-invariant', 'a declared-vs-effective dtype deviation must be classified MATERIALLY, not absorbed silently');
+        }
+        if (dev.recipeEditedRetroactively !== false) {
+          fail('training-invariant', 'the immutable package recipe must not be edited retroactively to hide a runtime deviation');
+        }
+      }
+
+      const attempts = Array.isArray(completion.executionAttemptHistory) ? completion.executionAttemptHistory : [];
+      const failed = attempts.filter((x) => x?.externalStatus === 'KernelWorkerStatus.ERROR');
+      if (failed.length !== 2) fail('training-invariant', 'both pre-training ERROR attempts must be preserved in the attempt history');
+      for (const f of failed) {
+        if (f.trainingStarted !== false) {
+          fail('training-invariant', `attempt ${f.attemptNumber} must remain recorded with trainingStarted=false`);
+        }
+      }
+    }
+
     for (const m of state.models?.derivedModels || []) {
       if (['NOT_CREATED', 'EXPERIMENT'].includes(m.status) && m.produced === true) {
         fail('training-invariant', `${m.id}: derived model with status ${m.status} is claimed as produced`);
       }
     }
-    if (!failedUnder('training-invariant')) pass('training-invariant', 'training has not started; issued/queued IDs require exact governed DEC-0025/DEC-0026 evidence; no evaluation, weights or model artifacts');
+    if (!failedUnder('training-invariant')) {
+      pass('training-invariant', 'post-training invariants hold: completion evidence is real and coherent, TEST stays isolated, the dtype deviation is recorded, both failed attempts survive, and no evaluation or promotion is claimed');
+    }
   }
 
   // -------------------------------------------------------------- 12. generated markdown sync
@@ -476,8 +537,7 @@ function runChecks(state, rawText) {
         preview.declaredMinimumRecordsPerSplit !== null || !hash(preview.recipeHash) ||
         preview.qualificationHash !== state.training.qualification?.qualificationHash ||
         preview.engineFreeze !== state.training.engine?.freezeLabel ||
-        (!isAcceptedGoldGovernanceState(state) && (experiment?.packageId !== null || experiment?.trainingRunId !== null)) ||
-        state.training.hasStarted !== false) {
+        (!isAcceptedGoldGovernanceState(state) && (experiment?.packageId !== null || experiment?.trainingRunId !== null))) {
       fail('gold-preview', 'preview must preserve accepted provenance and remain unissued and non-executable');
     }
 

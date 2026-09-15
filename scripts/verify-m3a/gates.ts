@@ -19,7 +19,9 @@
  *   9.  notebook generator/render drift — generator output matches committed notebook
  *   10. documentation facts             — docs:validate and verify:m2 --check
  *   11. no fabricated benchmark results — NOT_RUN status, no fake scores
- *   12. Kaggle-dependent gates          — PENDING_EXTERNAL_EXECUTION (real GPU required)
+ *   12. Kaggle-dependent gates          — accepted real-GPU execution evidence (DEC-0030)
+ *                                         when a completed run is reconciled, otherwise
+ *                                         PENDING_EXTERNAL_EXECUTION (real GPU required)
  *   13. qualification safety (static)   — the harness contains no training primitive
  *
  * STATUS TYPES
@@ -1243,9 +1245,10 @@ function gateKaggleDependent(): Gate {
   let issuanceAuthorized = false;
   let executionAuthorized = false;
   let kaggleStartAuthorized = false;
+  let master: any = null;
 
   try {
-    const master = JSON.parse(fs.readFileSync(masterStatePath, "utf8"));
+    master = JSON.parse(fs.readFileSync(masterStatePath, "utf8"));
     const candidate = master?.training?.qualification;
     previewStateAccepted = isAcceptedGoldGovernanceState(master);
     issuanceAuthorized = master?.experiments?.["GHARIBO-exp-001"]?.trainingAuthorized === true;
@@ -1302,26 +1305,152 @@ function gateKaggleDependent(): Gate {
         ),
   );
 
+  // ---- post-execution acceptance (DEC-0030) -------------------------------
+  // Training is no longer a pre-execution STOP condition: a real Kaggle run
+  // completed and DEC-0030 accepted its evidence. These checks are therefore
+  // asserted against the acceptance record instead of the old "not started"
+  // ladder, which is retained only for a state where no completion exists.
+  const completion = master?.training?.executionCompletion ?? null;
+  const decisions: any[] = Array.isArray(master?.decisions) ? master.decisions : [];
+  const dec0030 = decisions.find((d: any) => d?.id === "DEC-0030") ?? null;
+  const dec0030Accepted =
+    !!dec0030 &&
+    dec0030.status === "ACCEPTED" &&
+    dec0030.supersedes === null &&
+    typeof completion?.acceptanceHash === "string" &&
+    /^[0-9a-f]{64}$/.test(completion?.acceptanceHash ?? "");
+
+  let acceptanceRecomputed = "";
+  try {
+    const acceptancePath = path.join(
+      ROOT,
+      "governance",
+      "DEC-0030-kaggle-execution-acceptance.json",
+    );
+    const record = JSON.parse(fs.readFileSync(acceptancePath, "utf8"));
+    const { acceptanceHash, ...acceptanceBody } = record;
+    acceptanceRecomputed = sha256Canonical(acceptanceBody);
+  } catch {
+    acceptanceRecomputed = "";
+  }
+
+  const completionRecorded =
+    completion?.status === "KAGGLE_EXECUTION_COMPLETED_ACCEPTED" &&
+    completion?.trainingCompleted === true &&
+    completion?.decisionId === "DEC-0030" &&
+    dec0030Accepted &&
+    acceptanceRecomputed !== "" &&
+    acceptanceRecomputed === completion.acceptanceHash;
+
+  const ct: any = completion?.training ?? {};
+  const cArtifacts: any = completion?.artifacts ?? {};
+  const cDeviation: any = completion?.runtimeDeviation ?? {};
+  const cTestPolicy: any = completion?.testPolicy ?? {};
+  const cEvaluation: any = completion?.evaluation ?? {};
+  const cPromotion: any = completion?.promotion ?? {};
+
+  const completionCoherent =
+    completionRecorded &&
+    previewStateAccepted &&
+    ct.numExamples === 640 &&
+    ct.numEpochs === 1 &&
+    ct.globalStep === 160 &&
+    ct.totalSteps === 160 &&
+    ct.epoch === ct.numEpochs &&
+    ct.completionMarker === "COMPLETED" &&
+    typeof ct.trainRuntimeSeconds === "number" &&
+    ct.trainRuntimeSeconds > 0 &&
+    typeof ct.trainLoss === "number" &&
+    ct.trainLoss > 0 &&
+    cArtifacts.checksumMismatches === 0 &&
+    cArtifacts.rollupRecomputedMatches === true &&
+    /^[0-9a-f]{64}$/.test(String(cArtifacts.rollupHash ?? "")) &&
+    /^[0-9a-f]{64}$/.test(String(cArtifacts.finalAdapterSha256 ?? "")) &&
+    cDeviation.declaredDtype === "fp16" &&
+    cDeviation.effectiveDtype === "float32" &&
+    cDeviation.recipeEditedRetroactively === false &&
+    cTestPolicy.testPayloadUploaded === false &&
+    cTestPolicy.testPayloadAccessed === false &&
+    cTestPolicy.testRecordsParsed === 0 &&
+    cEvaluation.status === "NOT_RUN" &&
+    cPromotion.promoted === false;
+
   checks.push(
-    previewStateAccepted
-      ? pending(
-          "training execution (not started ? STOP condition)",
-          kaggleStartAuthorized
-            ? "DEC-0027 Kaggle Start authorization verified. Exact run remains QUEUED until real Kaggle launch/running evidence is observed; training has not started."
-            : executionAuthorized
-              ? "DEC-0026 execution authorization verified. Exact issued run is QUEUED; Kaggle start/RUNNING remains sealed and training has not started."
-              : issuanceAuthorized
-              ? "DEC-0025 issuance binding verified. Any issued run is DRAFT; execution is not authorized and training has not started."
-              : "Qualification does not authorize training. Separate explicit authorization is required.",
+    completionCoherent
+      ? pass(
+          "training execution (COMPLETED — real external evidence accepted)",
+          `DEC-0030 ACCEPTED (acceptance hash ${completion.acceptanceHash}, recomputed identical): ` +
+            `${completion.kernelRef} v${completion.kernelVersion} attempt ${completion.attemptNumber} → ${completion.externalStatus}; ` +
+            `epoch ${ct.epoch}/${ct.numEpochs}, step ${ct.globalStep}/${ct.totalSteps}, ` +
+            `train_loss ${ct.trainLoss}, runtime ${ct.trainRuntimeSeconds}s, trainable ${ct.trainableParameters}, ` +
+            `lifecycle ${(completion.lifecyclePath ?? []).join("→")}`,
         )
-      : expect("training execution governance binding", false,
-          "Invalid preview/DEC-0025/DEC-0026 binding or execution is no longer NOT_STARTED with the exact governed state."),
+      : completionRecorded
+        ? expect(
+            "training execution completion coherence",
+            false,
+            "DEC-0030 is recorded but the completion evidence is not internally coherent (metrics, checksums, dtype deviation, TEST isolation, NOT_RUN evaluation or non-promotion do not reconcile).",
+          )
+        : previewStateAccepted
+          ? pending(
+              "training execution (not started ? STOP condition)",
+              kaggleStartAuthorized
+                ? "DEC-0027 Kaggle Start authorization verified. Exact run remains QUEUED until real Kaggle launch/running evidence is observed; training has not started."
+                : executionAuthorized
+                  ? "DEC-0026 execution authorization verified. Exact issued run is QUEUED; Kaggle start/RUNNING remains sealed and training has not started."
+                  : issuanceAuthorized
+                    ? "DEC-0025 issuance binding verified. Any issued run is DRAFT; execution is not authorized and training has not started."
+                    : "Qualification does not authorize training. Separate explicit authorization is required.",
+            )
+          : expect("training execution governance binding", false,
+              "Invalid preview/DEC-0025/DEC-0026 binding or execution is no longer NOT_STARTED with the exact governed state."),
+  );
+
+  checks.push(
+    completionCoherent
+      ? pass(
+          "post-training artifact acceptance (real checksums)",
+          `rollup=${cArtifacts.rollupHash}; verified ${cArtifacts.checksumFilesVerified}/${cArtifacts.checksumFileEntries}; ` +
+            `mismatches ${cArtifacts.checksumMismatches}; final adapter ${cArtifacts.finalAdapterSha256}`,
+        )
+      : pending(
+          "post-training artifact acceptance",
+          "Real Kaggle output artifacts (adapter, checkpoints, trainer state, metrics, manifest) with a matching manifest rollup are required.",
+        ),
+  );
+
+  checks.push(
+    completionCoherent
+      ? pass(
+          "runtime deviation recorded truthfully (declared fp16 → effective float32)",
+          `${cDeviation.classification}; operatorAuthored=${cDeviation.operatorAuthored}; ` +
+            `engineImposed=${cDeviation.engineImposed}; recipeEditedRetroactively=${cDeviation.recipeEditedRetroactively}`,
+        )
+      : pending(
+          "runtime deviation truthfulness",
+          "The declared-vs-effective precision can only be reconciled after a real executed run.",
+        ),
+  );
+
+  checks.push(
+    completionCoherent
+      ? pass(
+          "no auto-promotion and no evaluation claim",
+          `GHARIBO-V0.1 promotion=${cPromotion.promoted} (${cPromotion.targetStatus}); ` +
+            `evaluation=${cEvaluation.status} (${cEvaluation.authorizationStatus})`,
+        )
+      : pending(
+          "no auto-promotion and no evaluation claim",
+          "Only applicable once a completed execution is accepted.",
+        ),
   );
 
   checks.push(
     pending(
       "benchmark evaluation (real GPU inference required)",
-      "Benchmark metrics require real model inference on GPU. No trained candidate exists yet. Base=NOT_RUN, Candidate=NOT_RUN.",
+      completionCoherent
+        ? "A real trained adapter now exists, but held-out TEST evaluation is NOT authorized. Base=NOT_RUN, Candidate=NOT_RUN. Next gate: EXPLICIT_EVALUATION_AUTHORIZATION_REQUIRED."
+        : "Benchmark metrics require real model inference on GPU. No trained candidate exists yet. Base=NOT_RUN, Candidate=NOT_RUN.",
     ),
   );
 

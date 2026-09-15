@@ -38,16 +38,25 @@ function rowToEvent(row: RawRow): TrainingRunEventRow {
 }
 
 export const trainingRunEventsRepository = {
-  /** Appends one transition event. */
+  /**
+   * Appends one transition event.
+   *
+   * `createdAt` is optional and defaults to "now". It exists so an external
+   * execution can be reconciled truthfully: when a transition actually happened
+   * on a remote worker (observed status change or a timestamp derived from the
+   * worker's own log offsets), the audit row must carry THAT time rather than
+   * the moment the bookkeeping caught up.
+   */
   append(e: {
     runId: string;
     fromStatus: RunStatus | null;
     toStatus: RunStatus;
     reason?: string | null;
     source: string;
+    createdAt?: string;
   }): TrainingRunEventRow {
     const id = genId();
-    const ts = now();
+    const ts = e.createdAt ?? now();
     db()
       .prepare(
         `INSERT INTO training_run_events (id, run_id, from_status, to_status, reason, source, created_at)

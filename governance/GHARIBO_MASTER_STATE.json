@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.10.0",
+  "masterStateVersion": "1.11.0",
   "updatedAt": "2026-09-15",
   "project": {
     "id": "GHARIBO",
@@ -14,12 +14,12 @@
     "decisionAuthority": "CTO"
   },
   "currentState": {
-    "trainingStatus": "NOT_STARTED",
-    "trainingHasStarted": false,
-    "trainingInvariant": "TRAINING HAS NOT STARTED",
+    "trainingStatus": "COMPLETED",
+    "trainingHasStarted": true,
+    "trainingInvariant": "TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM",
     "currentMilestone": "M3C",
     "milestoneStatus": "COMPLETE",
-    "blockerSummary": "DEC-0029 supersedes the DEC-0028 launch artifact. Launch attempt 2 was accepted and then failed at KernelWorkerStatus.ERROR in the pinned-engine install cell because the whole frozen set was submitted to one resolver transaction (unsloth/unsloth_zoo cap datasets<4.4.0 while the frozen set pins datasets==5.0.1). Section 4 now reproduces the accepted qualification's install staging with no change to the governed dependency set. One retry is authorized. TRAINING HAS NOT STARTED.",
+    "blockerSummary": "DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (kernel version 3, KernelWorkerStatus.COMPLETE): 640 examples, 1 epoch, 160 steps, train_loss 0.6016419500112533, effective runtime dtype float32 against a declared fp16 (engine-imposed, accepted, package not retroactively edited), TEST payload never uploaded or accessed. The result is an EXPERIMENTAL adapter: no evaluation has run and GHARIBO-V0.1 is NOT_CREATED. Next gate: an explicit evaluation authorization before TEST is touched.",
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
       "exampleCount": 800,
@@ -644,6 +644,35 @@
       "supersedes": "DEC-0028",
       "supersededBy": null,
       "architectureChanging": false
+    },
+    {
+      "id": "DEC-0030",
+      "date": "2026-09-15",
+      "title": "Accept the completed GHARIBO-exp-001 Kaggle execution and record the fp16→float32 runtime deviation",
+      "status": "ACCEPTED",
+      "decision": "Kaggle kernel version 3 (the artifact DEC-0029 authorized: notebook dda3b050034afa0922bda573565ff8f678767e62a944a01d597761aec254b4b1, launch bundle b3b4efc8f4b4c04eedd8610b6b4cdb479817d638e971ce8e8c9b67079d587efb) reached KernelWorkerStatus.COMPLETE and executed real training: 640 examples, 1 epoch, 160 steps, batch 1 x grad-accum 4 = 4, 3,981,312 trainable parameters, train_runtime 4041.9648 s, train_loss 0.6016419500112533. Artifact evidence is accepted: CHECKSUMS.sha256 verifies 129 of 130 declared files with 0 mismatches and its rollup 788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885 recomputes exactly over the full 130-entry manifest; final adapter and checkpoint-160 are byte-identical (794917f25c4aa9e77acb6a746b69a703412539e993f6bfc1e8c602d64be678f) and checkpoint-150 is 5e062fa0bbba3c5276e3d6086f8e7dc0a7e1605c2dbf8c1d989ecbfe5a140249. The run's declared dtype was fp16 but the Unsloth runtime emitted \"Using float16 precision for gpt_oss won't work! Using float32\" and then \"Switching to float32 training since model cannot work with float16\"; the produced adapter is stored as F32 (96 tensors, 15,938,048 bytes). That deviation is accepted here as MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION: engine-imposed, not operator-authored, and the immutable package's dtype field is NOT retroactively edited. TEST isolation held: the governed dataset carried train.jsonl and validation.jsonl only, the runtime reported test=ABSENT and TEST usage HASH_INTEGRITY_ONLY, and no TEST record was parsed. Training completion is NOT model promotion and NOT evaluation: GHARIBO-V0.1 stays NOT_CREATED and evaluation stays NOT_RUN.",
+      "rationale": "The external evidence is internally coherent and independently reproducible from the downloaded result: the completion marker, the trainer state (global_step 160 of max_steps 160, epoch 1.0), the metrics log (160 losses from 4.6434 down to 0.2192, train_loss matching the mean), the manifest identity (GHARIBO-exp-001 / package 78dd1bf3... / run ea6e30f2...), and a manifest-of-hashes rollup that recomputes exactly. Refusing to accept it would be a governance fiction; accepting it without recording the dtype deviation would be a second one. The parameter-count difference (qualification 11,045,084,736 vs runtime 20,918,738,496) is resolved as a 4-bit packed-storage accounting difference, not a model identity mismatch: trainable parameters are identical at 3,981,312, and the adapter's 96 tensor shapes (24 layers, hidden 2880, q 4096, v 512 at r=16) reproduce openai/gpt-oss-20b at the pinned revision exactly. Evaluation is deliberately NOT authorized here: no accepted governance rule permits held-out TEST use at this stage, and TEST must not be touched for validation, model selection, prompt engineering or checkpoint selection. DEC-0030 does not supersede DEC-0027/0028/0029 — attempts 1 and 2 remain recorded as ERROR-before-training.",
+      "scope": [
+        "training",
+        "experiments",
+        "models",
+        "datasets"
+      ],
+      "references": [
+        "docs/TRAINING_STRATEGY.md",
+        "docs/EVALUATION.md",
+        "docs/RESEARCH_BENCHMARK.md",
+        "governance/DEC-0027-kaggle-start-authorization.json",
+        "governance/DEC-0028-kaggle-launch-repair-authorization.json",
+        "governance/DEC-0029-kaggle-launch-reauthorization.json",
+        "governance/DEC-0030-kaggle-execution-acceptance.json",
+        "governance/GHARIBO_MASTER_STATE.json",
+        "scripts/training/build-dec0030-acceptance.mjs",
+        "scripts/training/verify-kaggle-result.py"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
     }
   ],
   "roadmap": {
@@ -756,9 +785,9 @@
     ]
   },
   "training": {
-    "status": "NOT_STARTED",
-    "hasStarted": false,
-    "invariant": "TRAINING HAS NOT STARTED",
+    "status": "COMPLETED",
+    "hasStarted": true,
+    "invariant": "TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM",
     "engine": {
       "id": "unsloth-core",
       "name": "Unsloth Core",
@@ -791,9 +820,9 @@
       "fallback": "local export/download — GHARIBO must work with no external artifact repo configured",
       "github": "source code + docs only — never model artifacts"
     },
-    "weightsDownloaded": false,
-    "adaptersProduced": 0,
-    "checkpointsProduced": 0,
+    "weightsDownloaded": true,
+    "adaptersProduced": 1,
+    "checkpointsProduced": 2,
     "evaluationResults": 0,
     "qualification": {
       "status": "QUALIFIED",
@@ -866,7 +895,7 @@
       }
     },
     "authorization": {
-      "status": "KAGGLE_LAUNCH_REAUTHORIZED_AWAITING_RETRY",
+      "status": "EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION",
       "decisionId": "DEC-0025",
       "authorizedAt": "2026-09-15",
       "scope": "PACKAGE_AND_RUN_ISSUANCE_ONLY",
@@ -1317,6 +1346,258 @@
       },
       "authorizedAt": "2026-09-15T18:31:15.213Z",
       "launchAuthorizationHash": "ec78b2678d0f764b026246806c9e4b3e15d2c241084ec401ef24afc08e051e5b"
+    },
+    "executionCompletion": {
+      "status": "KAGGLE_EXECUTION_COMPLETED_ACCEPTED",
+      "decisionId": "DEC-0030",
+      "supersedesDecisionId": null,
+      "scope": "POST_EXECUTION_ACCEPTANCE_AND_LIFECYCLE_RECONCILIATION",
+      "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
+      "runId": "ea6e30f2-ce26-4323-b35a-3436ee867eaf",
+      "experimentId": "GHARIBO-exp-001",
+      "datasetId": "GHARIBO-Research-Gold-v0.1",
+      "issuanceReceiptHash": "878b961f03ba069b82b4eb82530e7ebdfa4f8644ab159beff0a9adc7935f99bd",
+      "executionAuthorizationHash": "8c089dd9c6967dd33c32f64128bc7e939e8019a27c2428897c23156a075d07bf",
+      "startAuthorizationHash": "4bb2d0b2d38ddd39ce85277c5806838a162620970adf07a6d52844ccf7b2734f",
+      "launchAuthorizationHash": "ec78b2678d0f764b026246806c9e4b3e15d2c241084ec401ef24afc08e051e5b",
+      "authorizedCodeSnapshot": "107cb4be7ae3d1f61c2d6852e432308342bc14e4",
+      "recipeHash": "c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd",
+      "qualificationHash": "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0",
+      "engineFreeze": "unsloth-freeze-2026.09.15",
+      "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+      "splitHashes": {
+        "train": "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2",
+        "validation": "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787",
+        "test": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b"
+      },
+      "recordFormat": "harmony-messages-v1",
+      "worker": "kaggle",
+      "accelerator": "NvidiaTeslaT4",
+      "kernelRef": "vokaigharibo/gharibo-exp-001-kaggle-start-fec22ca2",
+      "kernelVersion": 3,
+      "attemptNumber": 3,
+      "artifactNotebookSha256": "dda3b050034afa0922bda573565ff8f678767e62a944a01d597761aec254b4b1",
+      "artifactLaunchBundleHash": "b3b4efc8f4b4c04eedd8610b6b4cdb479817d638e971ce8e8c9b67079d587efb",
+      "externalStatus": "KernelWorkerStatus.COMPLETE",
+      "externalRunStartedAt": "2026-09-15T18:35:56.230Z",
+      "externalObservedRunningAt": "2026-09-15T18:36:27Z",
+      "timestampBasis": "KAGGLE_LASTRUNTIME_ANCHOR_PLUS_RELATIVE_KERNEL_LOG_OFFSET",
+      "timestampAnchorSource": "authenticated Kaggle API lastRunTime for kernel version 3",
+      "derivedTimestamps": {
+        "trainerStartOffsetSeconds": 263.574344109,
+        "trainerStartedAt": "2026-09-15T18:40:19.804Z",
+        "trainingFinishedOffsetSeconds": 4307.589593596,
+        "trainingFinishedAt": "2026-09-15T19:47:43.819Z",
+        "runCompleteOffsetSeconds": 4310.044056347,
+        "runCompletedAt": "2026-09-15T19:47:46.274Z"
+      },
+      "executionStarted": true,
+      "trainingStarted": true,
+      "trainingCompleted": true,
+      "fromStatus": "QUEUED",
+      "toStatus": "COMPLETED",
+      "lifecyclePath": [
+        "QUEUED",
+        "RUNNING",
+        "COMPLETED"
+      ],
+      "training": {
+        "numExamples": 640,
+        "numEpochs": 1,
+        "totalSteps": 160,
+        "globalStep": 160,
+        "epoch": 1,
+        "perDeviceTrainBatchSize": 1,
+        "gradientAccumulationSteps": 4,
+        "totalBatchSize": 4,
+        "trainableParameters": 3981312,
+        "totalParametersReportedByRuntime": 20918738496,
+        "trainRuntimeSeconds": 4041.9648,
+        "trainSamplesPerSecond": 0.158,
+        "trainStepsPerSecond": 0.04,
+        "totalFlos": 39989290708500480,
+        "trainLoss": 0.6016419500112533,
+        "firstStepLoss": 4.6434,
+        "finalStepLoss": 0.2192,
+        "minStepLoss": 0.1439,
+        "maxStepLoss": 4.745,
+        "meanStepLoss": 0.60164375,
+        "firstStepGradNorm": 15.750786781311035,
+        "finalStepGradNorm": 1.048417091369629,
+        "loggedSteps": 160,
+        "completionMarker": "COMPLETED"
+      },
+      "runtime": {
+        "gpuModel": "Tesla T4",
+        "gpuCount": 2,
+        "dataParallelGpus": 1,
+        "modelShardedAcrossGpus": true,
+        "cuda": "12.8",
+        "torch": "2.10.0+cu128",
+        "triton": "3.6.0",
+        "python": "3.12.13",
+        "note": "The 4-bit loader placed weights on both T4s (5.680 GiB each); data parallelism stayed at 1. The package declares no GPU count, so this is a runtime observation rather than a recipe deviation."
+      },
+      "runtimeDeviation": {
+        "declaredDtype": "fp16",
+        "effectiveDtype": "float32",
+        "classification": "MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION",
+        "operatorAuthored": false,
+        "engineImposed": true,
+        "recipeEditedRetroactively": false,
+        "packageDtypeFieldUnchanged": true,
+        "evidence": [
+          "t=109.379s stdout: Unsloth: Using float16 precision for gpt_oss won't work! Using float32.",
+          "t=257.934s stdout: Unsloth: Switching to float32 training since model cannot work with float16"
+        ],
+        "adapterStorageDtype": "F32",
+        "adapterStorageDtypeEvidence": "safetensors header: 96 tensors, dtype F32, 15938048 bytes == 3981312 params x 4 bytes + 12800-byte header",
+        "scope": "GHARIBO-exp-001 only",
+        "consequence": "The produced adapter is fp32. The effective dtype must be declared honestly for any future run instead of assuming fp16."
+      },
+      "parameterCountReview": {
+        "qualificationTotalParameters": 11045084736,
+        "runtimeTotalParameters": 20918738496,
+        "trainableParametersBoth": 3981312,
+        "trainableTensorCount": 96,
+        "verdict": "ACCOUNTING_DIFFERENCE_NOT_MODEL_IDENTITY_MISMATCH",
+        "basis": [
+          "The qualification harness counted parameters with a plain sum of param.numel() over the live model (scripts/qualify/qualify-kaggle-env.mjs, count_parameters). Under bitsandbytes 4-bit, quantized weights are stored two-per-byte, so numel() reports roughly half the logical count.",
+          "Solving 2*packed + unquantized = 20918738496 with packed = 11045084736 - unquantized yields unquantized = 1171430976, which matches embed_tokens (201088 x 2880 = 579133440) + lm_head (579133440) plus the per-layer norms, attention biases, sinks and MoE routers that 4-bit conversion leaves alone.",
+          "The adapter carries 96 tensors named base_model.model.model.layers.{0..23}.self_attn.{q_proj,v_proj}.lora_{A,B}.weight with shapes lora_A [16, 2880], q_proj lora_B [4096, 16], v_proj lora_B [512, 16]: 24 layers, hidden 2880, 64 query heads and 8 KV heads at head_dim 64 - exactly openai/gpt-oss-20b at the pinned revision 6cee5e81ee83917806bbde320786a8fb61efebee.",
+          "Trainable parameters are byte-identical (3981312) in the qualification and the training run, so the two runs cannot have loaded different models."
+        ],
+        "authoritativeTotalForThisRun": 20918738496,
+        "qualificationArtifactNotEdited": true
+      },
+      "testPolicy": {
+        "testPayloadUploaded": false,
+        "testPayloadAccessed": false,
+        "testUsage": "HASH_INTEGRITY_ONLY",
+        "testRecordsParsed": 0,
+        "testSplitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+        "evidence": [
+          "runtime stdout: train=640 validation=80 test=ABSENT (permanently held out)",
+          "runtime stdout: TEST usage: HASH_INTEGRITY_ONLY",
+          "runtime stdout: dataset hash (metadata anchor, TEST never read): 84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+          "the governed Kaggle dataset bundle contains train.jsonl and validation.jsonl only; no test.jsonl was uploaded",
+          "the raw TEST payload was never opened to produce this acceptance record - path, hash and log metadata only"
+        ]
+      },
+      "artifacts": {
+        "source": "Kaggle kernel version 3 output (external result download)",
+        "resultDirLabel": "kaggle-results/GHARIBO-exp-001",
+        "completionMarker": "COMPLETED",
+        "checksumFileEntries": 130,
+        "checksumFilesVerified": 129,
+        "checksumMismatches": 0,
+        "checksumFilesAbsentLocally": [
+          "__notebook__.ipynb"
+        ],
+        "absentFileNote": "Kaggle's internal executed-notebook copy: not served by the authenticated output API and not a model or result artifact. Its declared hash still participates in the rollup, so the rollup validates the full 130-entry manifest.",
+        "rollupHash": "788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885",
+        "rollupRecomputedMatches": true,
+        "rollupAlgorithm": "sha256 over \"\\n\".join(sorted(`${relativePath}\\t${sha256}`))",
+        "finalAdapterSha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+        "checkpoint160Sha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+        "checkpoint150Sha256": "5e062fa0bbba3c5276e3d6086f8e7dc0a7e1605c2dbf8c1d989ecbfe5a140249",
+        "adapterTensorCount": 96,
+        "adapterStorageDtype": "F32",
+        "checkpointSteps": [
+          150,
+          160
+        ],
+        "registeredKinds": [
+          "final_adapter",
+          "checkpoint_160",
+          "checkpoint_150",
+          "trainer_state",
+          "metrics",
+          "manifest",
+          "checksums"
+        ],
+        "commitPolicy": "Model binaries are never committed to the public repository; GitHub carries source, governance and tests only."
+      },
+      "evaluation": {
+        "status": "NOT_RUN",
+        "executed": false,
+        "authorizationStatus": "EVALUATION_READY_AWAITING_AUTHORIZATION",
+        "note": "No accepted governance rule authorizes held-out TEST evaluation at this stage. Training completion does not authorize TEST use, and TEST must not be used for validation, model selection, prompt engineering or checkpoint selection.",
+        "nextGate": "EXPLICIT_EVALUATION_AUTHORIZATION_REQUIRED"
+      },
+      "promotion": {
+        "promoted": false,
+        "targetModel": "GHARIBO-V0.1",
+        "targetStatus": "NOT_CREATED",
+        "reason": "Training completion is not model promotion. Promotion requires at least one real evaluation result; none exists."
+      },
+      "executionAttemptHistory": [
+        {
+          "attemptNumber": 1,
+          "decisionId": "DEC-0027",
+          "kernelVersion": 1,
+          "artifactNotebookSha256": "f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf",
+          "artifactLaunchBundleHash": "fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0",
+          "externalStatus": "KernelWorkerStatus.ERROR",
+          "rootCauseClass": "DEPENDENCY_INSTALL_FAILURE_WITH_DIAGNOSTIC_SUPPRESSED",
+          "trainingStarted": false,
+          "testPayloadUploaded": false,
+          "testPayloadAccessed": false
+        },
+        {
+          "attemptNumber": 2,
+          "decisionId": "DEC-0028",
+          "kernelVersion": 2,
+          "artifactNotebookSha256": "be4af0d4f9a492e7c6b5a2b713b205e17adf7d34d0d0f62aaf1589977cec54ba",
+          "artifactLaunchBundleHash": "4380da6382a1484ed41388661057c4a9c1c60f7ae34d612380a4b6f36da21230",
+          "externalStatus": "KernelWorkerStatus.ERROR",
+          "rootCauseClass": "FROZEN_SET_RESOLVER_UNSATISFIABLE_IN_SINGLE_TRANSACTION",
+          "trainingStarted": false,
+          "testPayloadUploaded": false,
+          "testPayloadAccessed": false
+        },
+        {
+          "attemptNumber": 3,
+          "decisionId": "DEC-0029",
+          "kernelVersion": 3,
+          "artifactNotebookSha256": "dda3b050034afa0922bda573565ff8f678767e62a944a01d597761aec254b4b1",
+          "artifactLaunchBundleHash": "b3b4efc8f4b4c04eedd8610b6b4cdb479817d638e971ce8e8c9b67079d587efb",
+          "externalStatus": "KernelWorkerStatus.COMPLETE",
+          "rootCauseClass": null,
+          "trainingStarted": true,
+          "testPayloadUploaded": false,
+          "testPayloadAccessed": false
+        }
+      ],
+      "recipe": {
+        "method": "QLoRA + SFT",
+        "quantization": "4-bit",
+        "declaredDtype": "fp16",
+        "effectiveDtype": "float32",
+        "sequenceLength": 512,
+        "loraR": 16,
+        "loraAlpha": 32,
+        "targetModules": [
+          "q_proj",
+          "v_proj"
+        ],
+        "perDeviceTrainBatchSize": 1,
+        "gradientAccumulationSteps": 4,
+        "effectiveBatchSize": 4,
+        "learningRate": 0.0002,
+        "epochs": 1,
+        "seed": 42,
+        "optimizer": "adamw_8bit",
+        "lrSchedulerType": "linear",
+        "warmupSteps": 5,
+        "weightDecay": 0.01,
+        "baseModel": "openai/gpt-oss-20b",
+        "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+        "loaderModelId": "unsloth/gpt-oss-20b",
+        "note": "Byte-identical to the DEC-0027/DEC-0028/DEC-0029 governed recipe except for the effective dtype, which the runtime imposed. No recipe field was edited after the fact."
+      },
+      "acceptedAt": "2026-09-15T20:22:22Z",
+      "acceptanceHash": "06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647"
     }
   },
   "datasets": {
@@ -1380,12 +1661,12 @@
       "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "KAGGLE_LAUNCH_REAUTHORIZED_AWAITING_RETRY",
+      "readinessStatus": "EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION",
       "engineDependencyCount": 12,
       "resolvedEngineDependencies": 9,
       "promotionTarget": "GHARIBO-V0.1",
       "promotable": false,
-      "promotionBlockedReason": "Promotion requires at least one evaluation result and a training-run reference; neither exists.",
+      "promotionBlockedReason": "Training completed, but promotion requires at least one real evaluation result and none exists. Training completion is not model promotion (ADR-0008).",
       "references": [
         "docs/MODEL_REGISTRY.md",
         "docs/TRAINING_STRATEGY.md"
@@ -1400,7 +1681,13 @@
       "recipeHash": "c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd",
       "authorizationQualificationHash": "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0",
       "authorizationEngineFreeze": "unsloth-freeze-2026.09.15",
-      "runStatus": "QUEUED"
+      "runStatus": "COMPLETED",
+      "trainingCompleted": true,
+      "trainingCompletedAt": "2026-09-15T19:47:46.274Z",
+      "declaredDtype": "fp16",
+      "effectiveDtype": "float32",
+      "runtimeDeviationClassification": "MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION",
+      "artifactRollupHash": "788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885"
     }
   },
   "models": {
@@ -1419,12 +1706,12 @@
       {
         "id": "GHARIBO-exp-001",
         "status": "EXPERIMENT",
-        "note": "Registered as an EXPERIMENT only. No training run, no evaluation."
+        "note": "Registered as an EXPERIMENT. A real training run has completed (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and an adapter exists, but no evaluation has run, so it is not promoted."
       },
       {
         "id": "GHARIBO-V0.1",
         "status": "NOT_CREATED",
-        "note": "Reserved name. Cannot be created without evaluation and promotion (ADR-0008)."
+        "note": "Reserved name. Cannot be created without evaluation and promotion (ADR-0008). Training completion alone does not create it."
       }
     ]
   },
@@ -1756,6 +2043,16 @@
         "id": "build",
         "command": "npm run build",
         "asserts": "Next.js production build"
+      },
+      {
+        "id": "build:dec0030",
+        "command": "node scripts/training/build-dec0030-acceptance.mjs --check",
+        "asserts": "the DEC-0030 acceptance record is byte-identical to its deterministic generator output"
+      },
+      {
+        "id": "verify:result",
+        "command": "python scripts/training/verify-kaggle-result.py",
+        "asserts": "the downloaded GHARIBO-exp-001 result matches CHECKSUMS.sha256 and recomputes the rollup (requires the private local result directory)"
       }
     ],
     "requiredBeforeCommit": [
@@ -1768,7 +2065,8 @@
       "typecheck",
       "lint",
       "test",
-      "build"
+      "build",
+      "build:dec0030"
     ],
     "lastVerifiedCheckpoint": "4d6c9fcd6e46af92ca1ef400bbffe7b71d68e0a3",
     "lastVerifiedAt": "2026-09-15",
@@ -1779,7 +2077,7 @@
         "command": "npm run master:generate",
         "status": "PASS",
         "exitCode": 0,
-        "evidence": "Generated docs/GHARIBO_MASTER_STATE.md from canonical JSON; masterStateVersion=1.3.0, updatedAt=2026-09-15, 23 decisions, 7 roadmap stages.",
+        "evidence": "Regenerated docs/GHARIBO_MASTER_STATE.md from the canonical JSON; masterStateVersion=1.11.0, updatedAt=2026-09-15, 30 decisions, 7 roadmap stages.",
         "verifiedAt": "2026-09-15"
       },
       {
@@ -1787,7 +2085,7 @@
         "command": "npm run master:validate",
         "status": "PASS",
         "exitCode": 0,
-        "evidence": "Master state validation PASSED: 21 top-level sections in order, DEC-0001..DEC-0023 gapless, current-state consistency PASS, TRAINING HAS NOT STARTED invariant PASS, generated Markdown byte-identical, secrets/privacy/path/reference checks PASS.",
+        "evidence": "19 checks PASS: 21 top-level sections in order, DEC-0001..DEC-0030 gapless, post-training execution invariants PASS (completion evidence real and coherent, TEST isolated, fp16->float32 deviation recorded, both failed attempts preserved, no evaluation or promotion claimed), generated Markdown byte-identical, secrets/privacy/machine-paths/references PASS.",
         "verifiedAt": "2026-09-15"
       },
       {
@@ -1795,15 +2093,15 @@
         "command": "npm run docs:validate",
         "status": "PASS",
         "exitCode": 0,
-        "evidence": "Documentation governance PASSED: 39 markdown + 2 diagram documents, 18 ADRs, docs:facts metrics consistent, 23 registered documents.",
+        "evidence": "Documentation governance PASSED: 40 markdown + 2 diagram documents, 19 ADRs, docs:facts metrics consistent (api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=19), register versions match each document header (Master State 1.11.0).",
         "verifiedAt": "2026-09-15"
       },
       {
         "gate": "verify:m2",
-        "command": "npm run verify:m2",
+        "command": "npm run verify:m2 -- --check",
         "status": "PASS",
         "exitCode": 0,
-        "evidence": "Milestone 2 metrics verified: api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=18.",
+        "evidence": "Milestone 2 metrics verified: api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=19.",
         "verifiedAt": "2026-09-15"
       },
       {
@@ -1811,7 +2109,7 @@
         "command": "npm run verify:m3a",
         "status": "PASS",
         "exitCode": 0,
-        "evidence": "61 PASS / 0 NOT_APPLICABLE / 2 PENDING_EXTERNAL_EXECUTION / 0 FAIL. Governed real-Kaggle environment qualification is PASS with qualification_hash=6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0. Only training execution and benchmark evaluation remain pending.",
+        "evidence": "65 PASS / 0 NOT_APPLICABLE / 1 PENDING_EXTERNAL_EXECUTION / 0 FAIL. Gate 12 was updated for the accepted completion: it now asserts the DEC-0030 acceptance hash (recomputed identical), post-training artifact acceptance (rollup 788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885, 129/130 verified, 0 mismatches), the truthful fp16->float32 runtime deviation, no auto-promotion and NOT_RUN evaluation. Only benchmark evaluation remains pending: a real adapter now exists but held-out TEST evaluation is not authorized.",
         "verifiedAt": "2026-09-15"
       },
       {
@@ -1819,7 +2117,7 @@
         "command": "npm run qualify:check",
         "status": "PASS",
         "exitCode": 0,
-        "evidence": "Post-freeze qualification harness matches package.ts and contract v1.5.0 / artifact schema 1.1.0; 16 cells; engine_version=unsloth-freeze-2026.09.15; content address=e7ff550c0c2e174a20a52d0a8f64ac78356cb63e4b699fb5b1e5ea92d1eb80dc.",
+        "evidence": "Post-freeze qualification harness matches package.ts and contract v1.5.0 / artifact schema 1.1.0; 16 cells; 78 user-defined functions; engine_version=unsloth-freeze-2026.09.15; content address=e7ff550c0c2e174a20a52d0a8f64ac78356cb63e4b699fb5b1e5ea92d1eb80dc.",
         "verifiedAt": "2026-09-15"
       },
       {
@@ -1843,7 +2141,7 @@
         "command": "npm test",
         "status": "PASS",
         "exitCode": 0,
-        "evidence": "Vitest: 4 test files passed; 153/153 tests passed.",
+        "evidence": "Vitest: 11 test files, 230/230 tests passed (including the new DEC-0030 execution-acceptance and post-training lifecycle suites).",
         "verifiedAt": "2026-09-15"
       },
       {
@@ -1851,8 +2149,24 @@
         "command": "npm run build",
         "status": "PASS",
         "exitCode": 0,
-        "evidence": "Next.js 14.2.35 production build compiled successfully; type/lint validation passed; 31/31 static pages generated.",
+        "evidence": "Next.js 14.2.35 production build compiled successfully; type/lint validation passed; 31/31 static pages generated; BUILD_ID pOXHhLltYfY5te-KN5oGA. Note: the first attempt in this session was interrupted by the WorkBuddy sandbox bulk-delete guard while Next removed its own .next/export directory; the build was re-run into a fresh .next and completed normally. No source change was required.",
         "environmentLimitation": false,
+        "verifiedAt": "2026-09-15"
+      },
+      {
+        "gate": "build:dec0030",
+        "command": "npm run build:dec0030",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "governance/DEC-0030-kaggle-execution-acceptance.json is up to date; acceptanceHash=06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647.",
+        "verifiedAt": "2026-09-15"
+      },
+      {
+        "gate": "verify:result",
+        "command": "npm run verify:result",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "Downloaded GHARIBO-exp-001 result: 130 manifest entries, 129 verified, 0 mismatches, rollup recomputed over the full manifest = 788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885 (matches declared). __notebook__.ipynb is Kaggle's internal executed-notebook copy: not served by the authenticated output API and not a model artifact; its declared hash still participates in the rollup. Requires the private local result directory.",
         "verifiedAt": "2026-09-15"
       }
     ],
@@ -1884,17 +2198,42 @@
         "docs/ENV_QUALIFICATION_CONTRACT.md",
         "docs/adr/ADR-0018-real-model-compatibility-qualification.md"
       ]
+    },
+    {
+      "id": "BLK-0003",
+      "status": "OPEN",
+      "title": "Held-out TEST evaluation is not authorized",
+      "detail": "OPEN 2026-09-15. GHARIBO-exp-001 has completed training, but no accepted governance rule authorizes held-out TEST evaluation at this stage. TEST must not be used for validation, model selection, prompt engineering or checkpoint selection. An explicit evaluation authorization is required before the first benchmark run (docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md §3.5 leakage audit).",
+      "blocks": [
+        "STAGE-2"
+      ],
+      "references": [
+        "docs/EVALUATION.md",
+        "docs/RESEARCH_BENCHMARK.md",
+        "governance/DEC-0030-kaggle-execution-acceptance.json"
+      ]
     }
   ],
   "nextActions": [
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Submit the exact DEC-0027 launch bundle to the private Kaggle T4 worker, then record the real Kaggle kernel status. Transition the run to RUNNING only after external evidence shows that execution has actually started.",
-      "requires": "DEC-0027",
+      "action": "Obtain an explicit, recorded evaluation authorization before any held-out TEST use, then run the governed benchmark (leakage audit first) and record real scores. Until then the adapter stays EXPERIMENTAL.",
+      "requires": "EXPLICIT_EVALUATION_AUTHORIZATION",
+      "references": [
+        "docs/EVALUATION.md",
+        "docs/RESEARCH_BENCHMARK.md",
+        "governance/DEC-0030-kaggle-execution-acceptance.json"
+      ]
+    },
+    {
+      "id": "ACT-0002",
+      "priority": "P1",
+      "action": "Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides.",
+      "requires": "DEC-0030",
       "references": [
         "docs/TRAINING_STRATEGY.md",
-        "governance/DEC-0027-kaggle-start-authorization.json"
+        "scripts/training/build-dec0030-acceptance.mjs"
       ]
     }
   ],
@@ -2070,6 +2409,27 @@
         "training status NOT_STARTED"
       ],
       "trainingExecuted": false
+    },
+    {
+      "revision": "1.11.0",
+      "date": "2026-09-15",
+      "summary": "Post-execution acceptance: DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and recorded the fp16→float32 runtime deviation instead of hiding it. Training state moved to COMPLETED, artifacts were registered, TEST isolation was re-proven, and evaluation stayed NOT_RUN with no model promotion.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "The containing commit cannot embed its own SHA. DEC-0030's acceptance hash is content-addressed over the acceptance body and is stable independent of the commit.",
+      "changes": [
+        "added DEC-0030 post-execution acceptance",
+        "added governance/DEC-0030-kaggle-execution-acceptance.json (acceptanceHash 06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647)",
+        "added scripts/training/build-dec0030-acceptance.mjs (deterministic generator + --check drift mode)",
+        "added scripts/training/verify-kaggle-result.py (read-only result verification)",
+        "recorded real training evidence: 640 examples, 1 epoch, 160 steps, train_loss 0.6016419500112533, train_runtime 4041.9648s",
+        "recorded effective dtype float32 against declared fp16 as MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION",
+        "resolved the parameter-count presentation as a 4-bit packed-storage accounting difference, not a model identity mismatch",
+        "re-proved TEST isolation (train/validation uploaded, test=ABSENT, HASH_INTEGRITY_ONLY)",
+        "kept evaluation NOT_RUN and GHARIBO-V0.1 NOT_CREATED",
+        "preserved attempts 1 and 2 as ERROR-before-training; DEC-0030 supersedes nothing"
+      ],
+      "trainingExecuted": true
     }
   ]
 }

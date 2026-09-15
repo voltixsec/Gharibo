@@ -34,11 +34,19 @@ describe("DEC-0026 execution authorization (accepted chain checkpoint)", () => {
     expect(dec0026).toHaveLength(1);
     expect(["ACCEPTED", "SUPERSEDED"]).toContain(dec0026[0].status);
 
-    expect(state.experiments["GHARIBO-exp-001"].runStatus).toBe("QUEUED");
+    // DEC-0026's own block is preserved verbatim: it authorized a QUEUED run and
+    // recorded that execution had not started.
     expect(state.training.executionAuthorization.executionAuthorized).toBe(true);
     expect(state.training.executionAuthorization.kaggleStartAuthorized).toBe(false);
     expect(state.training.executionAuthorization.executionStarted).toBe(false);
-    expect(state.training.hasStarted).toBe(false);
+    expect(state.training.executionAuthorization.status).toBe(
+      "EXECUTION_AUTHORIZED_QUEUED",
+    );
+
+    // The run it authorized has since executed and completed (DEC-0030), which is
+    // why this layer is history rather than the tip.
+    expect(state.experiments["GHARIBO-exp-001"].runStatus).toBe("COMPLETED");
+    expect(state.training.hasStarted).toBe(true);
   });
 
   it("fails closed for altered identity, TEST policy, RUNNING or start authorization", () => {
@@ -53,11 +61,19 @@ describe("DEC-0026 execution authorization (accepted chain checkpoint)", () => {
       (s: any) => { s.training.hasStarted = true; },
     ];
 
+    // The tip is now DEC-0030, so the accepted-chain predicate no longer keys off
+    // this layer's fields. What must still hold is that THIS layer fails closed.
     for (const mutate of mutations) {
       const bad = structuredClone(state);
       mutate(bad);
       expect(isExecutionAuthorizedGoldState(bad)).toBe(false);
-      expect(isAcceptedGoldGovernanceState(bad)).toBe(false);
     }
+
+    // The DEC-0030 tip fails closed on its own bindings: altering the DEC-0026
+    // authorization hash it carries must not stay accepted.
+    const badTip = structuredClone(state);
+    badTip.training.executionCompletion.executionAuthorizationHash = "0".repeat(64);
+    expect(isExecutionAuthorizedGoldState(badTip)).toBe(false);
+    expect(isAcceptedGoldGovernanceState(badTip)).toBe(false);
   });
 });

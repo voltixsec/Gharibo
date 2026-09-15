@@ -3,9 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   isAcceptedGoldGovernanceState,
+  isKaggleExecutionCompletedGoldState,
   isKaggleLaunchReauthorizedGoldState,
   isKaggleLaunchRepairedGoldState,
   isKaggleStartAuthorizedGoldState,
+  preExecutionState,
 } from "@/lib/training/gold-authorization.mjs";
 
 const root = path.resolve(__dirname, "../../../..");
@@ -38,19 +40,33 @@ const DEC0029_BUNDLE =
  * DEC-0028 repaired the artifact and authorized attempt 2, which failed at
  * KernelWorkerStatus.ERROR for a different, now fully-diagnosed reason: the whole
  * frozen set was submitted to one resolver transaction.
- * DEC-0029 reproduces the accepted qualification's install staging and is the tip.
+ * DEC-0029 reproduced the accepted qualification's install staging; attempt 3 then
+ * actually trained (KernelWorkerStatus.COMPLETE) and DEC-0030 accepted the outcome.
+ *
+ * DEC-0027/0028/0029 are therefore HISTORY, not the tip. Their own invariants are
+ * pinned here against `preExecutionState(state)` — the DEC-0029 checkpoint as it
+ * stood before DEC-0030 — so these assertions stay live instead of passing only
+ * because the tip no longer matches their shape.
  *
  * Every superseded checkpoint keeps every evidence field it recorded.
  */
 describe("superseded Kaggle launch checkpoints (DEC-0027, DEC-0028)", () => {
-  it("is retained as history while the reauthorized checkpoint is the tip", () => {
+  // The DEC-0029 checkpoint as it stood before DEC-0030 accepted the completion.
+  const preExecution = preExecutionState(state);
+
+  it("is retained as history while the completed execution is the tip", () => {
     // Neither older layer is the operative launch authorization any more.
     expect(isKaggleStartAuthorizedGoldState(state)).toBe(false);
     expect(isKaggleLaunchRepairedGoldState(state)).toBe(false);
+    expect(isKaggleLaunchReauthorizedGoldState(state)).toBe(false);
 
-    // The reauthorized checkpoint is the current tip, and the chain is still accepted.
-    expect(isKaggleLaunchReauthorizedGoldState(state)).toBe(true);
+    // The accepted completion is the current tip, and the chain is still accepted.
+    expect(isKaggleExecutionCompletedGoldState(state)).toBe(true);
     expect(isAcceptedGoldGovernanceState(state)).toBe(true);
+
+    // ...and the DEC-0029 checkpoint it grew out of still validates on its own terms.
+    expect(isKaggleLaunchReauthorizedGoldState(preExecution)).toBe(true);
+    expect(isAcceptedGoldGovernanceState(preExecution)).toBe(true);
 
     const byId = (id: string) => (state.decisions as any[]).filter((d) => d.id === id);
 
@@ -91,8 +107,13 @@ describe("superseded Kaggle launch checkpoints (DEC-0027, DEC-0028)", () => {
     expect(reauth.supersededLaunchBundleHash).toBe(DEC0028_BUNDLE);
     expect(reauth.supersededNotebookSha256).toBe(DEC0028_NOTEBOOK);
 
-    expect(state.experiments["GHARIBO-exp-001"].runStatus).toBe("QUEUED");
-    expect(state.training.hasStarted).toBe(false);
+    // DEC-0029's own block still records the pre-execution truth it was issued with.
+    expect(reauth.trainingHasStarted).toBe(false);
+
+    // The live state has since advanced to the accepted completion (DEC-0030) —
+    // advancing it did not rewrite any field of the superseded blocks above.
+    expect(state.experiments["GHARIBO-exp-001"].runStatus).toBe("COMPLETED");
+    expect(state.training.hasStarted).toBe(true);
   });
 
   it("records both launch attempts truthfully and never claims a training start", () => {
@@ -275,12 +296,21 @@ describe("superseded Kaggle launch checkpoints (DEC-0027, DEC-0028)", () => {
       },
     ];
 
+    // The mutations are applied to the DEC-0029 checkpoint as it stood before the
+    // completion, which is the state this layer's predicate actually governs.
     for (const mutate of mutations) {
-      const bad = structuredClone(state);
+      const bad = structuredClone(preExecution);
       mutate(bad);
 
       expect(isKaggleLaunchReauthorizedGoldState(bad)).toBe(false);
       expect(isAcceptedGoldGovernanceState(bad)).toBe(false);
     }
+
+    // The DEC-0030 tip fails closed on its own bindings too — altering the launch
+    // authorization hash it recorded must not stay accepted.
+    const badTip = structuredClone(state);
+    badTip.training.executionCompletion.launchAuthorizationHash = "0".repeat(64);
+    expect(isKaggleExecutionCompletedGoldState(badTip)).toBe(false);
+    expect(isAcceptedGoldGovernanceState(badTip)).toBe(false);
   });
 });

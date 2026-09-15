@@ -712,6 +712,220 @@ export function isKaggleLaunchReauthorizedGoldState(state) {
   return isKaggleLaunchRepairedGoldState(before);
 }
 
+const COMPLETED_READINESS =
+  "EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION";
+const COMPLETED_KERNEL_REF =
+  "vokaigharibo/gharibo-exp-001-kaggle-start-fec22ca2";
+const COMPLETED_KERNEL_VERSION = 3;
+const COMPLETED_EXTERNAL_STATUS = "KernelWorkerStatus.COMPLETE";
+const COMPLETED_GLOBAL_STEP = 160;
+const COMPLETED_EPOCHS = 1;
+const COMPLETED_ROLLUP =
+  "788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885";
+const COMPLETED_FINAL_ADAPTER =
+  "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f";
+const COMPLETED_CKPT_160 =
+  "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f";
+const COMPLETED_CKPT_150 =
+  "5e062fa0bbba3c5276e3d6086f8e7dc0a7e1605c2dbf8c1d989ecbfe5a140249";
+const COMPLETED_ACCEPTANCE_HASH =
+  "06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647";
+
+/**
+ * DEC-0030 accepts the POST-EXECUTION reality of the artifact DEC-0029 authorized.
+ *
+ * It is deliberately NOT a supersession: `supersedesDecisionId` is null because
+ * DEC-0027/0028/0029 remain the true history of what was launched, and attempts 1 and 2
+ * stay recorded as ERROR-before-training. What this checkpoint adds is the acceptance of
+ * a completed run — including the fp16 -> float32 runtime deviation, which is recorded
+ * rather than smoothed over — and the explicit refusal to promote a model or to treat
+ * training completion as evaluation.
+ */
+export function isKaggleExecutionCompletedGoldState(state) {
+  const training = state?.training;
+  const authorization = training?.authorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  const completion = training?.executionCompletion;
+
+  if (!completion ||
+      state?.masterStateVersion !== "1.11.0" ||
+      training?.status !== "COMPLETED" ||
+      training?.hasStarted !== true ||
+      state?.currentState?.trainingStatus !== "COMPLETED" ||
+      state?.currentState?.trainingHasStarted !== true ||
+      authorization?.status !== COMPLETED_READINESS ||
+      experiment?.readinessStatus !== COMPLETED_READINESS ||
+      experiment?.runStatus !== "COMPLETED" ||
+      experiment?.evaluationStatus !== "NOT_RUN" ||
+      completion?.status !== "KAGGLE_EXECUTION_COMPLETED_ACCEPTED" ||
+      completion?.decisionId !== "DEC-0030" ||
+      completion?.supersedesDecisionId !== null ||
+      completion?.packageId !== ISSUED_PACKAGE ||
+      completion?.runId !== ISSUED_RUN ||
+      completion?.experimentId !== "GHARIBO-exp-001" ||
+      completion?.issuanceReceiptHash !== ISSUANCE_RECEIPT ||
+      completion?.executionAuthorizationHash !== EXECUTION_AUTHORIZATION_HASH ||
+      completion?.startAuthorizationHash !== DEC0027_START_AUTHORIZATION_HASH ||
+      completion?.launchAuthorizationHash !==
+        training?.kaggleLaunchReauthorization?.launchAuthorizationHash ||
+      completion?.recipeHash !== RECIPE ||
+      completion?.qualificationHash !== ACCEPTED_QUALIFICATION_HASH ||
+      completion?.engineFreeze !== FREEZE ||
+      completion?.datasetHash !== ACCEPTED_GOLD_HASHES.dataset ||
+      ["train", "validation", "test"].some(
+        (split) => completion?.splitHashes?.[split] !== ACCEPTED_GOLD_HASHES[split],
+      ) ||
+      completion?.recordFormat !== "harmony-messages-v1") {
+    return false;
+  }
+
+  // ---------------------------------------------------------------- external execution
+  if (completion?.worker !== "kaggle" ||
+      completion?.accelerator !== "NvidiaTeslaT4" ||
+      completion?.kernelRef !== COMPLETED_KERNEL_REF ||
+      completion?.kernelVersion !== COMPLETED_KERNEL_VERSION ||
+      completion?.attemptNumber !== COMPLETED_KERNEL_VERSION ||
+      completion?.artifactNotebookSha256 !== REAUTHORIZED_NOTEBOOK ||
+      completion?.artifactLaunchBundleHash !== REAUTHORIZED_LAUNCH_BUNDLE ||
+      completion?.externalStatus !== COMPLETED_EXTERNAL_STATUS ||
+      completion?.executionStarted !== true ||
+      completion?.trainingStarted !== true ||
+      completion?.trainingCompleted !== true ||
+      completion?.fromStatus !== "QUEUED" ||
+      completion?.toStatus !== "COMPLETED") {
+    return false;
+  }
+
+  // ------------------------------------------------------------- real training evidence
+  const t = completion?.training;
+  if (!t ||
+      t.numExamples !== 640 ||
+      t.numEpochs !== COMPLETED_EPOCHS ||
+      t.totalSteps !== COMPLETED_GLOBAL_STEP ||
+      t.globalStep !== COMPLETED_GLOBAL_STEP ||
+      t.epoch !== 1 ||
+      t.perDeviceTrainBatchSize !== 1 ||
+      t.gradientAccumulationSteps !== 4 ||
+      t.totalBatchSize !== 4 ||
+      t.trainableParameters !== 3981312 ||
+      !(t.trainRuntimeSeconds > 0) ||
+      !(t.trainLoss > 0) ||
+      t.loggedSteps !== COMPLETED_GLOBAL_STEP ||
+      t.completionMarker !== "COMPLETED") {
+    return false;
+  }
+
+  // ------------------------------------------- the fp16 -> float32 deviation, recorded
+  const deviation = completion?.runtimeDeviation;
+  if (!deviation ||
+      deviation.declaredDtype !== "fp16" ||
+      deviation.effectiveDtype !== "float32" ||
+      deviation.classification !== "MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION" ||
+      deviation.operatorAuthored !== false ||
+      deviation.engineImposed !== true ||
+      deviation.recipeEditedRetroactively !== false ||
+      deviation.packageDtypeFieldUnchanged !== true ||
+      !Array.isArray(deviation.evidence) || deviation.evidence.length < 2) {
+    return false;
+  }
+
+  // ------------------------------------------------------------------ TEST isolation
+  const testPolicy = completion?.testPolicy;
+  if (!testPolicy ||
+      testPolicy.testPayloadUploaded !== false ||
+      testPolicy.testPayloadAccessed !== false ||
+      testPolicy.testUsage !== "HASH_INTEGRITY_ONLY" ||
+      testPolicy.testRecordsParsed !== 0) {
+    return false;
+  }
+
+  // ---------------------------------------------------------------- artifact evidence
+  const artifacts = completion?.artifacts;
+  if (!artifacts ||
+      artifacts.checksumMismatches !== 0 ||
+      artifacts.rollupHash !== COMPLETED_ROLLUP ||
+      artifacts.rollupRecomputedMatches !== true ||
+      artifacts.finalAdapterSha256 !== COMPLETED_FINAL_ADAPTER ||
+      artifacts.checkpoint160Sha256 !== COMPLETED_CKPT_160 ||
+      artifacts.checkpoint150Sha256 !== COMPLETED_CKPT_150 ||
+      artifacts.completionMarker !== "COMPLETED") {
+    return false;
+  }
+
+  // ------------------------------- completion must not smuggle in promotion or evaluation
+  // An unevaluated run is never promotable: ADR-0008 gates promotion on at least one real
+  // evaluation result, and `evaluationStatus` is NOT_RUN here by construction.
+  if (completion?.evaluation?.status !== "NOT_RUN" ||
+      completion?.evaluation?.executed !== false ||
+      completion?.promotion?.promoted !== false ||
+      completion?.promotion?.targetModel !== "GHARIBO-V0.1" ||
+      experiment?.promotable !== false ||
+      state?.training?.evaluationResults !== 0) {
+    return false;
+  }
+
+  // ------------------------------- attempts 1 and 2 stay ERROR-before-training, verbatim
+  const attempts = completion?.executionAttemptHistory;
+  if (!Array.isArray(attempts) || attempts.length !== 3) return false;
+  const [first, second, third] = attempts;
+  if (first?.attemptNumber !== 1 || first?.decisionId !== "DEC-0027" ||
+      first?.externalStatus !== "KernelWorkerStatus.ERROR" ||
+      first?.trainingStarted !== false) return false;
+  if (second?.attemptNumber !== 2 || second?.decisionId !== "DEC-0028" ||
+      second?.externalStatus !== "KernelWorkerStatus.ERROR" ||
+      second?.trainingStarted !== false) return false;
+  if (third?.attemptNumber !== 3 || third?.decisionId !== "DEC-0029" ||
+      third?.externalStatus !== COMPLETED_EXTERNAL_STATUS ||
+      third?.trainingStarted !== true) return false;
+
+  // --------------------------------------------------------------- acceptance hash + history
+  const { acceptanceHash, ...body } = completion;
+  if (createHash("sha256").update(JSON.stringify(canonical(body))).digest("hex") !==
+      acceptanceHash) {
+    return false;
+  }
+  if (acceptanceHash !== COMPLETED_ACCEPTANCE_HASH) return false;
+
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  const checkpoint = decisions.filter((decision) => decision?.id === "DEC-0030");
+  const previous = decisions.filter((decision) => decision?.id === "DEC-0029");
+  if (checkpoint.length !== 1 ||
+      checkpoint[0].status !== "ACCEPTED" ||
+      checkpoint[0].supersededBy !== null ||
+      checkpoint[0].supersedes !== null ||
+      previous.length !== 1 ||
+      previous[0].status !== "ACCEPTED" ||
+      previous[0].supersededBy !== null) {
+    return false;
+  }
+
+  return isKaggleLaunchReauthorizedGoldState(preExecutionState(state));
+}
+
+/**
+ * Reconstructs the DEC-0029 launch checkpoint exactly as it stood BEFORE DEC-0030
+ * accepted the completed execution. DEC-0029 stays an ACCEPTED decision: DEC-0030
+ * accepts its outcome rather than replacing its authority.
+ *
+ * Exported so the pre-execution predicates — and the regression tests that pin
+ * them — stay meaningful after the state advanced, instead of silently passing
+ * because the tip no longer matches their shape.
+ */
+export function preExecutionState(state) {
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.10.0";
+  before.training.status = "NOT_STARTED";
+  before.training.hasStarted = false;
+  before.currentState.trainingStatus = "NOT_STARTED";
+  before.currentState.trainingHasStarted = false;
+  before.training.authorization.status = REAUTHORIZED_READINESS;
+  before.experiments["GHARIBO-exp-001"].readinessStatus = REAUTHORIZED_READINESS;
+  before.experiments["GHARIBO-exp-001"].runStatus = "QUEUED";
+  delete before.training.executionCompletion;
+  before.decisions = before.decisions.filter((decision) => decision?.id !== "DEC-0030");
+  return before;
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -719,6 +933,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isExecutionAuthorizedGoldState(state) ||
     isKaggleStartAuthorizedGoldState(state) ||
     isKaggleLaunchRepairedGoldState(state) ||
-    isKaggleLaunchReauthorizedGoldState(state)
+    isKaggleLaunchReauthorizedGoldState(state) ||
+    isKaggleExecutionCompletedGoldState(state)
   );
 }

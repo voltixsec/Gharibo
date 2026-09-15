@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.10.0 |
+| **Version** | 1.11.0 |
 | **Last Updated** | 2026-09-15 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -20,10 +20,10 @@
 
 | Field | Value |
 | --- | --- |
-| Training status | NOT_STARTED |
-| Training invariant | TRAINING HAS NOT STARTED |
+| Training status | COMPLETED |
+| Training invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | DEC-0029 supersedes the DEC-0028 launch artifact. Launch attempt 2 was accepted and then failed at KernelWorkerStatus.ERROR in the pinned-engine install cell because the whole frozen set was submitted to one resolver transaction (unsloth/unsloth_zoo cap datasets<4.4.0 while the frozen set pins datasets==5.0.1). Section 4 now reproduces the accepted qualification's install staging with no change to the governed dependency set. One retry is authorized. TRAINING HAS NOT STARTED. |
+| Blocker summary | DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (kernel version 3, KernelWorkerStatus.COMPLETE): 640 examples, 1 epoch, 160 steps, train_loss 0.6016419500112533, effective runtime dtype float32 against a declared fp16 (engine-imposed, accepted, package not retroactively edited), TEST payload never uploaded or accessed. The result is an EXPERIMENTAL adapter: no evaluation has run and GHARIBO-V0.1 is NOT_CREATED. Next gate: an explicit evaluation authorization before TEST is touched. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -49,9 +49,9 @@
 
 | Field | Value |
 | --- | --- |
-| Status | NOT_STARTED |
-| Has started | false |
-| Invariant | TRAINING HAS NOT STARTED |
+| Status | COMPLETED |
+| Has started | true |
+| Invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
 | Engine | Unsloth Core (unsloth-core) — Measured freeze applied from the CTO-accepted Kaggle v6 qualification. torch/triton remain environment-preserved Kaggle runtime facts; triton_kernels remains conditional on the preserved path. |
 | Method | QLoRA + SFT |
 | Quantization | 4-bit |
@@ -63,14 +63,14 @@
 | Artifact policy — external | Hugging Face private repo (optional, free allowance) |
 | Artifact policy — fallback | local export/download — GHARIBO must work with no external artifact repo configured |
 | Artifact policy — GitHub | source code + docs only — never model artifacts |
-| Weights downloaded | false |
-| Adapters produced | 0 |
-| Checkpoints produced | 0 |
+| Weights downloaded | true |
+| Adapters produced | 1 |
+| Checkpoints produced | 2 |
 | Evaluation results | 0 |
 | Environment qualification | QUALIFIED |
 | Qualification hash | 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 |
 | Package preview | PREVIEW_ONLY |
-| Authorization status | KAGGLE_LAUNCH_REAUTHORIZED_AWAITING_RETRY |
+| Authorization status | EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION |
 | Authorization decision | DEC-0025 |
 | Authorized code snapshot | ad1e011c55729f5447b324d35b4ad88d0a47d10f |
 | Authorized preview package ID | f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c |
@@ -161,9 +161,9 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | KAGGLE_LAUNCH_REAUTHORIZED_AWAITING_RETRY | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | EXECUTION_COMPLETED_ACCEPTED_AWAITING_EVALUATION_AUTHORIZATION | 9/12 | GHARIBO-V0.1 | false |
 
-- **GHARIBO-exp-001 promotion blocked:** Promotion requires at least one evaluation result and a training-run reference; neither exists.
+- **GHARIBO-exp-001 promotion blocked:** Training completed, but promotion requires at least one real evaluation result and none exists. Training completion is not model promotion (ADR-0008).
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
 
 ## Models
@@ -178,8 +178,8 @@ Notes:
 
 | ID | Status | Note |
 | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | Registered as an EXPERIMENT only. No training run, no evaluation. |
-| GHARIBO-V0.1 | NOT_CREATED | Reserved name. Cannot be created without evaluation and promotion (ADR-0008). |
+| GHARIBO-exp-001 | EXPERIMENT | Registered as an EXPERIMENT. A real training run has completed (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and an adapter exists, but no evaluation has run, so it is not promoted. |
+| GHARIBO-V0.1 | NOT_CREATED | Reserved name. Cannot be created without evaluation and promotion (ADR-0008). Training completion alone does not create it. |
 
 ## Approved Roadmap
 
@@ -367,12 +367,14 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0027 | 2026-09-15 | Authorize the exact queued GHARIBO-exp-001 run for Kaggle start | SUPERSEDED | — |
 | DEC-0028 | 2026-09-15 | Repair the governed Kaggle launch artifact and re-authorize a single retry | SUPERSEDED | — |
 | DEC-0029 | 2026-09-15 | Stage the governed Kaggle install and re-authorize a single retry | ACCEPTED | — |
+| DEC-0030 | 2026-09-15 | Accept the completed GHARIBO-exp-001 Kaggle execution and record the fp16→float32 runtime deviation | ACCEPTED | — |
 
 ## Validation
 
 | ID | Command | Asserts |
 | --- | --- | --- |
 | build | `npm run build` | Next.js production build |
+| build:dec0030 | `node scripts/training/build-dec0030-acceptance.mjs --check` | the DEC-0030 acceptance record is byte-identical to its deterministic generator output |
 | docs:validate | `npm run docs:validate` | documentation governance + master state validation |
 | lint | `npm run lint` | ESLint |
 | master:generate | `npm run master:generate` | regenerates docs/GHARIBO_MASTER_STATE.md from the canonical JSON |
@@ -382,8 +384,9 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | typecheck | `npm run typecheck` | TypeScript |
 | verify:m2 | `npm run verify:m2 -- --check` | docs:facts metrics match the source tree |
 | verify:m3a | `npm run verify:m3a` | Milestone 3A/3B gate runner |
+| verify:result | `python scripts/training/verify-kaggle-result.py` | the downloaded GHARIBO-exp-001 result matches CHECKSUMS.sha256 and recomputes the rollup (requires the private local result directory) |
 
-**Required before commit:** `master:generate`, `master:validate`, `docs:validate`, `verify:m2`, `verify:m3a`, `qualify:check`, `typecheck`, `lint`, `test`, `build`
+**Required before commit:** `master:generate`, `master:validate`, `docs:validate`, `verify:m2`, `verify:m3a`, `qualify:check`, `typecheck`, `lint`, `test`, `build`, `build:dec0030`
 
 | Field | Value |
 | --- | --- |
@@ -395,16 +398,18 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | Gate | Command | Status | Exit code | Evidence | Verified at | Environment limitation |
 | --- | --- | --- | --- | --- | --- | --- |
-| master:generate | npm run master:generate | PASS | 0 | Generated docs/GHARIBO_MASTER_STATE.md from canonical JSON; masterStateVersion=1.3.0, updatedAt=2026-09-15, 23 decisions, 7 roadmap stages. | 2026-09-15 | — |
-| master:validate | npm run master:validate | PASS | 0 | Master state validation PASSED: 21 top-level sections in order, DEC-0001..DEC-0023 gapless, current-state consistency PASS, TRAINING HAS NOT STARTED invariant PASS, generated Markdown byte-identical, secrets/privacy/path/reference checks PASS. | 2026-09-15 | — |
-| docs:validate | npm run docs:validate | PASS | 0 | Documentation governance PASSED: 39 markdown + 2 diagram documents, 18 ADRs, docs:facts metrics consistent, 23 registered documents. | 2026-09-15 | — |
-| verify:m2 | npm run verify:m2 | PASS | 0 | Milestone 2 metrics verified: api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=18. | 2026-09-15 | — |
-| verify:m3a | npm run verify:m3a | PASS | 0 | 61 PASS / 0 NOT_APPLICABLE / 2 PENDING_EXTERNAL_EXECUTION / 0 FAIL. Governed real-Kaggle environment qualification is PASS with qualification_hash=6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0. Only training execution and benchmark evaluation remain pending. | 2026-09-15 | — |
-| qualify:check | npm run qualify:check | PASS | 0 | Post-freeze qualification harness matches package.ts and contract v1.5.0 / artifact schema 1.1.0; 16 cells; engine_version=unsloth-freeze-2026.09.15; content address=e7ff550c0c2e174a20a52d0a8f64ac78356cb63e4b699fb5b1e5ea92d1eb80dc. | 2026-09-15 | — |
+| master:generate | npm run master:generate | PASS | 0 | Regenerated docs/GHARIBO_MASTER_STATE.md from the canonical JSON; masterStateVersion=1.11.0, updatedAt=2026-09-15, 30 decisions, 7 roadmap stages. | 2026-09-15 | — |
+| master:validate | npm run master:validate | PASS | 0 | 19 checks PASS: 21 top-level sections in order, DEC-0001..DEC-0030 gapless, post-training execution invariants PASS (completion evidence real and coherent, TEST isolated, fp16->float32 deviation recorded, both failed attempts preserved, no evaluation or promotion claimed), generated Markdown byte-identical, secrets/privacy/machine-paths/references PASS. | 2026-09-15 | — |
+| docs:validate | npm run docs:validate | PASS | 0 | Documentation governance PASSED: 40 markdown + 2 diagram documents, 19 ADRs, docs:facts metrics consistent (api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=19), register versions match each document header (Master State 1.11.0). | 2026-09-15 | — |
+| verify:m2 | npm run verify:m2 -- --check | PASS | 0 | Milestone 2 metrics verified: api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=19. | 2026-09-15 | — |
+| verify:m3a | npm run verify:m3a | PASS | 0 | 65 PASS / 0 NOT_APPLICABLE / 1 PENDING_EXTERNAL_EXECUTION / 0 FAIL. Gate 12 was updated for the accepted completion: it now asserts the DEC-0030 acceptance hash (recomputed identical), post-training artifact acceptance (rollup 788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885, 129/130 verified, 0 mismatches), the truthful fp16->float32 runtime deviation, no auto-promotion and NOT_RUN evaluation. Only benchmark evaluation remains pending: a real adapter now exists but held-out TEST evaluation is not authorized. | 2026-09-15 | — |
+| qualify:check | npm run qualify:check | PASS | 0 | Post-freeze qualification harness matches package.ts and contract v1.5.0 / artifact schema 1.1.0; 16 cells; 78 user-defined functions; engine_version=unsloth-freeze-2026.09.15; content address=e7ff550c0c2e174a20a52d0a8f64ac78356cb63e4b699fb5b1e5ea92d1eb80dc. | 2026-09-15 | — |
 | typecheck | npm run typecheck | PASS | 0 | TypeScript tsc --noEmit completed successfully. | 2026-09-15 | — |
 | lint | npm run lint | PASS | 0 | Next.js ESLint completed with no warnings or errors. | 2026-09-15 | — |
-| test | npm test | PASS | 0 | Vitest: 4 test files passed; 153/153 tests passed. | 2026-09-15 | — |
-| build | npm run build | PASS | 0 | Next.js 14.2.35 production build compiled successfully; type/lint validation passed; 31/31 static pages generated. | 2026-09-15 | false |
+| test | npm test | PASS | 0 | Vitest: 11 test files, 230/230 tests passed (including the new DEC-0030 execution-acceptance and post-training lifecycle suites). | 2026-09-15 | — |
+| build | npm run build | PASS | 0 | Next.js 14.2.35 production build compiled successfully; type/lint validation passed; 31/31 static pages generated; BUILD_ID pOXHhLltYfY5te-KN5oGA. Note: the first attempt in this session was interrupted by the WorkBuddy sandbox bulk-delete guard while Next removed its own .next/export directory; the build was re-run into a fresh .next and completed normally. No source change was required. | 2026-09-15 | false |
+| build:dec0030 | npm run build:dec0030 | PASS | 0 | governance/DEC-0030-kaggle-execution-acceptance.json is up to date; acceptanceHash=06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647. | 2026-09-15 | — |
+| verify:result | npm run verify:result | PASS | 0 | Downloaded GHARIBO-exp-001 result: 130 manifest entries, 129 verified, 0 mismatches, rollup recomputed over the full manifest = 788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885 (matches declared). __notebook__.ipynb is Kaggle's internal executed-notebook copy: not served by the authenticated output API and not a model artifact; its declared hash still participates in the rollup. Requires the private local result directory. | 2026-09-15 | — |
 
 ## Blockers
 
@@ -412,12 +417,14 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | --- | --- | --- | --- | --- | --- |
 | BLK-0001 | CLOSED | Free-Kaggle v6 qualification completed and CTO-accepted | CLOSED 2026-09-15. Qualification artifact 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 is QUALIFIED with two independent fresh passes IDENTICAL and active-runtime alignment IDENTICAL. The measured engine freeze unsloth-freeze-2026.09.15 has been applied. This closure does not authorize training. | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/TRAINING_STRATEGY.md |
 | BLK-0002 | CLOSED | gpt-oss-20b model compatibility measured successfully | CLOSED 2026-09-15. openai/gpt-oss-20b loaded on the real free Kaggle GPU through the intended 4-bit QLoRA path; tokenizer/Harmony, adapter init, batch collation and one forward-only no_grad pass succeeded. Parameter digest remained 951055a91551d1d442d45f342a33ba3bfbb0efe500b8cc7c41ca0cf6a61a6331; TEST was not accessed; no training primitive executed and output hygiene passed. | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/adr/ADR-0018-real-model-compatibility-qualification.md |
+| BLK-0003 | OPEN | Held-out TEST evaluation is not authorized | OPEN 2026-09-15. GHARIBO-exp-001 has completed training, but no accepted governance rule authorizes held-out TEST evaluation at this stage. TEST must not be used for validation, model selection, prompt engineering or checkpoint selection. An explicit evaluation authorization is required before the first benchmark run (docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md §3.5 leakage audit). | STAGE-2 | docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md, governance/DEC-0030-kaggle-execution-acceptance.json |
 
 ## Next Actions
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Submit the exact DEC-0027 launch bundle to the private Kaggle T4 worker, then record the real Kaggle kernel status. Transition the run to RUNNING only after external evidence shows that execution has actually started. | DEC-0027 | docs/TRAINING_STRATEGY.md, governance/DEC-0027-kaggle-start-authorization.json |
+| ACT-0001 | P0 | Obtain an explicit, recorded evaluation authorization before any held-out TEST use, then run the governed benchmark (leakage audit first) and record real scores. Until then the adapter stays EXPERIMENTAL. | EXPLICIT_EVALUATION_AUTHORIZATION | docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md, governance/DEC-0030-kaggle-execution-acceptance.json |
+| ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
 
 ## History
 
@@ -432,6 +439,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.6.0 | 2026-09-15 | Executed DEC-0025 issuance authorization: persisted exactly one immutable GHARIBO-exp-001 Training Package and one linked DRAFT Training Run, independently reopened and verified them, and retained a separate execution-authorization boundary. | — | PENDING_CHECKPOINT |
 | 1.7.0 | 2026-09-15 | Accepted DEC-0026 execution authorization for the exact issued GHARIBO-exp-001 package/run. Authorized DRAFT to QUEUED only while retaining a hard separate boundary before RUNNING/Kaggle start. | — | PENDING_CHECKPOINT |
 | 1.8.0 | 2026-09-15 | Accepted DEC-0027 Kaggle Start authorization for the exact QUEUED GHARIBO-exp-001 run and the safe content-addressed launch notebook. Training remains NOT_STARTED until real Kaggle execution evidence is observed. | — | PENDING_CHECKPOINT |
+| 1.11.0 | 2026-09-15 | Post-execution acceptance: DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and recorded the fp16→float32 runtime deviation instead of hiding it. Training state moved to COMPLETED, artifacts were registered, TEST isolation was re-proven, and evaluation stayed NOT_RUN with no model promotion. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -541,3 +549,17 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - training status NOT_STARTED
 - This checkpoint authorizes Kaggle submission only; it does not itself constitute external execution evidence.
 - Training executed: false
+
+**1.11.0 — changes**
+- added DEC-0030 post-execution acceptance
+- added governance/DEC-0030-kaggle-execution-acceptance.json (acceptanceHash 06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647)
+- added scripts/training/build-dec0030-acceptance.mjs (deterministic generator + --check drift mode)
+- added scripts/training/verify-kaggle-result.py (read-only result verification)
+- recorded real training evidence: 640 examples, 1 epoch, 160 steps, train_loss 0.6016419500112533, train_runtime 4041.9648s
+- recorded effective dtype float32 against declared fp16 as MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION
+- resolved the parameter-count presentation as a 4-bit packed-storage accounting difference, not a model identity mismatch
+- re-proved TEST isolation (train/validation uploaded, test=ABSENT, HASH_INTEGRITY_ONLY)
+- kept evaluation NOT_RUN and GHARIBO-V0.1 NOT_CREATED
+- preserved attempts 1 and 2 as ERROR-before-training; DEC-0030 supersedes nothing
+- The containing commit cannot embed its own SHA. DEC-0030's acceptance hash is content-addressed over the acceptance body and is stable independent of the commit.
+- Training executed: true
