@@ -338,6 +338,21 @@ describe("notebook template regression guards", () => {
     );
   });
 
+  it("installs the frozen set in stages so the over-constrained pair never shares a resolver transaction", () => {
+    const s = templateSource();
+    // Regression guard for governed launch attempt 2: submitting the WHOLE frozen set to
+    // one resolver transaction is unsatisfiable, because unsloth/unsloth_zoo declare a
+    // conservative `datasets<4.4.0` metadata cap while the frozen set pins
+    // `datasets==5.0.1`. The accepted M3C qualification installed that pair with
+    // --no-deps; the launch notebook must do the same.
+    expect(s).toContain("FROZEN_NO_DEPS = ('unsloth', 'unsloth_zoo')");
+    expect(s).toContain("('install', [*BASE, *resolver_specs])");
+    expect(s).toContain("('frozen-no-deps', [*BASE, '--upgrade', '--no-deps', *frozen_specs])");
+    expect(s).toContain("if _dep['name'] in FROZEN_NO_DEPS:");
+    // the resolver stage must never carry the conflicting pair
+    expect(s).not.toContain("install_specs = []");
+  });
+
   it("preserves the Kaggle-provided torch/triton instead of re-resolving them from PyPI", () => {
     const s = templateSource();
     expect(s).toContain("KAGGLE_PRESERVED_CANDIDATES = ('torch', 'triton')");
