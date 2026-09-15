@@ -191,6 +191,19 @@ export function renderMasterStateMarkdown(state) {
       ['Adapters produced', tr.adaptersProduced],
       ['Checkpoints produced', tr.checkpointsProduced],
       ['Evaluation results', tr.evaluationResults],
+      ['Environment qualification', tr.qualification?.status ?? 'UNRECORDED'],
+      ['Qualification hash', tr.qualification?.qualificationHash ?? null],
+      ['Qualification accepted by CTO', tr.qualification?.ctoAccepted ?? false],
+      ['Engine freeze',
+        tr.engine.freezeLabel
+          ? `${tr.engine.freezeLabel} (${tr.engine.freezeApplied ? 'applied' : 'not applied'})`
+          : 'UNFROZEN'],
+      ['Executed harness content address',
+        tr.qualification?.executedHarnessContentAddress ?? null],
+      ['Post-freeze harness content address',
+        tr.qualification?.postFreezeHarnessContentAddress ?? null],
+      ['Experiment authorized',
+        tr.qualification?.experimentAuthorized ?? false],
     ]),
   );
   push('');

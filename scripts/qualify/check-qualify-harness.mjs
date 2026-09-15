@@ -323,6 +323,12 @@ for (const dep of pinned) {
   if ((entry.url ?? null) !== dep.url) fail("inventory", `${dep.name}: url ${entry.url} != package.ts ${dep.url}`);
   if (entry.pinned_in_package_ts !== true) fail("inventory", `${dep.name}: pinned_in_package_ts should be true`);
   if (!entry.install) fail("inventory", `${dep.name}: no install argument`);
+  if (dep.source === "pip" && entry.install !== dep.spec) {
+    fail(
+      "inventory",
+      `${dep.name}: pip install argument "${entry.install}" != authoritative package.ts spec "${dep.spec}"`,
+    );
+  }
 }
 
 // Contract §4.3 rule 1: dependencies[] must be EXACTLY the pinned set.
@@ -803,18 +809,21 @@ for (const stale of [
   }
 }
 
-const expectedRecipe = new Map([
-  ['unsloth', 'unsloth'], ['unsloth_zoo', 'unsloth_zoo'],
-  ['transformers', 'transformers==4.56.2'], ['trl', 'trl==0.22.2'],
-  ['tokenizers', 'tokenizers>=0.22.0,<=0.23.0'], ['torchao', 'torchao>=0.16.0'],
+// Pinned pip recipe specs are governed by package.ts and validated above.
+// Only qualification-only additional dependencies remain intentionally
+// constrained here because they do not exist in PINNED_ENGINE_DEPENDENCIES.
+const expectedAdditionalRecipe = new Map([
+  ['tokenizers', 'tokenizers>=0.22.0,<=0.23.0'],
+  ['torchao', 'torchao>=0.16.0'],
   ['huggingface-hub', 'huggingface-hub>=0.34.0,<1.0'],
 ]);
-const recipeByName = new Map([...inventory.pinned_dependencies, ...inventory.additional_dependencies]
-  .map(dep => [dep.name, dep]));
-for (const [name, spec] of expectedRecipe) {
-  const entry = recipeByName.get(name);
+const additionalRecipeByName = new Map(
+  inventory.additional_dependencies.map(dep => [dep.name, dep]),
+);
+for (const [name, spec] of expectedAdditionalRecipe) {
+  const entry = additionalRecipeByName.get(name);
   if (!entry || entry.source !== 'pip' || entry.requested_spec !== spec || entry.install !== spec || entry.url !== null) {
-    fail('install', name + ': recipe source/spec/install metadata drift');
+    fail('install', name + ': additional recipe source/spec/install metadata drift');
   }
 }
 if (tritonKernels?.skip_if_kaggle_preserved !== true) fail('install', 'triton_kernels must be conditional');

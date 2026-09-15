@@ -43,44 +43,22 @@ export const LOADER_MODEL_ID = "unsloth/gpt-oss-20b";
 // ---------------------------------------------------------------------------
 
 /** The M2 dependency-freeze label (a date-based pin). */
-export const UNSLOTH_ENGINE_VERSION = "unsloth-freeze-2026.09.14";
+export const UNSLOTH_ENGINE_VERSION = "unsloth-freeze-2026.09.15";
 
 /** The exact pinned Unsloth install set (m2-stack-facts.md §4). */
 export const PINNED_ENGINE_DEPENDENCIES: EngineDependency[] = [
   { name: "torch", source: "pip", spec: "torch>=2.8.0", resolvedVersion: null, url: null },
   { name: "triton", source: "pip", spec: "triton>=3.4.0", resolvedVersion: null, url: null },
-  { name: "unsloth_zoo", source: "pip", spec: "unsloth_zoo", resolvedVersion: null, url: null },
-  { name: "unsloth", source: "pip", spec: "unsloth", resolvedVersion: null, url: null },
-  { name: "transformers", source: "pip", spec: "transformers==4.56.2", resolvedVersion: null, url: null },
-  {
-    name: "triton_kernels",
-    source: "git",
-    // Conditional: excluded from Kaggle qualification when torch is preserved.
-    // The package lives in a subdirectory of the triton monorepo, so the
-    // `#subdirectory=` fragment is required for the spec to be installable.
-    spec: "@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels",
-    resolvedVersion: null,
-    url: "https://github.com/triton-lang/triton.git",
-  },
-  // ---- Direct recipe dependencies (contract §4.5 promotion — 6→12) ----
-  // These are required by the gpt-oss-20b QLoRA+SFT recipe. They are pinned
-  // here (pinned_in_package_ts = true) so the qualification harness records
-  // them in `dependencies[]`, not `additional_dependencies[]`. The spec is
-  // an upstream constraint or bare name; the resolved version is not known until a
-  // real Kaggle T4 run; the harness resolves it and records the frozen form
-  // (name==version) into the manifest at run time. Nothing is invented.
-  { name: "peft", source: "pip", spec: "peft", resolvedVersion: null, url: null },
-  { name: "trl", source: "pip", spec: "trl==0.22.2", resolvedVersion: null, url: null },
-  { name: "datasets", source: "pip", spec: "datasets", resolvedVersion: null, url: null },
-  { name: "accelerate", source: "pip", spec: "accelerate", resolvedVersion: null, url: null },
-  { name: "bitsandbytes", source: "pip", spec: "bitsandbytes", resolvedVersion: null, url: null },
-  {
-    name: "openai-harmony",
-    source: "pip",
-    spec: "openai-harmony",
-    resolvedVersion: null,
-    url: null,
-  },
+  { name: "unsloth_zoo", source: "pip", spec: "unsloth_zoo==2026.9.3", resolvedVersion: "2026.9.3", url: null },
+  { name: "unsloth", source: "pip", spec: "unsloth==2026.9.4", resolvedVersion: "2026.9.4", url: null },
+  { name: "transformers", source: "pip", spec: "transformers==4.56.2", resolvedVersion: "4.56.2", url: null },
+  { name: "triton_kernels", source: "git", spec: "@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels", resolvedVersion: null, url: "https://github.com/triton-lang/triton.git" },
+  { name: "peft", source: "pip", spec: "peft==0.20.0", resolvedVersion: "0.20.0", url: null },
+  { name: "trl", source: "pip", spec: "trl==0.22.2", resolvedVersion: "0.22.2", url: null },
+  { name: "datasets", source: "pip", spec: "datasets==5.0.1", resolvedVersion: "5.0.1", url: null },
+  { name: "accelerate", source: "pip", spec: "accelerate==1.15.0", resolvedVersion: "1.15.0", url: null },
+  { name: "bitsandbytes", source: "pip", spec: "bitsandbytes==0.50.2", resolvedVersion: "0.50.2", url: null },
+  { name: "openai-harmony", source: "pip", spec: "openai-harmony==0.0.8", resolvedVersion: "0.0.8", url: null },
 ];
 
 /** Builds a fresh copy of the pinned engine config. */

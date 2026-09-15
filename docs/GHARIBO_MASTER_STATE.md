@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-09-15 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
 > from [`governance/GHARIBO_MASTER_STATE.json`](../governance/GHARIBO_MASTER_STATE.json) by
@@ -22,8 +22,8 @@
 | --- | --- |
 | Training status | NOT_STARTED |
 | Training invariant | TRAINING HAS NOT STARTED |
-| Current milestone | M3C (IN_PROGRESS) |
-| Blocker summary | A real free-Kaggle T4 qualification run is required: it resolves the 12 pinned engine dependency versions, loads openai/gpt-oss-20b and proves by parameter digest that no parameter is updated, producing the qualification hash that gates the architecture 15 O3 freeze. |
+| Current milestone | M3C (COMPLETE) |
+| Blocker summary | M3C is complete: the real Kaggle v6 qualification was CTO-inspected and accepted, the measured engine freeze was applied, and post-freeze static, test and build gates pass. Training remains NOT_STARTED; GHARIBO-exp-001 still requires a separate explicit CTO authorization before execution. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -52,7 +52,7 @@
 | Status | NOT_STARTED |
 | Has started | false |
 | Invariant | TRAINING HAS NOT STARTED |
-| Engine | Unsloth Core (unsloth-core) — Pinned install set required; a bare `pip install unsloth` is insufficient. |
+| Engine | Unsloth Core (unsloth-core) — Measured freeze applied from the CTO-accepted Kaggle v6 qualification. torch/triton remain environment-preserved Kaggle runtime facts; triton_kernels remains conditional on the preserved path. |
 | Method | QLoRA + SFT |
 | Quantization | 4-bit |
 | Base model candidate | openai/gpt-oss-20b |
@@ -67,6 +67,13 @@
 | Adapters produced | 0 |
 | Checkpoints produced | 0 |
 | Evaluation results | 0 |
+| Environment qualification | QUALIFIED |
+| Qualification hash | 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 |
+| Qualification accepted by CTO | true |
+| Engine freeze | unsloth-freeze-2026.09.15 (applied) |
+| Executed harness content address | 8dc7b26363b82b25522ebcfa128da6cccdbbc3699aed65bb0ae3e60d4d9ee50a |
+| Post-freeze harness content address | e7ff550c0c2e174a20a52d0a8f64ac78356cb63e4b699fb5b1e5ea92d1eb80dc |
+| Experiment authorized | false |
 
 ## Datasets
 
@@ -103,7 +110,7 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | — | NOT_RUN | READY_FOR_ENV_QUALIFICATION | 0/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | — | NOT_RUN | ENV_QUALIFIED_AWAITING_EXPLICIT_AUTHORIZATION | 9/12 | GHARIBO-V0.1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** Promotion requires at least one evaluation result and a training-run reference; neither exists.
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -302,6 +309,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0020 | 2026-09-14 | GHARIBO Master State as the canonical single source of truth | ACCEPTED | `docs/adr/ADR-0017-master-state-single-source-of-truth.md` |
 | DEC-0021 | 2026-09-14 | Real model-compatibility qualification before the engine freeze | ACCEPTED | `docs/adr/ADR-0018-real-model-compatibility-qualification.md` |
 | DEC-0022 | 2026-09-14 | CTO governance corrections: TRAIN-ONLY fixture, generic GPU, output hygiene, no auto-freeze | ACCEPTED | `docs/adr/ADR-0018-real-model-compatibility-qualification.md` |
+| DEC-0023 | 2026-09-15 | Accept Kaggle v6 qualification and apply the measured engine freeze | ACCEPTED | `docs/adr/ADR-0018-real-model-compatibility-qualification.md` |
 
 ## Validation
 
@@ -322,39 +330,39 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | Field | Value |
 | --- | --- |
-| Last verified checkpoint | a42315b39161aee19a80940a19228e81046ce562 |
-| Last verified at | 2026-09-14 |
+| Last verified checkpoint | 4d6c9fcd6e46af92ca1ef400bbffe7b71d68e0a3 |
+| Last verified at | 2026-09-15 |
 | Note | results are recorded by QA after a full gate run; this section must never claim a gate that was not actually executed. |
 
 **Recorded results**
 
 | Gate | Command | Status | Exit code | Evidence | Verified at | Environment limitation |
 | --- | --- | --- | --- | --- | --- | --- |
-| master:generate | npm run master:generate | PASS | 0 | wrote docs/GHARIBO_MASTER_STATE.md (373 lines); version 1.1.0; decisions 21; roadmap 7 stages | 2026-09-14 | — |
-| master:validate | npm run master:validate | PASS | 0 | 18/18 checks PASS (json, schema, sections, decision-ids, decision-status, roadmap, experiment-refs, model-refs, dataset-refs, consistency, training-invariant, markdown, secrets, privacy, machine-paths, adr-link, supersession, references) | 2026-09-14 | — |
-| docs:validate | npm run docs:validate | PASS | 0 | documentation governance PASSED (39 markdown + 2 diagram docs, 18 ADRs, facts api_route_files=36/api_handlers=53/sqlite_tables=17/dashboard_pages=11/adrs=18, 23 register docs) followed by master state 18/18 PASS | 2026-09-14 | — |
-| verify:m2 | npm run verify:m2 -- --check | PASS | 0 | docs:facts block matches the source tree (api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=18) | 2026-09-14 | — |
-| verify:m3a | npm run verify:m3a | PASS | 0 | 60 check(s) passed; 0 NOT_APPLICABLE; 3 PENDING_EXTERNAL_EXECUTION (real Kaggle GPU run required); 0 FAIL. Gate 13 strengthened to 22 forbidden training shapes plus 9 positive model-compatibility assertions. | 2026-09-14 | — |
-| qualify:check | npm run qualify:check | PASS | 0 | harness matches package.ts and conforms to qualification contract v1.3.0 (artifact schema 1.1.0); 16 cells, content address 9d8dc0b0e1391fc5f6f18b87d98e781b1b1654b59b0d61d2d90f99f90782d7f8; model-compat 14 named steps / 33 mandated keys; no dataset example content embedded | 2026-09-14 | — |
-| typecheck | npm run typecheck | PASS | 0 | tsc --noEmit completed with no errors (apps/web) | 2026-09-14 | — |
-| lint | npm run lint | PASS | 0 | next lint: No ESLint warnings or errors | 2026-09-14 | — |
-| test | npm test | PASS | 0 | 153/153 tests passed across 4 files (smoke 47, m2-workers 26, m2-training 51, m2-repositories 29) | 2026-09-14 | — |
-| build | npm run build | PASS | 0 | Next.js 14.2.35 production build: Compiled successfully; Generating static pages (31/31); exit code 0. The in-sandbox attempt is blocked by the WorkBuddy safe-delete cleanup guard on Next.js own .next removal (SAFE_DELETE_BULK_CONFIRM_REQUIRED), so the build was run with the sandbox bypassed; the guard is an environment artifact, not a build failure. | 2026-09-14 | false |
+| master:generate | npm run master:generate | PASS | 0 | Generated docs/GHARIBO_MASTER_STATE.md from canonical JSON; masterStateVersion=1.3.0, updatedAt=2026-09-15, 23 decisions, 7 roadmap stages. | 2026-09-15 | — |
+| master:validate | npm run master:validate | PASS | 0 | Master state validation PASSED: 21 top-level sections in order, DEC-0001..DEC-0023 gapless, current-state consistency PASS, TRAINING HAS NOT STARTED invariant PASS, generated Markdown byte-identical, secrets/privacy/path/reference checks PASS. | 2026-09-15 | — |
+| docs:validate | npm run docs:validate | PASS | 0 | Documentation governance PASSED: 39 markdown + 2 diagram documents, 18 ADRs, docs:facts metrics consistent, 23 registered documents. | 2026-09-15 | — |
+| verify:m2 | npm run verify:m2 | PASS | 0 | Milestone 2 metrics verified: api_route_files=36, api_handlers=53, sqlite_tables=17, dashboard_pages=11, adrs=18. | 2026-09-15 | — |
+| verify:m3a | npm run verify:m3a | PASS | 0 | 61 PASS / 0 NOT_APPLICABLE / 2 PENDING_EXTERNAL_EXECUTION / 0 FAIL. Governed real-Kaggle environment qualification is PASS with qualification_hash=6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0. Only training execution and benchmark evaluation remain pending. | 2026-09-15 | — |
+| qualify:check | npm run qualify:check | PASS | 0 | Post-freeze qualification harness matches package.ts and contract v1.5.0 / artifact schema 1.1.0; 16 cells; engine_version=unsloth-freeze-2026.09.15; content address=e7ff550c0c2e174a20a52d0a8f64ac78356cb63e4b699fb5b1e5ea92d1eb80dc. | 2026-09-15 | — |
+| typecheck | npm run typecheck | PASS | 0 | TypeScript tsc --noEmit completed successfully. | 2026-09-15 | — |
+| lint | npm run lint | PASS | 0 | Next.js ESLint completed with no warnings or errors. | 2026-09-15 | — |
+| test | npm test | PASS | 0 | Vitest: 4 test files passed; 153/153 tests passed. | 2026-09-15 | — |
+| build | npm run build | PASS | 0 | Next.js 14.2.35 production build compiled successfully; type/lint validation passed; 31/31 static pages generated. | 2026-09-15 | false |
 
 ## Blockers
 
 | ID | Status | Title | Detail | Blocks | References |
 | --- | --- | --- | --- | --- | --- |
-| BLK-0001 | OPEN | Free-Kaggle T4 qualification run required | The 12 pinned engine dependency versions are unresolved (resolvedVersion = null by design - never fabricate) and no qualification hash exists. A real free-Kaggle T4 run is required; it must now also load openai/gpt-oss-20b and prove the parameter digest is unchanged (contract 14). | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/TRAINING_STRATEGY.md |
-| BLK-0002 | OPEN | Model compatibility is unmeasured until the Kaggle run executes (TRAIN-ONLY fixture, no auto-freeze) | Whether openai/gpt-oss-20b loads and initialises in 4-bit within a free GPU 16 GB budget is an assumption until the qualification run measures it. If it does not fit, the run records QUALIFICATION_FAILED_MEASURED with the failing step and exception; no smaller model is substituted and the architecture is not changed. The harness now uses a TRAIN-ONLY fixture (qualification_fixture_source=TRAIN_ONLY, test_data_accessed=false), records generic GPU info, checks output hygiene, and does NOT auto-freeze (auto_freeze_applied=false, experiment_authorized=false) — the CTO must inspect before any freeze. | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/adr/ADR-0018-real-model-compatibility-qualification.md |
+| BLK-0001 | CLOSED | Free-Kaggle v6 qualification completed and CTO-accepted | CLOSED 2026-09-15. Qualification artifact 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 is QUALIFIED with two independent fresh passes IDENTICAL and active-runtime alignment IDENTICAL. The measured engine freeze unsloth-freeze-2026.09.15 has been applied. This closure does not authorize training. | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/TRAINING_STRATEGY.md |
+| BLK-0002 | CLOSED | gpt-oss-20b model compatibility measured successfully | CLOSED 2026-09-15. openai/gpt-oss-20b loaded on the real free Kaggle GPU through the intended 4-bit QLoRA path; tokenizer/Harmony, adapter init, batch collation and one forward-only no_grad pass succeeded. Parameter digest remained 951055a91551d1d442d45f342a33ba3bfbb0efe500b8cc7c41ca0cf6a61a6331; TEST was not accessed; no training primitive executed and output hygiene passed. | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/adr/ADR-0018-real-model-compatibility-qualification.md |
 
 ## Next Actions
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Run the qualification notebook on a free Kaggle T4 session with GHARIBO-Research-Gold-v0.1 attached: resolve the 12 pinned engine dependency versions, load openai/gpt-oss-20b, run the forward-only dry run, and produce the qualification hash. | CTO authorization | docs/ENV_QUALIFICATION_CONTRACT.md, docs/adr/ADR-0018-real-model-compatibility-qualification.md |
-| ACT-0002 | P0 | Freeze the engine dependency set (architecture 15 O3) once the qualification hash exists AND the model-compatibility block reports QUALIFIED. | ACT-0001 | docs/ARCHITECTURE.md, docs/ENV_QUALIFICATION_CONTRACT.md |
-| ACT-0003 | P1 | Begin STAGE-1 (GHARIBO-exp-001) only after the environment is qualified and training is explicitly authorized. | ACT-0001, ACT-0002, CTO authorization | docs/MODEL_REGISTRY.md |
+| ACT-0001 | P0 | Verify the final GHARIBO-exp-001 Training Package identity against the accepted qualification hash and unsloth-freeze-2026.09.15. This is authorization preparation only; do not execute training. | M3C COMPLETE | docs/ENV_QUALIFICATION_CONTRACT.md, docs/ARCHITECTURE_MILESTONE_2.md |
+| ACT-0002 | P0 | Issue a separate explicit governed CTO authorization for GHARIBO-exp-001 only after the final Training Package identity and pre-execution invariants are verified. | ACT-0001, CTO authorization | docs/TRAINING_STRATEGY.md, docs/MODEL_REGISTRY.md |
+| ACT-0003 | P1 | Only after ACT-0002 is explicitly accepted, execute STAGE-1 (GHARIBO-exp-001) on the approved free Kaggle worker and preserve its immutable run/package/result identities. | ACT-0002 | docs/TRAINING_STRATEGY.md, docs/ARCHITECTURE_MILESTONE_2.md |
 
 ## History
 
@@ -363,6 +371,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.0.0 | 2026-09-14 | Established the GHARIBO master state, the deterministic generator/validator pair, and the approved Universal Commercial + Procurement Knowledge Graph direction (ADR-0015..ADR-0017). | — | PENDING_CHECKPOINT |
 | 1.1.0 | 2026-09-14 | Milestone 3C: upgraded the qualification harness from dependency-only to real model-compatibility qualification. The generated notebook now loads openai/gpt-oss-20b on a free-Kaggle T4, verifies tokenizer and OpenAI Harmony against a real GHARIBO example, initialises QLoRA adapters, collates one batch and runs a single forward-only dry run under no_grad - proving by sha256 parameter digest that no parameter is updated (ADR-0018, DEC-0021). | — | PENDING_CHECKPOINT |
 | 1.2.0 | 2026-09-14 | CTO governance corrections to the M3C qualification harness: TRAIN-ONLY fixture (only train.jsonl attached), generic GPU detection (no hardcoded T4 x2), output hygiene guard, and no auto-freeze enforcement. Bumped harness to v2.1.0 and contract doc to v1.4.0. | — | PENDING_CHECKPOINT |
+| 1.3.0 | 2026-09-15 | M3C closure: accepted the real Kaggle v6 qualification artifact, applied the measured engine freeze, recorded qualification provenance and safety evidence, closed the two environment/model-compatibility blockers, and moved GHARIBO-exp-001 to qualified-but-not-authorized. Training has not started. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -405,4 +414,17 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - updated BLK-0002 to mention TRAIN-ONLY fixture and no auto-freeze
 - refreshed scripts/qualify/README.md for v2.1.0 harness
 - A commit SHA cannot be embedded in the commit that contains it; the SHA is recorded in the next master-state revision.
+- Training executed: false
+
+**1.3.0 — changes**
+- accepted Kaggle v6 qualification hash 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0
+- recorded executed harness content address 8dc7b26363b82b25522ebcfa128da6cccdbbc3699aed65bb0ae3e60d4d9ee50a
+- recorded post-freeze harness content address e7ff550c0c2e174a20a52d0a8f64ac78356cb63e4b699fb5b1e5ea92d1eb80dc
+- applied engine freeze unsloth-freeze-2026.09.15
+- recorded 9 package-resolved dependencies / 12 governed dependency entries
+- closed BLK-0001 and BLK-0002
+- added DEC-0023
+- set M3C milestoneStatus=COMPLETE
+- kept training status NOT_STARTED and experimentAuthorized=false
+- This governance revision is being validated on the working tree; the checkpoint SHA is recorded after commit.
 - Training executed: false

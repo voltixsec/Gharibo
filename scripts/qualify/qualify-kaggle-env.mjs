@@ -307,10 +307,11 @@ const KAGGLE_INPUT_ROOT = "/kaggle/input";
 
 // ---------------------------------------------------------------------------
 // 2. Inventory: how each pinned dependency is actually installed + probed.
-//    `install` is the exact argument handed to `uv pip install`.
+//    For pinned pip dependencies, `package.ts` spec is the authoritative install
+//    argument. Git entries may need install-detail metadata to compose the URL.
 // ---------------------------------------------------------------------------
 
-/** Per-dependency install detail, keyed by the package.ts name. */
+/** Per-dependency probe/install detail, keyed by the package.ts name. */
 const PINNED_INSTALL_DETAIL = {
   torch: { install: "torch>=2.8.0", modules: ["torch"], preserveIfPreinstalled: true },
   triton: { install: "triton>=3.4.0", modules: ["triton"], preserveIfPreinstalled: true },
@@ -395,7 +396,7 @@ const PINNED_INVENTORY = PINNED.map((dep) => {
     source: dep.source,
     requested_spec: dep.spec,
     url: dep.url,
-    install: detail.install,
+    install: dep.source === "pip" ? dep.spec : detail.install,
     fragment: detail.fragment ?? null,
     no_build_isolation: detail.noBuildIsolation === true,
     modules: detail.modules,

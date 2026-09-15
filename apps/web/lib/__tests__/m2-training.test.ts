@@ -548,13 +548,28 @@ describe("zip.ts", () => {
     expect(Buffer.from(createZip(entries))).toEqual(Buffer.from(createZip(entries)));
   });
 
-  it("is a real archive readable by the system unzip tool", () => {
+  it("is a real archive readable by a system archive tool", () => {
     const zipPath = path.join(os.tmpdir(), `gharibo-m2-zip-${Date.now()}.zip`);
     fs.writeFileSync(zipPath, Buffer.from(createZip(entries)));
     try {
-      const res = spawnSync("unzip", ["-t", zipPath], { encoding: "utf8" });
-      expect(res.status).toBe(0);
-      expect(res.stdout).toContain("No errors detected");
+      const unzip = spawnSync("unzip", ["-t", zipPath], { encoding: "utf8" });
+      const unzipMissing =
+        (unzip.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
+
+      if (unzipMissing) {
+        // Windows does not ship the Unix `unzip` executable by default.
+        // bsdtar/tar can validate and enumerate ZIP archives and is available
+        // on supported Windows installations.
+        const tar = spawnSync("tar", ["-tf", zipPath], { encoding: "utf8" });
+
+        expect(tar.error).toBeUndefined();
+        expect(tar.status).toBe(0);
+        expect(tar.stdout).toContain("manifest.json");
+      } else {
+        expect(unzip.error).toBeUndefined();
+        expect(unzip.status).toBe(0);
+        expect(unzip.stdout).toContain("No errors detected");
+      }
     } finally {
       fs.rmSync(zipPath, { force: true });
     }

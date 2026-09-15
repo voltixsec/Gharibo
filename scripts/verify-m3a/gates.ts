@@ -1231,28 +1231,86 @@ function gateNoFabricatedBenchmarkResults(): Gate {
 function gateKaggleDependent(): Gate {
   const checks: Check[] = [];
 
+  const masterStatePath = path.join(
+    ROOT,
+    "governance",
+    "GHARIBO_MASTER_STATE.json",
+  );
+
+  let qualification: Record<string, unknown> | null = null;
+
+  try {
+    const master = JSON.parse(fs.readFileSync(masterStatePath, "utf8"));
+    const candidate = master?.training?.qualification;
+
+    if (candidate && typeof candidate === "object") {
+      qualification = candidate as Record<string, unknown>;
+    }
+  } catch {
+    qualification = null;
+  }
+
+  const qualificationHash =
+    typeof qualification?.qualificationHash === "string"
+      ? qualification.qualificationHash
+      : "";
+
+  const executedHarness =
+    typeof qualification?.executedHarnessContentAddress === "string"
+      ? qualification.executedHarnessContentAddress
+      : "";
+
+  const qualificationRecorded =
+    qualification?.status === "QUALIFIED" &&
+    qualification?.ctoAccepted === true &&
+    qualification?.reproducibility === "IDENTICAL" &&
+    qualification?.activeRuntimeAlignment === "IDENTICAL" &&
+    qualification?.modelCompatibilityStatus === "QUALIFICATION_PASSED" &&
+    qualification?.optimizerCreated === false &&
+    qualification?.backwardExecuted === false &&
+    qualification?.optimizerStepExecuted === false &&
+    qualification?.trainingLoopExecuted === false &&
+    qualification?.modelParametersUpdated === false &&
+    qualification?.testDataAccessed === false &&
+    qualification?.outputHygieneVerified === true &&
+    qualification?.autoFreezeApplied === false &&
+    qualification?.manualFreezeApplied === true &&
+    qualification?.freezeApplied === true &&
+    qualification?.experimentAuthorized === false &&
+    /^[0-9a-f]{64}$/.test(qualificationHash) &&
+    /^[0-9a-f]{64}$/.test(executedHarness);
+
   checks.push(
-    pending(
-      "environment qualification (real Kaggle T4 run required)",
-      "The qualification notebook must be executed on a real Kaggle T4 instance to resolve dependency versions, verify GPU compatibility, and produce a qualification_hash. This gate cannot be faked — it requires a real GPU run.",
-    ),
+    qualificationRecorded
+      ? pass(
+          "environment qualification (governed real-Kaggle evidence accepted)",
+          `QUALIFIED; qualification_hash=${qualificationHash}; executed_harness=${executedHarness}`,
+        )
+      : pending(
+          "environment qualification (real Kaggle GPU run required)",
+          "No accepted governed qualification evidence is recorded yet. A real Kaggle GPU run must resolve the dependency set, verify model compatibility and produce a CTO-accepted qualification_hash.",
+        ),
   );
 
   checks.push(
     pending(
-      "training execution (not started — STOP condition)",
-      "No training has been executed. The CTO directive explicitly states DO NOT START TRAINING. This gate will remain PENDING until training is authorized.",
+      "training execution (not started ? STOP condition)",
+      "No training has been executed. Qualification and dependency freeze do not authorize training; GHARIBO-exp-001 requires a separate explicit CTO authorization.",
     ),
   );
 
   checks.push(
     pending(
       "benchmark evaluation (real GPU inference required)",
-      "Benchmark metrics require real model inference on GPU. All metric definitions are machine-verifiable but scores cannot be computed without a trained model. Base=NOT_RUN, Candidate=NOT_RUN.",
+      "Benchmark metrics require real model inference on GPU. No trained candidate exists yet. Base=NOT_RUN, Candidate=NOT_RUN.",
     ),
   );
 
-  return { id: "12", title: "Kaggle-dependent gates (external execution required)", checks };
+  return {
+    id: "12",
+    title: "Kaggle-dependent gates (governed external evidence)",
+    checks,
+  };
 }
 
 // ===========================================================================
