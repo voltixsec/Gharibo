@@ -1066,22 +1066,12 @@ def nvidia_driver_version():
         return None
     return None
 
-print('contract        : env-qualification.json @ schema', CONTRACT_SCHEMA_VERSION)
-print('harness         : v%s (content address %s)' % (HARNESS_VERSION, HARNESS_CONTENT_SHA256 or 'unset'))
-print('experiment_id   :', EXPERIMENT_ID)
-print('engine          :', ENGINE, ENGINE_VERSION)
-print('pinned deps     :', ', '.join(d['name'] for d in PINNED_DEPENDENCIES))
-print('additional deps :', ', '.join(d['name'] for d in ADDITIONAL_DEPENDENCIES))
-print('base model      :', BASE_MODEL, '(pin', BASE_MODEL_REVISION_PIN + ')')
-print('loader model    :', LOADER_MODEL, '4-bit' if LOAD_IN_4BIT else 'full precision')
-print('recipe          : dtype=%s max_seq_length=%d batch=%d grad_accum=%d' %
-      (DTYPE, MAX_SEQ_LENGTH, BATCH_SIZE, GRAD_ACCUM))
-print('lora            : r=%d alpha=%d modules=%s' % (LORA['r'], LORA['alpha'], LORA['target_modules']))
-print('dataset         :', DATASET['id'], DATASET['version'], 'split=', EXAMPLE_SPLIT)
-print('model compat    :', RUN_MODEL_COMPATIBILITY)
-print('output          :', QUALIFICATION_PATH)`,
+# ---- Hardware-gate helpers (defined here, BEFORE the pre-install probe in Section 3) ----
+# Moving these into Section 2 ensures every helper used by the pre-install hardware gate
+# is defined before first use in normal top-to-bottom fresh-kernel execution.  The gate
+# calls (probe_environment, print_hardware, enforce_gate) live in Section 3 and depend
+# on ALL of: probe_environment (above), print_hardware, recipe_dtype, enforce_gate (below).
 
-  String.raw`# --- Section 3: Hardware detect + budget gate (BEFORE anything expensive) ---
 def print_hardware(hw, label):
     print('--- %s ---' % label)
     print('python          :', hw['python_version'])
@@ -1135,6 +1125,25 @@ def enforce_gate(hw, phase):
         print('      below sm_80; the recipe stays on fp16 because Turing has no native bf16 path.')
     return dtype
 
+print('contract        : env-qualification.json @ schema', CONTRACT_SCHEMA_VERSION)
+print('harness         : v%s (content address %s)' % (HARNESS_VERSION, HARNESS_CONTENT_SHA256 or 'unset'))
+print('experiment_id   :', EXPERIMENT_ID)
+print('engine          :', ENGINE, ENGINE_VERSION)
+print('pinned deps     :', ', '.join(d['name'] for d in PINNED_DEPENDENCIES))
+print('additional deps :', ', '.join(d['name'] for d in ADDITIONAL_DEPENDENCIES))
+print('base model      :', BASE_MODEL, '(pin', BASE_MODEL_REVISION_PIN + ')')
+print('loader model    :', LOADER_MODEL, '4-bit' if LOAD_IN_4BIT else 'full precision')
+print('recipe          : dtype=%s max_seq_length=%d batch=%d grad_accum=%d' %
+      (DTYPE, MAX_SEQ_LENGTH, BATCH_SIZE, GRAD_ACCUM))
+print('lora            : r=%d alpha=%d modules=%s' % (LORA['r'], LORA['alpha'], LORA['target_modules']))
+print('dataset         :', DATASET['id'], DATASET['version'], 'split=', EXAMPLE_SPLIT)
+print('model compat    :', RUN_MODEL_COMPATIBILITY)
+print('output          :', QUALIFICATION_PATH)`,
+
+  String.raw`# --- Section 3: Hardware detect + budget gate (BEFORE anything expensive) ---
+# Helpers (probe_environment, print_hardware, recipe_dtype, enforce_gate) are defined
+# in Section 2 above.  This cell contains ONLY the pre-install hardware probe calls so
+# that a fresh-kernel Run All never hits a NameError from a helper defined later.
 hardware_before = probe_environment(sys.executable)
 print_hardware(hardware_before, 'Hardware BEFORE install')
 enforce_gate(hardware_before, 'pre-install')`,

@@ -23,7 +23,11 @@
  *   7. the harness performs the full real model-compatibility sequence against
  *      `openai/gpt-oss-20b` and emits every mission-mandated artifact field (§14);
  *   8. the harness exercises a REAL GHARIBO example and embeds none of the dataset;
- *   9. no secret-shaped literal and no secret-reading code path is present.
+ *   9. no secret-shaped literal and no secret-reading code path is present;
+ *  10. cell-order: every user-defined function called in any cell is defined in
+ *      an earlier cell (or earlier in the same cell) before the call — prevents
+ *      the "probe_environment NameError" class of generated-notebook ordering
+ *      defect.
  *
  * Run: node scripts/qualify/check-qualify-harness.mjs
  * Exits 1 on any failing group; prints every failure it finds.
@@ -764,6 +768,101 @@ for (const { label, re } of SECRET_SHAPES) {
 }
 
 // ---------------------------------------------------------------------------
+// 8. Cell-order smoke check — every user-defined function called in any cell
+//    must be defined in an earlier cell (or earlier in the same cell, before
+//    the call).  This prevents the class of generated-notebook ordering defect
+//    where a helper is used before its definition (the "probe_environment"
+//    NameError on Kaggle).  The check is a static, line-by-line walk: it does
+//    not execute the notebook, so it catches the defect at commit time.
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts bare function-call targets from a line of Python source.
+ * Returns the set of names that appear as NAME( and are NOT:
+ *   - a def line (def NAME(),
+ *   - a method call (obj.NAME(),
+ *   - a comment-only line (# ... NAME(),
+ *   - a decorator (@NAME( — treated as a definition, not a call).
+ *
+ * String-literal false positives are tolerated: they are rare in this
+ * notebook (the raw probe strings use only stdlib calls) and a false
+ * positive merely flags a name for human review, never silently passes.
+ */
+function extractCallTargets(line) {
+  const targets = [];
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith("#")) return targets; // comment-only line
+  if (trimmed.startsWith("@")) return targets; // decorator
+  // Match NAME( but exclude def NAME( and .NAME(
+  const re = /\b([A-Za-z_]\w*)\s*\(/g;
+  let m;
+  while ((m = re.exec(line)) !== null) {
+    const name = m[1];
+    const before = line.slice(0, m.index);
+    // Skip def NAME(
+    if (/\bdef\s+$/.test(before)) continue;
+    // Skip .NAME(
+    if (before.endsWith(".")) continue;
+    // Skip keyword NAME( (if, for, while, assert, return, print is builtin...)
+    // — we only flag user-defined names, so keywords are filtered later.
+    targets.push({ name, line, index: m.index });
+  }
+  return targets;
+}
+
+// Step 1: collect every user-defined function name across ALL cells.
+const allUserDefs = new Set();
+const defRe = /^\s*def\s+(\w+)\s*\(/;
+for (const src of cellSources) {
+  for (const line of src.split("\n")) {
+    const m = line.match(defRe);
+    if (m) allUserDefs.add(m[1]);
+  }
+}
+
+// Step 2: walk cells in order, tracking which functions are defined so far.
+// We only check calls at the MODULE level (NOT inside a function body),
+// because Python function bodies are not executed at definition time — only at
+// call time.  A stack of indentation levels tracks nested function definitions.
+const definedSoFar = new Set();
+for (let ci = 0; ci < cellSources.length; ci++) {
+  const lines = cellSources[ci].split("\n");
+  const defStack = []; // indentation levels of enclosing def bodies
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const trimmed = line.trim();
+    // Blank lines and comment-only lines don't affect the def-body stack.
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+
+    const indent = line.match(/^(\s*)/)[1].length;
+
+    // Pop function bodies we've exited (indentation returned to or below the def).
+    while (defStack.length > 0 && indent <= defStack[defStack.length - 1]) {
+      defStack.pop();
+    }
+
+    // Check if this is a new function definition.
+    const defMatch = line.match(defRe);
+    if (defMatch) {
+      definedSoFar.add(defMatch[1]);
+      defStack.push(indent);
+      continue; // Don't check calls on the def line itself.
+    }
+
+    // Only check calls at the module level (not inside any function body).
+    if (defStack.length === 0) {
+      for (const { name } of extractCallTargets(line)) {
+        if (allUserDefs.has(name) && !definedSoFar.has(name)) {
+          fail("cell-order",
+            `function '${name}' is called in cell ${ci} (line ${li + 1}) before it is defined — ` +
+            `move the def into an earlier cell or above the call within the same cell.`);
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Report
 // ---------------------------------------------------------------------------
 
@@ -781,6 +880,7 @@ console.log(`  base model      : ${modelCompatibility.base_model ?? "(missing)"}
 console.log(`  loader model    : ${modelCompatibility.loader_model ?? "(missing)"} (${modelCompatibility.loader_quantization ?? "?"})`);
 console.log(`  dataset         : ${datasetInventory.id ?? "(missing)"} ${datasetInventory.version ?? ""} (${datasetInventory.example_count ?? "?"} examples)`);
 console.log(`  model-compat    : ${MISSION_STEPS.length} named steps, ${REQUIRED_MODEL_KEYS.length} mandated artifact keys`);
+console.log(`  cell-order      : ${allUserDefs.size} user-defined functions, ${cellSources.length} cells checked`);
 for (const note of notes) console.log(`  ${note}`);
 console.log(line);
 
