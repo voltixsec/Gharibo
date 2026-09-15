@@ -5,8 +5,8 @@
 | **Document Owner** | Product (GHARIBO AI LAB) |
 | **Type** | Roadmap |
 | **Status** | Approved |
-| **Version** | 1.2.0 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.3.0 |
+| **Last Updated** | 2026-09-15 |
 
 > The milestone progression below is a planning document, not a frozen baseline. It may change as
 > milestones complete; the frozen architecture baseline is `docs/ARCHITECTURE.md`.
@@ -15,6 +15,12 @@
 > **zero monetary cost** constraint. Free training compute (Kaggle Notebooks, T4) replaces any
 > assumption of a purchased GPU machine or a paid training provider. See
 > `docs/TRAINING_STRATEGY.md` §"Compute & Cost Policy (Zero-Cost)" and ADR-0011..ADR-0014.
+
+> **v1.3.0 — STAGE-1 has started (2026-09-15).** `GHARIBO-exp-001` executed on the free Kaggle T4
+> worker, so STAGE-1 moves `NOT_STARTED → IN_PROGRESS`. It is deliberately **not** `COMPLETE`:
+> evaluation is `NOT_RUN` and held-out TEST use is not authorized, which is also why STAGE-2
+> ("After exp-001 evaluates") has not opened. See
+> [ADR-0020](adr/ADR-0020-post-execution-truth-reconciliation.md) and `DEC-0030`.
 
 ## Overview
 
@@ -169,7 +175,7 @@ Executed on **free** compute under the zero-cost policy. Not started.
 
 | Stage | Name | Status | Purpose |
 |-------|------|--------|---------|
-| STAGE-1 | `GHARIBO-exp-001` | NOT_STARTED | Establish a measurable baseline with QLoRA + SFT on the current 800 verified Gold examples; teach evidence-grounded behaviour, schema adherence and no-fabrication discipline. |
+| STAGE-1 | `GHARIBO-exp-001` | IN_PROGRESS | Establish a measurable baseline with QLoRA + SFT on the current 800 verified Gold examples; teach evidence-grounded behaviour, schema adherence and no-fabrication discipline. **Training executed 2026-09-15** (640 examples, 1 epoch, 160 steps, `train_loss` 0.6016); the stage is not complete because evaluation is `NOT_RUN` and is not yet authorized (see [ADR-0020](adr/ADR-0020-post-execution-truth-reconciliation.md)). |
 | STAGE-2 | UCL FACTORY CHALLENGE | PLANNED | After exp-001 evaluates, ask GHARIBO to produce ~300-500 NEW candidate records from an under-represented domain; verify them to test whether the PROCESS was learned rather than examples memorized. |
 | STAGE-3 | `GHARIBO-Research-Gold-v0.2` | PLANNED | Grow the dataset from failures, hard cases, boundary cases and verified new generations — explicitly not volume for its own sake. |
 | STAGE-4 | PREFERENCE TRAINING | PLANNED | Generate multiple candidates, verify them, and build CHOSEN vs REJECTED pairs; evaluate DPO or ORPO without committing to one method until benchmark evidence exists. |

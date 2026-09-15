@@ -5,8 +5,8 @@
 | **Document Owner** | Delivery (GHARIBO AI LAB) |
 | **Type** | Delivery note |
 | **Status** | Living |
-| **Version** | 1.0.0 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.1.0 |
+| **Last Updated** | 2026-09-15 |
 
 All notable changes to GHARIBO AI LAB are recorded here.
 
@@ -64,6 +64,91 @@ milestone; a milestone is only listed as released once it is committed and pushe
 - **No training executed, no model weights downloaded, no gold example content modified, the
   accepted M3B split and dataset hash are unchanged, and this change is documentation/governance
   only.**
+
+### Milestone 3C — First Real Execution, Acceptance and Truth Reconciliation
+
+**`GHARIBO-exp-001` has executed for real. It has NOT been evaluated and it has NOT been
+promoted.** `GHARIBO-V0.1` does not exist; evaluation is `NOT_RUN`; the held-out TEST split has
+never been read. The terminal state is `EVALUATION_READY_AWAITING_AUTHORIZATION`.
+
+#### Added
+
+- `governance/DEC-0030-kaggle-execution-acceptance.json` — acceptance of the completed Kaggle
+  execution, content-addressed (`acceptanceHash`
+  `06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647`).
+- `governance/DEC-0031` — acceptance of ADR-0020 and the Frozen-baseline amendment.
+- `docs/adr/ADR-0020-post-execution-truth-reconciliation.md` — the decision to reconcile the
+  recorded state to reality without promoting, evaluating or retroactively editing the recipe.
+- `scripts/training/build-dec0030-acceptance.mjs` (deterministic generator + `--check` drift
+  mode, `npm run build:dec0030`) and `scripts/training/verify-kaggle-result.py`
+  (`npm run verify:result`) — read-only verification of the downloaded result.
+- `apps/web/lib/__tests__/m2-gold-execution-acceptance.test.ts` (19) and
+  `apps/web/lib/__tests__/m2-post-training-lifecycle.test.ts` (11) — regression tests freezing
+  the accepted execution, the TEST isolation policy, the recorded dtype deviation, the
+  lifecycle transitions and the no-promotion / no-evaluation boundary.
+- `NON_ARTIFACT_PREFIXES` in `apps/web/lib/db/repositories/training-artifacts.ts` — engine build
+  output (`unsloth_compiled_cache/`) can no longer be registered as a model artifact.
+- Roadmap `STAGE-1` ↔ `training.status` consistency invariant in `master:validate`.
+
+#### Training (real, executed once)
+
+- Kaggle kernel `vokaigharibo/gharibo-exp-001-kaggle-start-fec22ca2`, attempt 3 / kernel
+  version 3, `KernelWorkerStatus.COMPLETE` (verified externally).
+- Run `ea6e30f2-ce26-4323-b35a-3436ee867eaf`, package
+  `78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2`.
+- 640 examples, 1 epoch, 160 steps, batch 1 x grad-accum 4, 3,981,312 trainable parameters,
+  `train_runtime` 4041.9648 s, `train_loss` 0.6016419500112533.
+- Artifacts: `CHECKSUMS.sha256` verifies 129/130 declared files with 0 mismatches; rollup
+  `788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885` recomputes exactly; final
+  adapter == checkpoint-160 `794917f25c4aa9e77acb6a746b69a703412539e993f6bfc1e8c602d64be678f`;
+  checkpoint-150 `5e062fa0bbba3c5276e3d6086f8e7dc0a7e1605c2dbf8c1d989ecbfe5a140249`.
+  **No binary artifact is committed** — GitHub carries source and docs only.
+
+#### Runtime truth (declared vs effective)
+
+- Declared dtype `fp16`; the Unsloth runtime emitted
+  `Using float16 precision for gpt_oss won't work! Using float32` and
+  `Switching to float32 training since model cannot work with float16`. **Effective dtype is
+  `float32`** and the adapter is stored as F32 (96 tensors, 15,938,048 bytes).
+- Classified `MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION`. The immutable package recipe
+  was **not** edited retroactively (`recipeEditedRetroactively: false`).
+- The parameter-count difference (qualification 11,045,084,736 vs runtime 20,918,738,496) is a
+  4-bit packed-storage accounting difference, not a model identity mismatch
+  (`ACCOUNTING_DIFFERENCE_NOT_MODEL_IDENTITY_MISMATCH`).
+
+#### Changed
+
+- `master:validate`: the obsolete **"TRAINING HAS NOT STARTED"** invariant is replaced by
+  post-execution invariants that still fail closed — completion evidence must be real and
+  coherent, TEST must stay isolated, the dtype deviation must be recorded, both failed attempts
+  must survive, the roadmap must agree with the execution, and no evaluation or promotion may
+  be claimed.
+- `scripts/verify-m3a` gate 12: post-execution acceptance, artifact acceptance, runtime-deviation
+  truthfulness and the no-auto-promotion check replace the pre-execution pending ladder
+  (65 PASS / 0 FAIL / 1 PENDING_EXTERNAL_EXECUTION).
+- Database lifecycle reconciled through the real repositories: `QUEUED → RUNNING → COMPLETED`,
+  every transition audited at real externally-observed timestamps; historical events preserved.
+- Documentation reconciled (all additive; historical notes retained verbatim):
+  `docs/ARCHITECTURE.md` 1.2.0 → 1.2.1 (machine-checked `adrs` fact 19 → 20);
+  `docs/MODEL_REGISTRY.md` 1.3.0 → 1.4.0; `docs/TRAINING_STRATEGY.md` 1.3.0 → 1.4.0 (the
+  "fp16 only on T4" assumption is corrected — the engine refuses fp16 for `gpt-oss`);
+  `docs/ROADMAP.md` 1.2.0 → 1.3.0 (`STAGE-1` `NOT_STARTED` → `IN_PROGRESS`);
+  `PROJECT_STATE.md` 1.1.0 → 1.2.0.
+
+#### Fixed
+
+- `scripts/training/verify-kaggle-result.py` used the wrong rollup material order
+  (`"<digest>  <path>"` instead of `"<path>\t<digest>"`), so it reported a rollup that did not
+  match `CHECKSUMS.sha256`. It now recomputes the declared rollup exactly.
+- Attempts 1 and 2 remain recorded as `KernelWorkerStatus.ERROR` **before** training — cell-order
+  defect (`cd4ae00`) and dependency-install failure (`5d62ea8`).
+
+#### Notes
+
+- The local database reconciliation is not reproducible from Git; `DEC-0030` is the durable
+  evidence of record.
+- The Windows `charmap` error emitted while Unsloth downloaded its compiled cache is an engine
+  log-decoding artifact, not an artifact failure.
 
 ### Milestone 3B — Split Integrity, Split-Aware Audit and Qualification Safety
 

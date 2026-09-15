@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.3.0 |
+| **Version** | 1.4.0 |
 | **Last Updated** | 2026-09-15 |
 
 This directory holds the decision log for GHARIBO AI LAB. An ADR captures **why** the
@@ -38,6 +38,7 @@ Governance rules (statuses, ownership, when an ADR is required) live in
 | [ADR-0017](ADR-0017-master-state-single-source-of-truth.md) | GHARIBO Master State as the canonical single source of truth | Accepted | 2026-09-14 |
 | [ADR-0018](ADR-0018-real-model-compatibility-qualification.md) | Real model-compatibility qualification before the engine freeze | Accepted | 2026-09-14 |
 | [ADR-0019](ADR-0019-governed-gold-package-preview.md) | Governed physical Gold package preview | Accepted | 2026-09-15 |
+| [ADR-0020](ADR-0020-post-execution-truth-reconciliation.md) | Truthful post-execution reconciliation without promotion | Accepted | 2026-09-15 |
 
 ## Conventions
 

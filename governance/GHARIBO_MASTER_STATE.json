@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.11.0",
+  "masterStateVersion": "1.12.0",
   "updatedAt": "2026-09-15",
   "project": {
     "id": "GHARIBO",
@@ -41,12 +41,12 @@
   "architecture": {
     "frozenBaseline": {
       "document": "docs/ARCHITECTURE.md",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "status": "Frozen",
       "extends": "docs/ARCHITECTURE_MILESTONE_2.md"
     },
     "decisionRecords": "docs/adr/",
-    "decisionRecordCount": 19,
+    "decisionRecordCount": 20,
     "factsBlock": "docs/ARCHITECTURE.md#docs:facts",
     "backend": "Next.js Route Handlers (ADR-0001)",
     "persistence": "SQLite + better-sqlite3 behind a Repository Pattern (ADR-0002)",
@@ -673,6 +673,36 @@
       "supersedes": null,
       "supersededBy": null,
       "architectureChanging": false
+    },
+    {
+      "id": "DEC-0031",
+      "date": "2026-09-15",
+      "title": "Accept ADR-0020 and amend the Frozen Milestone 1 specifications to reflect the executed GHARIBO-exp-001 run",
+      "status": "ACCEPTED",
+      "decision": "ADR-0020 (Truthful post-execution reconciliation without promotion) is accepted. It authorises: (1) replacing the obsolete \"TRAINING HAS NOT STARTED\" validator invariant with post-execution invariants that still fail closed; (2) additive v1.4.0 amendments to the two Frozen Milestone 1 specifications that assert no training has been executed — docs/MODEL_REGISTRY.md and docs/TRAINING_STRATEGY.md — while their v1.3.0 notes stay verbatim as history; (3) correcting the TRAINING_STRATEGY assumption that T4 training is fp16-only, which real execution disproved for gpt-oss (the engine refuses fp16 and trains in float32); (4) moving roadmap STAGE-1 from NOT_STARTED to IN_PROGRESS, because the stage has started but is not complete while evaluation is NOT_RUN and unauthorized; and (5) bumping the frozen baseline docs/ARCHITECTURE.md to v1.2.1 for the machine-checked adrs fact (19 -> 20) only. The reconciliation stops at EVALUATION_READY_AWAITING_AUTHORIZATION: GHARIBO-V0.1 stays NOT_CREATED, evaluation stays NOT_RUN, and the held-out TEST split stays untouched.",
+      "rationale": "Governed documents that assert a state which no longer exists are worse than no documents: they make the validator fail on truth and mislead every future session and agent. ADR-0017 makes the master state the canonical record, so once DEC-0030 accepted a real execution, every downstream claim had to be reconciled to it. Frozen documents cannot simply be edited; DOCUMENTATION_GOVERNANCE.md 5.1 requires an ADR plus a version bump, and 5.4 requires additive supersession, so the historical notes are preserved and new dated notes are appended. STAGE-1 is IN_PROGRESS rather than COMPLETE because the stage's own exit condition is an evaluation, which is neither executed nor authorized.",
+      "scope": [
+        "architecture",
+        "training",
+        "experiments",
+        "models",
+        "roadmap"
+      ],
+      "references": [
+        "docs/adr/ADR-0020-post-execution-truth-reconciliation.md",
+        "docs/adr/README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/MODEL_REGISTRY.md",
+        "docs/TRAINING_STRATEGY.md",
+        "docs/ROADMAP.md",
+        "docs/DOCUMENT_REGISTER.md",
+        "scripts/master/validate-master-state.mjs",
+        "governance/DEC-0030-kaggle-execution-acceptance.json",
+        "governance/GHARIBO_MASTER_STATE.json"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": true
     }
   ],
   "roadmap": {
@@ -692,7 +722,7 @@
           "evidence to entity to relation construction",
           "no-fabrication behaviour"
         ],
-        "status": "NOT_STARTED",
+        "status": "IN_PROGRESS",
         "dependsOn": []
       },
       {
@@ -2428,6 +2458,27 @@
         "re-proved TEST isolation (train/validation uploaded, test=ABSENT, HASH_INTEGRITY_ONLY)",
         "kept evaluation NOT_RUN and GHARIBO-V0.1 NOT_CREATED",
         "preserved attempts 1 and 2 as ERROR-before-training; DEC-0030 supersedes nothing"
+      ],
+      "trainingExecuted": true
+    },
+    {
+      "revision": "1.12.0",
+      "date": "2026-09-15",
+      "summary": "Documentation and validator reconciliation: ADR-0020 accepted (DEC-0031). The obsolete \"TRAINING HAS NOT STARTED\" validator invariant was replaced with post-execution invariants; docs/MODEL_REGISTRY.md and docs/TRAINING_STRATEGY.md gained additive v1.4.0 notes (fp16-only T4 assumption corrected to float32); docs/ROADMAP.md STAGE-1 moved NOT_STARTED -> IN_PROGRESS; docs/ARCHITECTURE.md moved to v1.2.1 for the adrs fact 19 -> 20. No evaluation, no promotion.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "The containing commit cannot embed its own SHA. DEC-0030's acceptance hash is content-addressed over the acceptance body and is stable independent of the commit.",
+      "changes": [
+        "added ADR-0020 Truthful post-execution reconciliation without promotion",
+        "added DEC-0031 to the master state",
+        "bumped docs/ARCHITECTURE.md 1.2.0 -> 1.2.1 and the adrs fact 19 -> 20",
+        "bumped docs/MODEL_REGISTRY.md 1.3.0 -> 1.4.0 with an additive post-execution note",
+        "bumped docs/TRAINING_STRATEGY.md 1.3.0 -> 1.4.0 and corrected the fp16-only T4 assumption",
+        "bumped docs/ROADMAP.md 1.2.0 -> 1.3.0; STAGE-1 NOT_STARTED -> IN_PROGRESS",
+        "bumped docs/adr/README.md 1.3.0 -> 1.4.0",
+        "bumped PROJECT_STATE.md 1.1.0 -> 1.2.0 and removed the stale no-training-has-been-executed claims",
+        "replaced the obsolete TRAINING HAS NOT STARTED validator invariant with post-execution invariants",
+        "added a roadmap STAGE-1 / training status consistency invariant so this class of contradiction is caught automatically"
       ],
       "trainingExecuted": true
     }

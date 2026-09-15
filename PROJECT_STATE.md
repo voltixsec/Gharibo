@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.1.0 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.2.0 |
+| **Last Updated** | 2026-09-15 |
 
 The single source of truth for **where the project actually is** — as opposed to where it is
 planned to be. Every claim here must be verifiable against the code and the document set.
@@ -70,11 +70,20 @@ Milestone 1 delivered a working vertical slice. It is real, runnable, and frozen
 | Model Registry with status gates | Built (UI-level) | `docs/MODEL_REGISTRY.md`, ADR-0008 |
 | Python FastAPI services (trainer/inference/research) | Built | `services/` on ports 8100/8101/8102 |
 | Documentation governance + validator | Built | `docs/DOCUMENTATION_GOVERNANCE.md`, `scripts/validate-docs.mjs` |
-| 14 ADRs, frozen architecture baseline | Built | `docs/adr/` |
+| 20 ADRs, frozen architecture baseline | Built | `docs/adr/` |
 
 **Milestone 1 did NOT include real training.** The Training Center can configure a run and perform
-a pre-flight check, but launching training is gated and no training has ever been executed
-(ADR-0005). This is intentional, not a gap.
+a pre-flight check, and launching training was gated (ADR-0005); no training was executed during
+Milestone 1. This was intentional, not a gap.
+
+> **Correction (2026-09-15, v1.2.0).** The first real training execution has **now** happened,
+> under Milestone 3C — not Milestone 1. `GHARIBO-exp-001` completed on the free Kaggle T4 worker
+> (kernel version 3, `KernelWorkerStatus.COMPLETE`): 640 examples, 1 epoch, 160 steps,
+> `train_loss` 0.6016419500112533, 3,981,312 trainable parameters. Declared dtype `fp16`,
+> **effective dtype `float32`** (engine-imposed, accepted in `DEC-0030`). The model is **not**
+> promoted and has **not** been evaluated: `GHARIBO-V0.1` is `NOT_CREATED`, evaluation is
+> `NOT_RUN`, and the held-out TEST split is untouched. See
+> [`docs/adr/ADR-0020-post-execution-truth-reconciliation.md`](docs/adr/ADR-0020-post-execution-truth-reconciliation.md).
 
 ---
 
@@ -155,9 +164,14 @@ scheduler construction, and a `qualification_safety` evidence block (contract §
 A static safety gate (`qualify:check` + `verify:m3a` Gate 13) forbids the training primitives from
 appearing in the generated notebook at all.
 
-**Remaining blocker:** The Kaggle qualification notebook must be executed on a real T4 instance to resolve
-dependency versions, verify GPU compatibility, and produce a qualification_hash. This requires CTO authorization
-for Kaggle credentials. No training has been started.
+**Resolved (2026-09-15):** the Kaggle T4 environment has now been qualified and used for real, and
+`GHARIBO-exp-001` has completed its first training execution (see the correction note in §2 and
+`DEC-0030`).
+
+**Remaining blocker:** evaluation of the resulting adapter is **not authorized**. The held-out TEST
+split may not be used for validation, model selection, prompt engineering or checkpoint selection;
+the state is `EVALUATION_READY_AWAITING_AUTHORIZATION` and needs explicit CTO/CEO authorization to
+proceed. `GHARIBO-V0.1` therefore does not exist yet.
 
 ---
 

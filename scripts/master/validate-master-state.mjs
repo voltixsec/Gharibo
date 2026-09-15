@@ -390,8 +390,18 @@ function runChecks(state, rawText) {
         fail('training-invariant', `${m.id}: derived model with status ${m.status} is claimed as produced`);
       }
     }
+
+    const stage1 = (state.roadmap?.stages || []).find((s) => s.id === 'STAGE-1');
+    if (!stage1) {
+      fail('training-invariant', 'roadmap STAGE-1 is missing');
+    } else if (['NOT_STARTED', 'PLANNED'].includes(stage1.status)) {
+      fail('training-invariant', `roadmap STAGE-1 is "${stage1.status}" while training has executed — the roadmap must not contradict the recorded execution`);
+    } else if (stage1.status === 'COMPLETE' && (t.evaluationResults ?? 0) === 0) {
+      fail('training-invariant', 'roadmap STAGE-1 cannot be COMPLETE while evaluationResults is 0');
+    }
+
     if (!failedUnder('training-invariant')) {
-      pass('training-invariant', 'post-training invariants hold: completion evidence is real and coherent, TEST stays isolated, the dtype deviation is recorded, both failed attempts survive, and no evaluation or promotion is claimed');
+      pass('training-invariant', 'post-training invariants hold: completion evidence is real and coherent, TEST stays isolated, the dtype deviation is recorded, both failed attempts survive, the roadmap agrees with the execution, and no evaluation or promotion is claimed');
     }
   }
 

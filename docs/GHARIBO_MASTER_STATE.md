@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.11.0 |
+| **Version** | 1.12.0 |
 | **Last Updated** | 2026-09-15 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -34,10 +34,10 @@
 
 | Field | Value |
 | --- | --- |
-| Frozen baseline | docs/ARCHITECTURE.md v1.2.0 (Frozen) |
+| Frozen baseline | docs/ARCHITECTURE.md v1.2.1 (Frozen) |
 | Frozen baseline extends | docs/ARCHITECTURE_MILESTONE_2.md |
 | Decision records | docs/adr/ |
-| Decision record count | 19 |
+| Decision record count | 20 |
 | Verified facts block | docs/ARCHITECTURE.md#docs:facts |
 | Backend | Next.js Route Handlers (ADR-0001) |
 | Persistence | SQLite + better-sqlite3 behind a Repository Pattern (ADR-0002) |
@@ -187,7 +187,7 @@ Notes:
 
 | ID | Name | Status | Method | Dataset | Purpose | Depends on |
 | --- | --- | --- | --- | --- | --- | --- |
-| STAGE-1 | GHARIBO-exp-001 | NOT_STARTED | QLoRA + SFT using Unsloth | GHARIBO-Research-Gold-v0.1 (current 800 verified Gold examples) | establish a measurable baseline, teach structured evidence-grounded behaviour, schema adherence, provenance discipline, evidence to entity to relation construction, no-fabrication behaviour | — |
+| STAGE-1 | GHARIBO-exp-001 | IN_PROGRESS | QLoRA + SFT using Unsloth | GHARIBO-Research-Gold-v0.1 (current 800 verified Gold examples) | establish a measurable baseline, teach structured evidence-grounded behaviour, schema adherence, provenance discipline, evidence to entity to relation construction, no-fabrication behaviour | — |
 | STAGE-2 | UCL FACTORY CHALLENGE | PLANNED | After successful exp-001 evaluation, ask GHARIBO to produce approximately 300-500 NEW candidate records from a domain/system not clearly represented in the training examples. | New candidate records from an under-represented domain (CANDIDATE until verified) | outputs remain CANDIDATE records until verified, validate identity, schema, evidence, provenance, relations, duplicates, unsupported claims and hallucinations, measure whether GHARIBO learned the PROCESS rather than memorized examples | STAGE-1 |
 | STAGE-3 | GHARIBO-Research-Gold-v0.2 | PLANNED | Built primarily from failures, hard cases, boundary cases, verified new generations, human-approved corrections and validator-approved difficult examples. | GHARIBO-Research-Gold-v0.2 | grow the dataset from difficulty, not volume, explicitly NOT volume for its own sake | STAGE-2 |
 | STAGE-4 | PREFERENCE TRAINING | PLANNED | Generate multiple candidate outputs; use deterministic validators, evidence verification, judge evaluation and selective human review to create CHOSEN vs REJECTED; evaluate DPO or ORPO. | Preference pairs derived from validated candidate outputs | create CHOSEN vs REJECTED pairs, evaluate DPO ORPO, do not commit to one method until benchmark evidence exists | STAGE-3 |
@@ -368,6 +368,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0028 | 2026-09-15 | Repair the governed Kaggle launch artifact and re-authorize a single retry | SUPERSEDED | — |
 | DEC-0029 | 2026-09-15 | Stage the governed Kaggle install and re-authorize a single retry | ACCEPTED | — |
 | DEC-0030 | 2026-09-15 | Accept the completed GHARIBO-exp-001 Kaggle execution and record the fp16→float32 runtime deviation | ACCEPTED | — |
+| DEC-0031 | 2026-09-15 | Accept ADR-0020 and amend the Frozen Milestone 1 specifications to reflect the executed GHARIBO-exp-001 run | ACCEPTED | `docs/adr/ADR-0020-post-execution-truth-reconciliation.md` |
 
 ## Validation
 
@@ -440,6 +441,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.7.0 | 2026-09-15 | Accepted DEC-0026 execution authorization for the exact issued GHARIBO-exp-001 package/run. Authorized DRAFT to QUEUED only while retaining a hard separate boundary before RUNNING/Kaggle start. | — | PENDING_CHECKPOINT |
 | 1.8.0 | 2026-09-15 | Accepted DEC-0027 Kaggle Start authorization for the exact QUEUED GHARIBO-exp-001 run and the safe content-addressed launch notebook. Training remains NOT_STARTED until real Kaggle execution evidence is observed. | — | PENDING_CHECKPOINT |
 | 1.11.0 | 2026-09-15 | Post-execution acceptance: DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and recorded the fp16→float32 runtime deviation instead of hiding it. Training state moved to COMPLETED, artifacts were registered, TEST isolation was re-proven, and evaluation stayed NOT_RUN with no model promotion. | — | PENDING_CHECKPOINT |
+| 1.12.0 | 2026-09-15 | Documentation and validator reconciliation: ADR-0020 accepted (DEC-0031). The obsolete "TRAINING HAS NOT STARTED" validator invariant was replaced with post-execution invariants; docs/MODEL_REGISTRY.md and docs/TRAINING_STRATEGY.md gained additive v1.4.0 notes (fp16-only T4 assumption corrected to float32); docs/ROADMAP.md STAGE-1 moved NOT_STARTED -> IN_PROGRESS; docs/ARCHITECTURE.md moved to v1.2.1 for the adrs fact 19 -> 20. No evaluation, no promotion. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -561,5 +563,19 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - re-proved TEST isolation (train/validation uploaded, test=ABSENT, HASH_INTEGRITY_ONLY)
 - kept evaluation NOT_RUN and GHARIBO-V0.1 NOT_CREATED
 - preserved attempts 1 and 2 as ERROR-before-training; DEC-0030 supersedes nothing
+- The containing commit cannot embed its own SHA. DEC-0030's acceptance hash is content-addressed over the acceptance body and is stable independent of the commit.
+- Training executed: true
+
+**1.12.0 — changes**
+- added ADR-0020 Truthful post-execution reconciliation without promotion
+- added DEC-0031 to the master state
+- bumped docs/ARCHITECTURE.md 1.2.0 -> 1.2.1 and the adrs fact 19 -> 20
+- bumped docs/MODEL_REGISTRY.md 1.3.0 -> 1.4.0 with an additive post-execution note
+- bumped docs/TRAINING_STRATEGY.md 1.3.0 -> 1.4.0 and corrected the fp16-only T4 assumption
+- bumped docs/ROADMAP.md 1.2.0 -> 1.3.0; STAGE-1 NOT_STARTED -> IN_PROGRESS
+- bumped docs/adr/README.md 1.3.0 -> 1.4.0
+- bumped PROJECT_STATE.md 1.1.0 -> 1.2.0 and removed the stale no-training-has-been-executed claims
+- replaced the obsolete TRAINING HAS NOT STARTED validator invariant with post-execution invariants
+- added a roadmap STAGE-1 / training status consistency invariant so this class of contradiction is caught automatically
 - The containing commit cannot embed its own SHA. DEC-0030's acceptance hash is content-addressed over the acceptance body and is stable independent of the commit.
 - Training executed: true

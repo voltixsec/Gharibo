@@ -732,6 +732,21 @@ const COMPLETED_ACCEPTANCE_HASH =
   "06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647";
 
 /**
+ * The accepted execution state is pinned to an exact master-state revision so silent drift
+ * cannot pass as "accepted". Exactly two revisions are known-good:
+ *
+ * - `1.11.0` — DEC-0030 acceptance of the completed run (the original freeze).
+ * - `1.12.0` — DEC-0031, an ADDITIVE reconciliation: ADR-0020, the post-execution validator
+ *   invariants, the Frozen-spec amendments, the ADR count 19 -> 20 and roadmap STAGE-1
+ *   NOT_STARTED -> IN_PROGRESS. It changes no accepted execution fact — same run, same
+ *   package, same artifacts, same hashes, same dtype deviation, still no evaluation and no
+ *   promotion — so the 1.11.0 acceptance still holds verbatim inside it.
+ *
+ * Any further revision is NOT accepted until it is added here deliberately.
+ */
+const COMPLETED_MASTER_STATE_VERSIONS = ["1.11.0", "1.12.0"];
+
+/**
  * DEC-0030 accepts the POST-EXECUTION reality of the artifact DEC-0029 authorized.
  *
  * It is deliberately NOT a supersession: `supersedesDecisionId` is null because
@@ -748,7 +763,7 @@ export function isKaggleExecutionCompletedGoldState(state) {
   const completion = training?.executionCompletion;
 
   if (!completion ||
-      state?.masterStateVersion !== "1.11.0" ||
+      !COMPLETED_MASTER_STATE_VERSIONS.includes(state?.masterStateVersion) ||
       training?.status !== "COMPLETED" ||
       training?.hasStarted !== true ||
       state?.currentState?.trainingStatus !== "COMPLETED" ||

@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-09-15 |
 
 > Part of the Milestone 1 architecture baseline. The promotion gates below are a frozen decision —
 > see `docs/adr/ADR-0008-model-registry-status-gates.md`.
@@ -51,6 +51,32 @@
 > were produced. No evaluation score exists. The experiment status remains EXPERIMENT. The
 > Training Package was not issued because `frozenOk = false` (requires `status = QUALIFIED` and
 > `unknowns` empty from a real Kaggle run).
+>
+> *(The block above is the verbatim v1.3.0 note. It was true when written and is retained as
+> history per `docs/DOCUMENTATION_GOVERNANCE.md` §5.4. It is superseded as a description of the
+> current state by the v1.4.0 note below.)*
+>
+> **v1.4.0 — Milestone 3C: `GHARIBO-exp-001` has executed; nothing is promoted (2026-09-15).**
+> Authorised by [ADR-0020](adr/ADR-0020-post-execution-truth-reconciliation.md) and
+> recorded as `DEC-0030`. The statements above — "no training has been executed", "no adapters were
+> produced", "no package was issued" — are **no longer true as of 2026-09-15** and are superseded
+> for current-state purposes. What is now true:
+>
+> | Field | Value (as of 2026-09-15) |
+> |---|---|
+> | **status** | `EXPERIMENT` — **unchanged**. Execution does not promote; promotion still requires >=1 evaluation result *and* explicit authorization (ADR-0008). |
+> | **training_run_id** | `ea6e30f2-ce26-4323-b35a-3436ee867eaf` — status `COMPLETED` |
+> | **package_id** | `78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2` (issued; immutable) |
+> | **training executed** | 640 examples, 1 epoch, 160 steps, 3,981,312 trainable params, `train_loss` 0.6016419500112533 |
+> | **declared / effective dtype** | declared `fp16`; **effective `float32`** (engine-imposed, accepted in DEC-0030; the package is *not* retroactively edited) |
+> | **adapter artifacts** | final adapter == checkpoint-160, sha256 `794917f2…5678f`; checkpoint-150 `5e062fa0…40249` (registered as artifacts; **not** in this repository) |
+> | **evaluation_score** | `NOT_RUN` — unchanged. Held-out TEST use is **not authorized**; state is `EVALUATION_READY_AWAITING_AUTHORIZATION`. |
+> | **GHARIBO-V0.1** | `NOT_CREATED` — the project has no promoted model version yet |
+> | **promotable to CANDIDATE** | **No** — evaluation is `NOT_RUN` and unauthorized |
+>
+> **Explicitly still forbidden.** Do not call this model `GHARIBO-V0.1`. Do not report an
+> evaluation score. Do not use the held-out TEST split for validation, model selection, prompt
+> engineering or checkpoint selection. Do not describe this run as an fp16 run.
 
 ## Overview
 

@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Domain spec |
 | **Status** | Frozen |
-| **Version** | 1.3.0 |
-| **Last Updated** | 2026-09-14 |
+| **Version** | 1.4.0 |
+| **Last Updated** | 2026-09-15 |
 
 > Part of the Milestone 1 architecture baseline. See `docs/DOCUMENTATION_GOVERNANCE.md` §5 for
 > change control and `docs/ARCHITECTURE.md` §1.3 for how this subsystem is wired.
@@ -47,6 +47,33 @@
 > **Unchanged.** The T4 constraints below (fp16 only, no bf16, no FlashAttention-2, ~14 GB
 > VRAM floor), the zero-cost constraint, the free-tier resilience requirements, and the Harmony
 > format requirement all remain binding.
+>
+> *(The block above is the verbatim v1.3.0 note. It was true when written and is retained as
+> history per `docs/DOCUMENTATION_GOVERNANCE.md` §5.4. It is superseded for current-state purposes
+> by the v1.4.0 note below.)*
+>
+> **v1.4.0 — first real execution completed; the fp16-only T4 assumption is corrected
+> (2026-09-15).** Authorised by [ADR-0020](adr/ADR-0020-post-execution-truth-reconciliation.md),
+> recorded as `DEC-0030`.
+>
+> 1. **Training has been executed.** `GHARIBO-exp-001` ran on the free Kaggle T4 worker (kernel
+>    version 3, `KernelWorkerStatus.COMPLETE`): 640 examples, 1 epoch, 160 steps, batch 1 x
+>    grad-accum 4, 3,981,312 trainable parameters, `train_runtime` 4041.9648 s, `train_loss`
+>    0.6016419500112533. The statement "No training has been executed" above is **no longer true**
+>    as of 2026-09-15.
+> 2. **Correction to the T4 precision assumption.** The "fp16 only" constraint as written is
+>    **wrong for `gpt-oss` on T4**: the Unsloth runtime refuses it —
+>    `Using float16 precision for gpt_oss won't work! Using float32` followed by
+>    `Switching to float32 training since model cannot work with float16` — and trained in
+>    **float32**. The produced adapter is stored as F32 (96 tensors, 15,938,048 bytes). The
+>    package's declared `fp16` is **not** retroactively edited; the master state records
+>    `declaredDtype: "fp16"`, `effectiveDtype: "float32"`, `recipeEditedRetroactively: false`.
+>    Future runs on this stack must budget for float32 memory (~2x the fp16 estimate against the
+>    ~14 GB T4 floor) and must not be described as fp16 runs.
+> 3. **Execution is not promotion and not evaluation.** `GHARIBO-V0.1` remains `NOT_CREATED`,
+>    evaluation remains `NOT_RUN`, and the held-out TEST split remains untouched
+>    (`HASH_INTEGRITY_ONLY`). The terminal state of this milestone is
+>    `EVALUATION_READY_AWAITING_AUTHORIZATION`.
 
 ## Philosophy
 
