@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.9.0 |
+| **Version** | 1.10.0 |
 | **Last Updated** | 2026-09-15 |
 
 The authoritative index of every governed document. Rules for ownership, statuses, and change
@@ -31,8 +31,8 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 | Model Registry | `docs/MODEL_REGISTRY.md` | Architecture | Domain spec | Frozen | 1.3.0 | 2026-09-14 |
 | Roadmap | `docs/ROADMAP.md` | Product | Roadmap | Approved | 1.2.0 | 2026-09-14 |
 | Documentation Governance | `docs/DOCUMENTATION_GOVERNANCE.md` | Architecture | Governance | Frozen | 1.0.0 | 2026-09-14 |
-| Document Register | `docs/DOCUMENT_REGISTER.md` | Architecture | Governance | Living | 1.9.0 | 2026-09-15 |
-| Master State (generated) | `docs/GHARIBO_MASTER_STATE.md` | Architecture | Governance | Living | 1.7.0 | 2026-09-15 |
+| Document Register | `docs/DOCUMENT_REGISTER.md` | Architecture | Governance | Living | 1.10.0 | 2026-09-15 |
+| Master State (generated) | `docs/GHARIBO_MASTER_STATE.md` | Architecture | Governance | Living | 1.8.0 | 2026-09-15 |
 | Master State (canonical) | `governance/GHARIBO_MASTER_STATE.json` | Architecture | Governance | Living | 1.0.0 | 2026-09-15 |
 | ADR Index | `docs/adr/README.md` | Architecture | Governance | Living | 1.3.0 | 2026-09-15 |
 | ADR Template | `docs/adr/TEMPLATE.md` | Architecture | Governance | Living | 1.0.0 | 2026-09-14 |

@@ -1242,6 +1242,7 @@ function gateKaggleDependent(): Gate {
   let previewStateAccepted = false;
   let issuanceAuthorized = false;
   let executionAuthorized = false;
+  let kaggleStartAuthorized = false;
 
   try {
     const master = JSON.parse(fs.readFileSync(masterStatePath, "utf8"));
@@ -1250,6 +1251,8 @@ function gateKaggleDependent(): Gate {
     issuanceAuthorized = master?.experiments?.["GHARIBO-exp-001"]?.trainingAuthorized === true;
     executionAuthorized =
       master?.training?.executionAuthorization?.executionAuthorized === true;
+    kaggleStartAuthorized =
+      master?.training?.kaggleStartAuthorization?.startAuthorized === true;
 
     if (candidate && typeof candidate === "object") {
       qualification = candidate as Record<string, unknown>;
@@ -1303,9 +1306,11 @@ function gateKaggleDependent(): Gate {
     previewStateAccepted
       ? pending(
           "training execution (not started ? STOP condition)",
-          executionAuthorized
-            ? "DEC-0026 execution authorization verified. Exact issued run is QUEUED; Kaggle start/RUNNING remains sealed and training has not started."
-            : issuanceAuthorized
+          kaggleStartAuthorized
+            ? "DEC-0027 Kaggle Start authorization verified. Exact run remains QUEUED until real Kaggle launch/running evidence is observed; training has not started."
+            : executionAuthorized
+              ? "DEC-0026 execution authorization verified. Exact issued run is QUEUED; Kaggle start/RUNNING remains sealed and training has not started."
+              : issuanceAuthorized
               ? "DEC-0025 issuance binding verified. Any issued run is DRAFT; execution is not authorized and training has not started."
               : "Qualification does not authorize training. Separate explicit authorization is required.",
         )

@@ -229,10 +229,133 @@ export function isExecutionAuthorizedGoldState(state) {
   return isIssuedGoldState(before);
 }
 
+const KAGGLE_START_READINESS =
+  "KAGGLE_START_AUTHORIZED_AWAITING_LAUNCH";
+const START_LAUNCH_BUNDLE =
+  "fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0";
+const START_NOTEBOOK =
+  "f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf";
+
+/**
+ * DEC-0027 authorizes the exact QUEUED run to be submitted to Kaggle.
+ * It does NOT claim launch acceptance or training start.
+ */
+export function isKaggleStartAuthorizedGoldState(state) {
+  const training = state?.training;
+  const authorization = training?.authorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  const start = training?.kaggleStartAuthorization;
+
+  if (!start ||
+      state?.masterStateVersion !== "1.8.0" ||
+      training?.status !== "NOT_STARTED" ||
+      training?.hasStarted !== false ||
+      state?.currentState?.trainingStatus !== "NOT_STARTED" ||
+      state?.currentState?.trainingHasStarted !== false ||
+      authorization?.status !== KAGGLE_START_READINESS ||
+      authorization?.kaggleStartAuthorized !== true ||
+      authorization?.executionStarted !== false ||
+      experiment?.readinessStatus !== KAGGLE_START_READINESS ||
+      experiment?.runStatus !== "QUEUED" ||
+      start?.status !== "KAGGLE_START_AUTHORIZED" ||
+      start?.decisionId !== "DEC-0027" ||
+      start?.packageId !== ISSUED_PACKAGE ||
+      start?.runId !== ISSUED_RUN ||
+      start?.issuanceReceiptHash !== ISSUANCE_RECEIPT ||
+      start?.executionAuthorizationHash !==
+        state?.training?.executionAuthorization?.authorizationHash ||
+      start?.launchBundleHash !== START_LAUNCH_BUNDLE ||
+      start?.notebookSha256 !== START_NOTEBOOK ||
+      start?.authorizedCodeSnapshot !== SNAPSHOT ||
+      start?.recipeHash !== RECIPE ||
+      start?.qualificationHash !== ACCEPTED_QUALIFICATION_HASH ||
+      start?.engineFreeze !== FREEZE ||
+      start?.datasetHash !== ACCEPTED_GOLD_HASHES.dataset ||
+      ["train", "validation", "test"].some(
+        (split) =>
+          start?.splitHashes?.[split] !==
+          ACCEPTED_GOLD_HASHES[split],
+      ) ||
+      start?.recordFormat !== "harmony-messages-v1" ||
+      start?.testUsage !== "HASH_INTEGRITY_ONLY" ||
+      start?.testPayloadIncluded !== false ||
+      start?.testPayloadAccessed !== false ||
+      start?.worker !== "kaggle" ||
+      start?.accelerator !== "NvidiaTeslaT4" ||
+      start?.expectedRunStatus !== "QUEUED" ||
+      start?.startAuthorized !== true ||
+      start?.launchAttempted !== false ||
+      start?.launchAccepted !== false ||
+      start?.executionStarted !== false ||
+      start?.trainingHasStarted !== false ||
+      !/^[0-9a-f]{64}$/.test(
+        start?.startAuthorizationHash ?? "",
+      )) {
+    return false;
+  }
+
+  const decisions = Array.isArray(state?.decisions)
+    ? state.decisions
+    : [];
+
+  const checkpoint = decisions.filter(
+    (decision) => decision?.id === "DEC-0027",
+  );
+
+  if (checkpoint.length !== 1 ||
+      checkpoint[0].status !== "ACCEPTED" ||
+      checkpoint[0].supersededBy !== null) {
+    return false;
+  }
+
+  const sorted = (value) =>
+    Array.isArray(value)
+      ? value.map(sorted)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.keys(value)
+              .sort()
+              .map(
+                (key) => [key, sorted(value[key])],
+              ),
+          )
+        : value;
+
+  const {
+    startAuthorizationHash,
+    ...body
+  } = start;
+
+  const computed = createHash("sha256")
+    .update(JSON.stringify(sorted(body)))
+    .digest("hex");
+
+  if (computed !== startAuthorizationHash) {
+    return false;
+  }
+
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.7.0";
+
+  before.training.authorization.status =
+    "EXECUTION_AUTHORIZED_QUEUED_AWAITING_KAGGLE_START";
+
+  delete before.training.authorization.kaggleStartAuthorized;
+
+  before.experiments["GHARIBO-exp-001"].readinessStatus =
+    "EXECUTION_AUTHORIZED_QUEUED_AWAITING_KAGGLE_START";
+
+  delete before.training.kaggleStartAuthorization;
+
+  return isExecutionAuthorizedGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
     isIssuedGoldState(state) ||
-    isExecutionAuthorizedGoldState(state)
+    isExecutionAuthorizedGoldState(state) ||
+    isKaggleStartAuthorizedGoldState(state)
   );
 }

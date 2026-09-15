@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.7.0 |
+| **Version** | 1.8.0 |
 | **Last Updated** | 2026-09-15 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | NOT_STARTED |
 | Training invariant | TRAINING HAS NOT STARTED |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | DEC-0026 explicitly authorizes the exact issued GHARIBO-exp-001 run to QUEUED execution preparation. The run remains sealed against RUNNING; Kaggle has not started and a separate explicit Kaggle-start checkpoint is still required. TRAINING HAS NOT STARTED. |
+| Blocker summary | DEC-0027 authorizes the exact QUEUED GHARIBO-exp-001 run for private Kaggle submission using the governed safe launch bundle. No launch acceptance or RUNNING evidence has yet been recorded. TRAINING HAS NOT STARTED. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -70,7 +70,7 @@
 | Environment qualification | QUALIFIED |
 | Qualification hash | 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 |
 | Package preview | PREVIEW_ONLY |
-| Authorization status | EXECUTION_AUTHORIZED_QUEUED_AWAITING_KAGGLE_START |
+| Authorization status | KAGGLE_START_AUTHORIZED_AWAITING_LAUNCH |
 | Authorization decision | DEC-0025 |
 | Authorized code snapshot | ad1e011c55729f5447b324d35b4ad88d0a47d10f |
 | Authorized preview package ID | f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c |
@@ -86,6 +86,13 @@
 | Execution authorized | true |
 | Kaggle start authorized | false |
 | Execution started | false |
+| Kaggle start authorization | KAGGLE_START_AUTHORIZED |
+| Kaggle start decision | DEC-0027 |
+| Kaggle start authorization hash | 4bb2d0b2d38ddd39ce85277c5806838a162620970adf07a6d52844ccf7b2734f |
+| Launch bundle hash | fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0 |
+| Launch notebook hash | f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf |
+| Kaggle start authorized | true |
+| Launch attempted | false |
 | Authorized recipe hash | c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd |
 | Candidate recipe hash | c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd |
 | Historical preview evidence package ID | 3bbe5626119fa5f8d58a362f722775a0cc3a5a019e8bc5a5324bb033cb1faa76 |
@@ -133,7 +140,7 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | EXECUTION_AUTHORIZED_QUEUED_AWAITING_KAGGLE_START | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | KAGGLE_START_AUTHORIZED_AWAITING_LAUNCH | 9/12 | GHARIBO-V0.1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** Promotion requires at least one evaluation result and a training-run reference; neither exists.
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -336,6 +343,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0024 | 2026-09-15 | Governed physical Gold package preview with explicit candidate recipe | ACCEPTED | `docs/adr/ADR-0019-governed-gold-package-preview.md` |
 | DEC-0025 | 2026-09-15 | Explicitly authorize GHARIBO-exp-001 for immutable package and run issuance | ACCEPTED | `docs/adr/ADR-0019-governed-gold-package-preview.md` |
 | DEC-0026 | 2026-09-15 | Authorize the exact issued GHARIBO-exp-001 run for QUEUED execution preparation | ACCEPTED | — |
+| DEC-0027 | 2026-09-15 | Authorize the exact queued GHARIBO-exp-001 run for Kaggle start | ACCEPTED | — |
 
 ## Validation
 
@@ -386,8 +394,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Create a separate explicit Kaggle-start checkpoint bound to DEC-0026, the exact package/run identities and execution authorization hash. Only that checkpoint may remove the QUEUED seal. | DEC-0026 | docs/TRAINING_STRATEGY.md, governance/DEC-0026-execution-authorization.json |
-| ACT-0002 | P0 | After the explicit Kaggle-start checkpoint, transition only the authorized run QUEUED to RUNNING and launch the approved free Kaggle worker while preserving TEST as HASH_INTEGRITY_ONLY. | ACT-0001 | docs/TRAINING_STRATEGY.md, docs/ENV_QUALIFICATION_CONTRACT.md |
+| ACT-0001 | P0 | Submit the exact DEC-0027 launch bundle to the private Kaggle T4 worker, then record the real Kaggle kernel status. Transition the run to RUNNING only after external evidence shows that execution has actually started. | DEC-0027 | docs/TRAINING_STRATEGY.md, governance/DEC-0027-kaggle-start-authorization.json |
 
 ## History
 
@@ -401,6 +408,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.5.0 | 2026-09-15 | Explicit GHARIBO-exp-001 authorization checkpoint: bound package/run issuance to the verified code snapshot, deterministic preview, recipe, qualification, engine freeze and Gold identities. No package/run was issued and training remains NOT_STARTED. | — | PENDING_CHECKPOINT |
 | 1.6.0 | 2026-09-15 | Executed DEC-0025 issuance authorization: persisted exactly one immutable GHARIBO-exp-001 Training Package and one linked DRAFT Training Run, independently reopened and verified them, and retained a separate execution-authorization boundary. | — | PENDING_CHECKPOINT |
 | 1.7.0 | 2026-09-15 | Accepted DEC-0026 execution authorization for the exact issued GHARIBO-exp-001 package/run. Authorized DRAFT to QUEUED only while retaining a hard separate boundary before RUNNING/Kaggle start. | — | PENDING_CHECKPOINT |
+| 1.8.0 | 2026-09-15 | Accepted DEC-0027 Kaggle Start authorization for the exact QUEUED GHARIBO-exp-001 run and the safe content-addressed launch notebook. Training remains NOT_STARTED until real Kaggle execution evidence is observed. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -498,4 +506,15 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - kept executionStarted=false
 - kept training status NOT_STARTED
 - DEC-0026 does not change the authorized executable snapshot or the immutable DEC-0025 package/issuance receipt.
+- Training executed: false
+
+**1.8.0 — changes**
+- start authorization 4bb2d0b2d38ddd39ce85277c5806838a162620970adf07a6d52844ccf7b2734f
+- launch bundle fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0
+- notebook f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf
+- TEST payload excluded
+- Kaggle start authorized
+- executionStarted=false
+- training status NOT_STARTED
+- This checkpoint authorizes Kaggle submission only; it does not itself constitute external execution evidence.
 - Training executed: false
