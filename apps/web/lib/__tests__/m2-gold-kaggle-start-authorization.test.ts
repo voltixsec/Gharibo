@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   isAcceptedGoldGovernanceState,
+  isKaggleLaunchReauthorizedGoldState,
   isKaggleLaunchRepairedGoldState,
   isKaggleStartAuthorizedGoldState,
 } from "@/lib/training/gold-authorization.mjs";
@@ -19,65 +20,122 @@ const state = JSON.parse(
   ),
 );
 
-/**
- * DEC-0027 authorized the first Kaggle launch. That launch was accepted and then
- * failed at KernelWorkerStatus.ERROR, so DEC-0028 repairs the artifact and
- * supersedes DEC-0027 for launch purposes. DEC-0027 keeps every evidence field it
- * recorded and remains the historical record for the artifact it anchored.
- */
-describe("DEC-0027 Kaggle start authorization (superseded launch checkpoint)", () => {
-  it("is retained as a superseded checkpoint while the repaired authorization is the tip", () => {
-    // DEC-0027 is no longer the operative launch authorization.
-    expect(isKaggleStartAuthorizedGoldState(state)).toBe(false);
+const DEC0027_NOTEBOOK =
+  "f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf";
+const DEC0027_BUNDLE =
+  "fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0";
+const DEC0028_NOTEBOOK =
+  "be4af0d4f9a492e7c6b5a2b713b205e17adf7d34d0d0f62aaf1589977cec54ba";
+const DEC0028_BUNDLE =
+  "4380da6382a1484ed41388661057c4a9c1c60f7ae34d612380a4b6f36da21230";
+const DEC0029_NOTEBOOK =
+  "dda3b050034afa0922bda573565ff8f678767e62a944a01d597761aec254b4b1";
+const DEC0029_BUNDLE =
+  "b3b4efc8f4b4c04eedd8610b6b4cdb479817d638e971ce8e8c9b67079d587efb";
 
-    // The repaired authorization is the current tip, and the chain is still accepted.
-    expect(isKaggleLaunchRepairedGoldState(state)).toBe(true);
+/**
+ * DEC-0027 authorized launch attempt 1, which failed at KernelWorkerStatus.ERROR.
+ * DEC-0028 repaired the artifact and authorized attempt 2, which failed at
+ * KernelWorkerStatus.ERROR for a different, now fully-diagnosed reason: the whole
+ * frozen set was submitted to one resolver transaction.
+ * DEC-0029 reproduces the accepted qualification's install staging and is the tip.
+ *
+ * Every superseded checkpoint keeps every evidence field it recorded.
+ */
+describe("superseded Kaggle launch checkpoints (DEC-0027, DEC-0028)", () => {
+  it("is retained as history while the reauthorized checkpoint is the tip", () => {
+    // Neither older layer is the operative launch authorization any more.
+    expect(isKaggleStartAuthorizedGoldState(state)).toBe(false);
+    expect(isKaggleLaunchRepairedGoldState(state)).toBe(false);
+
+    // The reauthorized checkpoint is the current tip, and the chain is still accepted.
+    expect(isKaggleLaunchReauthorizedGoldState(state)).toBe(true);
     expect(isAcceptedGoldGovernanceState(state)).toBe(true);
 
-    const dec0027 = (state.decisions as any[]).filter((d) => d.id === "DEC-0027");
-    expect(dec0027).toHaveLength(1);
-    expect(dec0027[0].status).toBe("SUPERSEDED");
-    expect(dec0027[0].supersededBy).toBe("DEC-0028");
+    const byId = (id: string) => (state.decisions as any[]).filter((d) => d.id === id);
 
-    // The DEC-0027 authorization block itself is untouched historical evidence.
+    expect(byId("DEC-0027")).toHaveLength(1);
+    expect(byId("DEC-0027")[0].status).toBe("SUPERSEDED");
+    expect(byId("DEC-0027")[0].supersededBy).toBe("DEC-0028");
+
+    expect(byId("DEC-0028")).toHaveLength(1);
+    expect(byId("DEC-0028")[0].status).toBe("SUPERSEDED");
+    expect(byId("DEC-0028")[0].supersededBy).toBe("DEC-0029");
+
+    expect(byId("DEC-0029")).toHaveLength(1);
+    expect(byId("DEC-0029")[0].status).toBe("ACCEPTED");
+    expect(byId("DEC-0029")[0].supersedes).toBe("DEC-0028");
+    expect(byId("DEC-0029")[0].supersededBy).toBeNull();
+  });
+
+  it("keeps every superseded authorization block as untouched historical evidence", () => {
     const start = state.training.kaggleStartAuthorization;
     expect(start.decisionId).toBe("DEC-0027");
     expect(start.startAuthorized).toBe(true);
     expect(start.launchAttempted).toBe(false);
-    expect(start.launchBundleHash).toBe(
-      "fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0",
-    );
-    expect(start.notebookSha256).toBe(
-      "f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf",
-    );
+    expect(start.launchBundleHash).toBe(DEC0027_BUNDLE);
+    expect(start.notebookSha256).toBe(DEC0027_NOTEBOOK);
+
+    const repaired = state.training.kaggleLaunchAuthorization;
+    expect(repaired.decisionId).toBe("DEC-0028");
+    expect(repaired.launchBundleHash).toBe(DEC0028_BUNDLE);
+    expect(repaired.notebookSha256).toBe(DEC0028_NOTEBOOK);
+    expect(repaired.supersededLaunchBundleHash).toBe(DEC0027_BUNDLE);
+    expect(repaired.supersededNotebookSha256).toBe(DEC0027_NOTEBOOK);
+
+    const reauth = state.training.kaggleLaunchReauthorization;
+    expect(reauth.decisionId).toBe("DEC-0029");
+    expect(reauth.supersedesDecisionId).toBe("DEC-0028");
+    expect(reauth.launchBundleHash).toBe(DEC0029_BUNDLE);
+    expect(reauth.notebookSha256).toBe(DEC0029_NOTEBOOK);
+    expect(reauth.supersededLaunchBundleHash).toBe(DEC0028_BUNDLE);
+    expect(reauth.supersededNotebookSha256).toBe(DEC0028_NOTEBOOK);
 
     expect(state.experiments["GHARIBO-exp-001"].runStatus).toBe("QUEUED");
     expect(state.training.hasStarted).toBe(false);
   });
 
-  it("records launch attempt 1 truthfully and does not claim a training start", () => {
-    const attempt = state.training.kaggleLaunchAuthorization.launchAttemptHistory[0];
-    expect(attempt.attemptNumber).toBe(1);
-    expect(attempt.externalStatus).toBe("KernelWorkerStatus.ERROR");
-    expect(attempt.rootCauseClass).toBe(
+  it("records both launch attempts truthfully and never claims a training start", () => {
+    const attempts = state.training.kaggleLaunchReauthorization.launchAttemptHistory;
+    expect(attempts).toHaveLength(2);
+
+    expect(attempts[0].attemptNumber).toBe(1);
+    expect(attempts[0].decisionId).toBe("DEC-0027");
+    expect(attempts[0].artifactNotebookSha256).toBe(DEC0027_NOTEBOOK);
+    expect(attempts[0].externalStatus).toBe("KernelWorkerStatus.ERROR");
+    expect(attempts[0].rootCauseClass).toBe(
       "DEPENDENCY_INSTALL_FAILURE_WITH_DIAGNOSTIC_SUPPRESSED",
     );
-    expect(attempt.trainingStarted).toBe(false);
-    expect(attempt.testPayloadUploaded).toBe(false);
-    expect(attempt.testPayloadAccessed).toBe(false);
-    expect(state.training.kaggleLaunchAuthorization.trainingHasStarted).toBe(false);
+
+    expect(attempts[1].attemptNumber).toBe(2);
+    expect(attempts[1].decisionId).toBe("DEC-0028");
+    expect(attempts[1].artifactNotebookSha256).toBe(DEC0028_NOTEBOOK);
+    expect(attempts[1].artifactLaunchBundleHash).toBe(DEC0028_BUNDLE);
+    expect(attempts[1].externalStatus).toBe("KernelWorkerStatus.ERROR");
+    expect(attempts[1].rootCauseClass).toBe(
+      "FROZEN_SET_RESOLVER_UNSATISFIABLE_IN_SINGLE_TRANSACTION",
+    );
+
+    for (const attempt of attempts) {
+      expect(attempt.trainingStarted).toBe(false);
+      expect(attempt.testPayloadUploaded).toBe(false);
+      expect(attempt.testPayloadAccessed).toBe(false);
+    }
+    expect(state.training.kaggleLaunchReauthorization.trainingHasStarted).toBe(false);
   });
 
   it("keeps the governed recipe, model, dataset, splits and TEST policy unchanged", () => {
-    const repaired = state.training.kaggleLaunchAuthorization;
+    const reauth = state.training.kaggleLaunchReauthorization;
     const original = state.training.kaggleStartAuthorization;
-    expect(JSON.stringify(repaired.recipe)).toBe(JSON.stringify(original.recipe));
-    expect(repaired.datasetHash).toBe(original.datasetHash);
-    expect(JSON.stringify(repaired.splitHashes)).toBe(JSON.stringify(original.splitHashes));
-    expect(repaired.recipeHash).toBe(original.recipeHash);
-    expect(repaired.testUsage).toBe("HASH_INTEGRITY_ONLY");
-    expect(repaired.testPayloadIncluded).toBe(false);
-    expect(repaired.testPayloadAccessed).toBe(false);
+    expect(JSON.stringify(reauth.recipe)).toBe(JSON.stringify(original.recipe));
+    expect(reauth.datasetHash).toBe(original.datasetHash);
+    expect(JSON.stringify(reauth.splitHashes)).toBe(JSON.stringify(original.splitHashes));
+    expect(reauth.recipeHash).toBe(original.recipeHash);
+    expect(reauth.qualificationHash).toBe(original.qualificationHash);
+    expect(reauth.engineFreeze).toBe(original.engineFreeze);
+    expect(reauth.testUsage).toBe("HASH_INTEGRITY_ONLY");
+    expect(reauth.testPayloadIncluded).toBe(false);
+    expect(reauth.testPayloadAccessed).toBe(false);
     for (const key of [
       "recipeChanged",
       "modelChanged",
@@ -86,36 +144,117 @@ describe("DEC-0027 Kaggle start authorization (superseded launch checkpoint)", (
       "testPolicyChanged",
       "dependencySetChanged",
     ]) {
-      expect(repaired.repair[key]).toBe(false);
+      expect(reauth.repair[key]).toBe(false);
     }
   });
 
-  it("fails closed for mutated launch or TEST state", () => {
+  it("records the staged-install repair as a resolution-strategy change only", () => {
+    const staged = state.training.kaggleLaunchReauthorization.stagedInstallRepair;
+    expect(staged.dependencySetChanged).toBe(false);
+    expect(staged.declaredSpecsUnchanged).toBe(true);
+    expect(staged.conflictingPair).toEqual(
+      expect.arrayContaining(["unsloth==2026.9.4", "unsloth_zoo==2026.9.3"]),
+    );
+    expect(staged.stages.map((s: any) => s.phase)).toEqual([
+      "install",
+      "frozen-no-deps",
+      "support-no-deps",
+    ]);
+    // The resolver stage carries the governed datasets pin and never the capped pair.
+    expect(staged.stages[0].specs).toContain("datasets==5.0.1");
+    expect(staged.stages[0].specs.some((s: string) => s.startsWith("unsloth"))).toBe(false);
+    expect(staged.stages[1].flags).toContain("--no-deps");
+    expect(staged.stages[1].specs).toEqual(
+      expect.arrayContaining(["unsloth==2026.9.4", "unsloth_zoo==2026.9.3"]),
+    );
+    expect(staged.stages[2].flags).toContain("--no-deps");
+    // The precedent is the accepted qualification, and the resolver proof is recorded.
+    expect(staged.qualificationPrecedent.activeRuntimeAlignment).toBe("IDENTICAL");
+    expect(staged.qualificationPrecedent.installPlan).toHaveLength(3);
+    expect(staged.resolverProof.oldSingleTransactionResolved).toBe(false);
+    expect(staged.resolverProof.stage1ResolvedVersions.tokenizers).toBe("0.22.2");
+    expect(staged.resolverProof.stage1ResolvedVersions["huggingface-hub"]).toBe("0.36.2");
+  });
+
+  it("fails closed for mutated launch, staged-install or TEST state", () => {
+    const tip = (s: any) => s.training.kaggleLaunchReauthorization;
     const mutations = [
       (s: any) => {
-        s.training.kaggleLaunchAuthorization.launchBundleHash = "0".repeat(64);
+        tip(s).launchBundleHash = "0".repeat(64);
       },
       (s: any) => {
-        s.training.kaggleLaunchAuthorization.notebookSha256 = "0".repeat(64);
+        tip(s).notebookSha256 = "0".repeat(64);
       },
       (s: any) => {
-        s.training.kaggleLaunchAuthorization.testPayloadIncluded = true;
+        tip(s).supersededNotebookSha256 = "0".repeat(64);
       },
       (s: any) => {
-        s.training.kaggleLaunchAuthorization.testPayloadAccessed = true;
+        tip(s).supersededLaunchBundleHash = "0".repeat(64);
       },
       (s: any) => {
-        s.training.kaggleLaunchAuthorization.launchAttempted = true;
+        tip(s).testPayloadIncluded = true;
       },
       (s: any) => {
-        s.training.kaggleLaunchAuthorization.executionStarted = true;
+        tip(s).testPayloadAccessed = true;
       },
       (s: any) => {
-        s.training.kaggleLaunchAuthorization.repair.recipeChanged = true;
+        tip(s).launchAttempted = true;
       },
       (s: any) => {
-        s.training.kaggleLaunchAuthorization.launchAttemptHistory[0].externalStatus =
-          "KernelWorkerStatus.COMPLETE";
+        tip(s).executionStarted = true;
+      },
+      (s: any) => {
+        tip(s).repair.recipeChanged = true;
+      },
+      (s: any) => {
+        tip(s).repair.dependencySetChanged = true;
+      },
+      // The staged-install record is the core of this checkpoint.
+      (s: any) => {
+        tip(s).stagedInstallRepair.dependencySetChanged = true;
+      },
+      (s: any) => {
+        tip(s).stagedInstallRepair.declaredSpecsUnchanged = false;
+      },
+      (s: any) => {
+        tip(s).stagedInstallRepair.stages[0].specs.push("unsloth==2026.9.4");
+      },
+      (s: any) => {
+        tip(s).stagedInstallRepair.stages[1].specs = ["unsloth==2026.9.4"];
+      },
+      (s: any) => {
+        tip(s).stagedInstallRepair.stages[1].flags = [];
+      },
+      (s: any) => {
+        tip(s).stagedInstallRepair.conflictingPair = ["datasets==5.0.1"];
+      },
+      (s: any) => {
+        tip(s).stagedInstallRepair.resolverProof.oldSingleTransactionResolved = true;
+      },
+      (s: any) => {
+        tip(s).stagedInstallRepair.qualificationPrecedent.activeRuntimeAlignment = "DIVERGENT";
+      },
+      (s: any) => {
+        tip(s).stagedInstallRepair.preservedDependencies.torch = "2.14.0";
+      },
+      // Attempt history must stay truthful.
+      (s: any) => {
+        tip(s).launchAttemptHistory.pop();
+      },
+      (s: any) => {
+        tip(s).launchAttemptHistory[1].artifactNotebookSha256 = "0".repeat(64);
+      },
+      (s: any) => {
+        tip(s).launchAttemptHistory[1].externalStatus = "KernelWorkerStatus.COMPLETE";
+      },
+      (s: any) => {
+        tip(s).launchAttemptHistory[1].rootCauseClass = "UNKNOWN";
+      },
+      (s: any) => {
+        tip(s).launchAttemptHistory[1].trainingStarted = true;
+      },
+      (s: any) => {
+        tip(s).launchAttemptHistory[0].externalStatus = "KernelWorkerStatus.COMPLETE";
       },
       (s: any) => {
         s.experiments["GHARIBO-exp-001"].runStatus = "RUNNING";
@@ -123,13 +262,24 @@ describe("DEC-0027 Kaggle start authorization (superseded launch checkpoint)", (
       (s: any) => {
         s.training.hasStarted = true;
       },
+      // The supersession chain must stay reciprocal.
+      (s: any) => {
+        s.decisions.find((d: any) => d.id === "DEC-0028").supersededBy = null;
+      },
+      (s: any) => {
+        s.decisions.find((d: any) => d.id === "DEC-0029").status = "DRAFT";
+      },
+      // The reauthorization hash must be recomputable from the recorded body.
+      (s: any) => {
+        tip(s).recipeHash = "0".repeat(64);
+      },
     ];
 
     for (const mutate of mutations) {
       const bad = structuredClone(state);
       mutate(bad);
 
-      expect(isKaggleLaunchRepairedGoldState(bad)).toBe(false);
+      expect(isKaggleLaunchReauthorizedGoldState(bad)).toBe(false);
       expect(isAcceptedGoldGovernanceState(bad)).toBe(false);
     }
   });
