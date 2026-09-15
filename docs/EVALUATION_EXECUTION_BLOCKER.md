@@ -5,8 +5,32 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Approved |
-| **Version** | 1.0.0 |
+| **Version** | 1.1.0 |
 | **Last Updated** | 2026-09-16 |
+
+## 0. Update — 2026-09-16 (v1.1.0)
+
+Two of the three code-side prerequisites listed in §7 have since been **completed**. The blocker
+itself is **unchanged and still OPEN**: the absence of a GPU execution environment is the remaining
+constraint, and it is not something a code change can resolve.
+
+| §7 step | State | Evidence |
+|---|---|---|
+| 1. Repair the kernel generator | **DONE** | `scripts/eval/build-eval-kernel.mjs` — three-stage governed `uv` discipline and render-then-tokenize are now the only forms present |
+| 2. Generate the notebook | **DONE** | `scripts/eval/kaggle/gharibo-eval-001.ipynb` — 11 cells, `sha256 de3d396a…c4a4969` |
+| 3. Add the static safety gate | **DONE** | `scripts/eval/check-eval-kernel.mjs` — 41 checks, imports the shared `FORBIDDEN_TOKENS` |
+| 4–8 (dataset, push, run, download, score, register) | **NOT DONE** | still blocked: no GPU execution environment |
+
+The repair was verified by **adversarial injection**, not by reading: re-introducing each original
+defect into the generated notebook made the checker fail with the expected diagnostic, and the
+clean notebook passes 41/41. A repair that cannot be observed to fail is not a repair.
+
+Both gates are now composed into `npm run verify:eval`, which runs the 30 evaluation-honesty checks
+**and** the 41 kernel-safety checks. The blocker is not downgraded by this update: the
+`INFRASTRUCTURE_NO_EXECUTION_ENVIRONMENT` classification and the `PRE_INFERENCE` phase below remain
+exactly correct, `authorizationConsumed` remains `false`, and every M1–M13 value remains `null`.
+
+---
 
 ## 1. Purpose
 
@@ -86,19 +110,30 @@ this from being completed inside the current session:
    records at up to 1024 new tokens are expected to add on the order of an hour or more. The
    result is retrievable only after the remote job completes and its output is downloaded.
    That exceeded the execution window available to this session.
-2. **Unverified kernel generator.** The kernel generator
-   `scripts/eval/build-eval-kernel.mjs` has **not** been corrected or executed. Two defects were
-   found while reading it against the accepted production artifacts, and pushing it unrepaired
-   would produce an environment that is *not* the accepted engine freeze — which would make the
-   benchmark incomparable to the qualification baseline and would itself be a governance defect:
-   - **Install staging.** It uses an ad-hoc `%pip install` sequence instead of the accepted
+2. **Unverified kernel generator (since repaired — see §0).** At the time of this record the kernel
+   generator `scripts/eval/build-eval-kernel.mjs` had **not** been corrected or executed. Two
+   defects were found while reading it against the accepted production artifacts, and pushing it
+   unrepaired would have produced an environment that is *not* the accepted engine freeze — which
+   would make the benchmark incomparable to the qualification baseline and would itself be a
+   governance defect:
+   - **Install staging.** It used an ad-hoc `%pip install` sequence instead of the accepted
      three-stage `uv` discipline. Reusing the accepted discipline is what makes BASE and
      CANDIDATE load in the same environment the adapter was trained and qualified in.
-   - **Chat-template rendering.** It calls `apply_chat_template(..., return_tensors='pt',
+     *Repaired:* the generator now emits the accepted `install` → `--upgrade --no-deps` →
+     `--no-deps --upgrade torchao>=0.16.0` plan, preserve-probes `torch`/`triton` with a
+     constraint file, skips `triton_kernels` on the preserved path, dry-runs every stage with its
+     exact arguments, and raises the real resolver reason instead of a bare exit code.
+   - **Chat-template rendering.** It called `apply_chat_template(..., return_tensors='pt',
      return_dict=True)` directly on message dicts, whereas the proven production path renders
      with `tokenize=False, add_generation_prompt=False` to a string and tokenizes afterwards.
      Rendering is a *frozen prompt/template rule* under the benchmark specification; getting it
-     wrong would silently change the prompts the model sees.
+     wrong would silently change the prompts the model sees. *Repaired:* the generator now
+     renders to a string and then tokenizes, asserts the rendered text is non-empty, maps the
+     standing instruction to a `developer` turn (matching the governed Gold representation), and
+     probes for Harmony control tokens before either arm runs.
+
+   Repairing this defect removed it as a *reason to withhold the push*, but it does not create an
+   execution environment. Constraint 1 above is independent and unaffected, so the blocker stands.
 
 Pushing an unrepaired kernel would not have produced a trustworthy measurement. Not pushing it
 preserves the authorization: `DEC-0032` permits **one** benchmark execution, and this session did
@@ -142,22 +177,29 @@ This condition is **not** triggered: TEST inference has not occurred in any degr
 
 In order, and all before any TEST record is parsed:
 
-1. **Repair `scripts/eval/build-eval-kernel.mjs`** — reproduce the accepted three-stage `uv`
-   install discipline (`install` → `--upgrade --no-deps` → `--no-deps --upgrade torchao>=0.16.0`),
-   preserve preinstalled `torch`/`triton` via a constraint file, skip `triton_kernels` on the
-   preserved path, and render prompts with `tokenize=False, add_generation_prompt=False` before
-   tokenizing.
-2. **Generate the notebook** — run the generator to emit `scripts/eval/kaggle/gharibo-eval-001.ipynb`.
-3. **Add the static safety gate** — `scripts/eval/check-eval-kernel.mjs`, importing the shared
-   `FORBIDDEN_TOKENS` list, mirroring `scripts/qualify/check-qualify-harness.mjs`.
-4. **Prepare the private input dataset** — `prompts.jsonl` only, never `gold.jsonl`. The filter
+1. ~~**Repair `scripts/eval/build-eval-kernel.mjs`**~~ — **DONE.** Reproduces the accepted
+   three-stage `uv` install discipline (`install` → `--upgrade --no-deps` →
+   `--no-deps --upgrade torchao>=0.16.0`), preserves preinstalled `torch`/`triton` via a
+   constraint file, skips `triton_kernels` on the preserved path, and renders prompts with
+   `tokenize=False, add_generation_prompt=False` before tokenizing.
+2. ~~**Generate the notebook**~~ — **DONE.** `scripts/eval/kaggle/gharibo-eval-001.ipynb`,
+   11 cells, `sha256 de3d396a…c4a4969`, reproducible via `npm run eval:render`.
+3. ~~**Add the static safety gate**~~ — **DONE.** `scripts/eval/check-eval-kernel.mjs` imports the
+   shared `FORBIDDEN_TOKENS` list (mirroring `scripts/qualify/check-qualify-harness.mjs`) and runs
+   41 checks over drift, forbidden primitives, TEST privacy, authorization pins, identity pins,
+   decoding values, inference-mode discipline, install discipline and Harmony rendering. Wired as
+   `npm run eval:check` and composed into `npm run verify:eval`. Verified by adversarial injection.
+4. **Provide a GPU execution environment** — **OUTSTANDING.** This is the blocker. Either a local
+   CUDA device with roughly 40 GB of accelerator memory (the adapter is stored float32), or the
+   governed Kaggle T4 route. No code change resolves this.
+5. **Prepare the private input dataset** — `prompts.jsonl` only, never `gold.jsonl`. The filter
    already asserts `gold payloads found : 0` inside the kernel, and the dataset must remain
    private and untracked by Git.
-5. **Push and run** — one governed Kaggle T4 execution covering BASE **then** CANDIDATE over the
+6. **Push and run** — one governed Kaggle T4 execution covering BASE **then** CANDIDATE over the
    same 80 TEST records with identical decoding.
-6. **Download outputs** — `predictions-base.jsonl`, `predictions-candidate.jsonl`, `run-record.json`.
-7. **Score locally** — `score-arm.mjs` over `gold.jsonl`, producing real M1–M13 values.
-8. **Register results** — `evaluationStatus` completed-equivalent, `evaluationResults >= 1`,
+7. **Download outputs** — `predictions-base.jsonl`, `predictions-candidate.jsonl`, `run-record.json`.
+8. **Score locally** — `score-arm.mjs` over `gold.jsonl`, producing real M1–M13 values.
+9. **Register results** — `evaluationStatus` completed-equivalent, `evaluationResults >= 1`,
    real scores and hashes into Master State.
 
 ---

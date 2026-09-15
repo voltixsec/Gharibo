@@ -27,7 +27,7 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 | Data Factory | `docs/DATA_FACTORY.md` | Architecture | Domain spec | Frozen | 1.4.0 | 2026-09-14 |
 | Evaluation Framework | `docs/EVALUATION.md` | Architecture | Domain spec | Frozen | 1.2.0 | 2026-09-14 |
 | Evaluation Authorization Request | `docs/EVALUATION_AUTHORIZATION_REQUEST.md` | Architecture | Governance | Approved | 1.2.0 | 2026-09-16 |
-| Evaluation Execution Blocker | `docs/EVALUATION_EXECUTION_BLOCKER.md` | Architecture | Governance | Approved | 1.0.0 | 2026-09-16 |
+| Evaluation Execution Blocker | `docs/EVALUATION_EXECUTION_BLOCKER.md` | Architecture | Governance | Approved | 1.1.0 | 2026-09-16 |
 | Research Benchmark | `docs/RESEARCH_BENCHMARK.md` | Architecture | Domain spec | Draft | 1.1.0 | 2026-09-14 |
 | Research Gym | `docs/RESEARCH_GYM.md` | Architecture | Domain spec | Frozen | 1.0.0 | 2026-09-14 |
 | Model Registry | `docs/MODEL_REGISTRY.md` | Architecture | Domain spec | Frozen | 1.4.0 | 2026-09-15 |

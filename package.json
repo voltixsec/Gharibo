@@ -34,7 +34,9 @@
     "eval:audit:blocker": "node scripts/eval/build-dec0033-blocker.mjs --check",
     "eval:audit:leakage": "python scripts/eval/leakage-audit.py --check",
     "eval:verify": "node scripts/eval/verify-evaluation-state.mjs",
-    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:leakage && npm run eval:verify"
+    "eval:render": "node scripts/eval/build-eval-kernel.mjs",
+    "eval:check": "node scripts/eval/build-eval-kernel.mjs --check && node scripts/eval/check-eval-kernel.mjs",
+    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:leakage && npm run eval:verify && npm run eval:check"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
