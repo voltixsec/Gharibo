@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.8.0",
+  "masterStateVersion": "1.9.0",
   "updatedAt": "2026-09-15",
   "project": {
     "id": "GHARIBO",
@@ -19,7 +19,7 @@
     "trainingInvariant": "TRAINING HAS NOT STARTED",
     "currentMilestone": "M3C",
     "milestoneStatus": "COMPLETE",
-    "blockerSummary": "DEC-0027 authorizes the exact QUEUED GHARIBO-exp-001 run for private Kaggle submission using the governed safe launch bundle. No launch acceptance or RUNNING evidence has yet been recorded. TRAINING HAS NOT STARTED.",
+    "blockerSummary": "DEC-0028 supersedes the DEC-0027 launch artifact. The first Kaggle launch (attempt 1) was accepted and then failed at KernelWorkerStatus.ERROR inside the notebook's pinned-engine install cell; the committed worker is repaired and a committed reproducible launch-bundle generator now produces the authorized artifact. One retry is authorized. TRAINING HAS NOT STARTED.",
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
       "exampleCount": 800,
@@ -582,7 +582,7 @@
       "id": "DEC-0027",
       "date": "2026-09-15",
       "title": "Authorize the exact queued GHARIBO-exp-001 run for Kaggle start",
-      "status": "ACCEPTED",
+      "status": "SUPERSEDED",
       "decision": "Authorize the exact already-issued and DEC-0026-queued GHARIBO-exp-001 run to be submitted to the private Kaggle worker using the content-addressed safe launch bundle fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0. TRAIN and VALIDATION are the only attached payloads; TEST remains HASH_INTEGRITY_ONLY. This decision authorizes the external start attempt but does not claim that Kaggle accepted, scheduled or started training.",
       "rationale": "The CEO explicitly approved Kaggle Start after the safe launch notebook was structurally verified, the official Kaggle CLI was installed and authenticated, and the exact queued package/run identities remained unchanged.",
       "scope": [
@@ -596,6 +596,28 @@
         "governance/GHARIBO_MASTER_STATE.json"
       ],
       "supersedes": null,
+      "supersededBy": "DEC-0028",
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0028",
+      "date": "2026-09-15",
+      "title": "Repair the governed Kaggle launch artifact and re-authorize a single retry",
+      "status": "ACCEPTED",
+      "decision": "The first DEC-0027 launch reached KernelWorkerStatus.ERROR inside the notebook's pinned-engine install cell. The committed worker source is repaired: install observability with a dry-run probe and a redacted diagnostic artifact, the Kaggle-preserve install strategy already proven by the accepted M3C qualification harness, TRAIN+VALIDATION-only dataset verification with an explicit TEST-payload guard and Kaggle input-root discovery, numeric PEP 440 dependency floor comparison, a data-driven TEST-payload policy in the bundle and operator instructions, and a committed reproducible launch-bundle generator. The repaired artifact - notebook sha256 be4af0d4f9a492e7c6b5a2b713b205e17adf7d34d0d0f62aaf1589977cec54ba and launch bundle hash 4380da6382a1484ed41388661057c4a9c1c60f7ae34d612380a4b6f36da21230 - is authorized for exactly one retry on the private Kaggle worker. The governed recipe, base model, dataset, splits, dependency set and TEST policy are unchanged. TRAINING HAS NOT STARTED.",
+      "rationale": "The failure was a correctable defect in the committed worker, not an external hard blocker. Fail-closed governance requires the executed artifact to be exactly the authorized artifact, so repairing the notebook necessarily invalidates the DEC-0027 artifact hash and requires a new checkpoint. DEC-0027 keeps every evidence field it recorded and remains the historical record for the artifact it actually anchored; it is superseded for launch purposes only. The DEC-0027 launch bundle hash was produced by an uncommitted ad-hoc step and was not reproducible from the repository, so this checkpoint also supersedes it with a committed, documented algorithm.",
+      "scope": [
+        "training",
+        "experiments"
+      ],
+      "references": [
+        "docs/TRAINING_STRATEGY.md",
+        "governance/DEC-0027-kaggle-start-authorization.json",
+        "governance/DEC-0028-kaggle-launch-repair-authorization.json",
+        "governance/GHARIBO_MASTER_STATE.json",
+        "scripts/training/prepare-kaggle-start.ts"
+      ],
+      "supersedes": "DEC-0027",
       "supersededBy": null,
       "architectureChanging": false
     }
@@ -820,7 +842,7 @@
       }
     },
     "authorization": {
-      "status": "KAGGLE_START_AUTHORIZED_AWAITING_LAUNCH",
+      "status": "KAGGLE_LAUNCH_REPAIRED_AUTHORIZED_AWAITING_RETRY",
       "decisionId": "DEC-0025",
       "authorizedAt": "2026-09-15",
       "scope": "PACKAGE_AND_RUN_ISSUANCE_ONLY",
@@ -966,6 +988,102 @@
       },
       "authorizedAt": "2026-09-15T17:22:38.236Z",
       "startAuthorizationHash": "4bb2d0b2d38ddd39ce85277c5806838a162620970adf07a6d52844ccf7b2734f"
+    },
+    "kaggleLaunchAuthorization": {
+      "status": "KAGGLE_LAUNCH_REPAIRED_AUTHORIZED",
+      "decisionId": "DEC-0028",
+      "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
+      "runId": "ea6e30f2-ce26-4323-b35a-3436ee867eaf",
+      "issuanceReceiptHash": "878b961f03ba069b82b4eb82530e7ebdfa4f8644ab159beff0a9adc7935f99bd",
+      "executionAuthorizationHash": "8c089dd9c6967dd33c32f64128bc7e939e8019a27c2428897c23156a075d07bf",
+      "startAuthorizationHash": "4bb2d0b2d38ddd39ce85277c5806838a162620970adf07a6d52844ccf7b2734f",
+      "supersededNotebookSha256": "f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf",
+      "supersededLaunchBundleHash": "fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0",
+      "notebookSha256": "be4af0d4f9a492e7c6b5a2b713b205e17adf7d34d0d0f62aaf1589977cec54ba",
+      "launchBundleHash": "4380da6382a1484ed41388661057c4a9c1c60f7ae34d612380a4b6f36da21230",
+      "launchBundleHashAlgorithm": "sha256 over \"\\n\".join(sorted(`${sha256(file)}  ${relativePath}`)) + \"\\n\" across the launch-bundle payload files (start-plan.json excluded)",
+      "authorizedCodeSnapshot": "200c1b7b2da65922489b88f4d180499d0afdd2dd",
+      "recipeHash": "c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd",
+      "qualificationHash": "6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0",
+      "engineFreeze": "unsloth-freeze-2026.09.15",
+      "datasetHash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+      "splitHashes": {
+        "train": "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2",
+        "validation": "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787",
+        "test": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b"
+      },
+      "recordFormat": "harmony-messages-v1",
+      "testUsage": "HASH_INTEGRITY_ONLY",
+      "testPayloadIncluded": false,
+      "testPayloadAccessed": false,
+      "worker": "kaggle",
+      "accelerator": "NvidiaTeslaT4",
+      "expectedRunStatus": "QUEUED",
+      "startAuthorized": true,
+      "launchAttempted": false,
+      "launchAccepted": false,
+      "executionStarted": false,
+      "trainingHasStarted": false,
+      "repair": {
+        "scope": [
+          "kaggle-notebook-install-observability",
+          "kaggle-notebook-kaggle-preserve-install-strategy",
+          "kaggle-notebook-dataset-locate-and-test-policy",
+          "kaggle-notebook-numeric-dependency-floor-comparison",
+          "worker-bundle-and-instructions-test-payload-policy",
+          "committed-launch-bundle-generator"
+        ],
+        "recipeChanged": false,
+        "modelChanged": false,
+        "datasetChanged": false,
+        "splitsChanged": false,
+        "testPolicyChanged": false,
+        "dependencySetChanged": false
+      },
+      "launchAttemptHistory": [
+        {
+          "attemptNumber": 1,
+          "decisionId": "DEC-0027",
+          "kernelRef": "vokaigharibo/gharibo-exp-001-kaggle-start-fec22ca2",
+          "artifactNotebookSha256": "f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf",
+          "artifactLaunchBundleHash": "fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0",
+          "externalStatus": "KernelWorkerStatus.ERROR",
+          "terminalStage": "notebook Section 4 (pinned engine install), executed as In[5]",
+          "rootCauseClass": "DEPENDENCY_INSTALL_FAILURE_WITH_DIAGNOSTIC_SUPPRESSED",
+          "rootCauseDetail": "uv pip install returned exit status 1 with the resolver reason suppressed by -qqq, so the failure was undiagnosable; the same cell also re-resolved torch/triton against the default PyPI index instead of preserving the Kaggle-provided +cu128 builds.",
+          "trainingStarted": false,
+          "testPayloadUploaded": false,
+          "testPayloadAccessed": false,
+          "evidence": "private gitignored incident log (kernel logs retrieved with the authenticated Kaggle CLI under UTF-8 output)"
+        }
+      ],
+      "recipe": {
+        "method": "QLoRA + SFT",
+        "quantization": "4-bit",
+        "dtype": "fp16",
+        "sequenceLength": 512,
+        "loraR": 16,
+        "loraAlpha": 32,
+        "targetModules": [
+          "q_proj",
+          "v_proj"
+        ],
+        "perDeviceTrainBatchSize": 1,
+        "gradientAccumulationSteps": 4,
+        "effectiveBatchSize": 4,
+        "learningRate": 0.0002,
+        "epochs": 1,
+        "seed": 42,
+        "optimizer": "adamw_8bit",
+        "warmupSteps": 5,
+        "scheduler": "linear",
+        "weightDecay": 0.01,
+        "saveStrategy": "steps",
+        "saveSteps": 50,
+        "saveTotalLimit": 2
+      },
+      "authorizedAt": "2026-09-15T18:05:14.921Z",
+      "launchAuthorizationHash": "4dbbed5874ff54de9b7ffe1c57dd135d654e665828ee5a3b590d7efe2cb5f851"
     }
   },
   "datasets": {
@@ -1029,7 +1147,7 @@
       "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "KAGGLE_START_AUTHORIZED_AWAITING_LAUNCH",
+      "readinessStatus": "KAGGLE_LAUNCH_REPAIRED_AUTHORIZED_AWAITING_RETRY",
       "engineDependencyCount": 12,
       "resolvedEngineDependencies": 9,
       "promotionTarget": "GHARIBO-V0.1",

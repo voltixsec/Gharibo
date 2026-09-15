@@ -236,6 +236,16 @@ const START_LAUNCH_BUNDLE =
 const START_NOTEBOOK =
   "f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf";
 
+/** The DEC-0026 execution authorization hash (referenced by later checkpoints). */
+const EXECUTION_AUTHORIZATION_HASH =
+  "8c089dd9c6967dd33c32f64128bc7e939e8019a27c2428897c23156a075d07bf";
+/** The DEC-0027 start authorization hash (referenced by later checkpoints). */
+const DEC0027_START_AUTHORIZATION_HASH =
+  "4bb2d0b2d38ddd39ce85277c5806838a162620970adf07a6d52844ccf7b2734f";
+/** The DEC-0027 artifact identity, preserved as historical evidence by DEC-0028. */
+const DEC0027_NOTEBOOK_SHA256 = START_NOTEBOOK;
+const DEC0027_LAUNCH_BUNDLE_HASH = START_LAUNCH_BUNDLE;
+
 /**
  * DEC-0027 authorizes the exact QUEUED run to be submitted to Kaggle.
  * It does NOT claim launch acceptance or training start.
@@ -351,11 +361,167 @@ export function isKaggleStartAuthorizedGoldState(state) {
   return isExecutionAuthorizedGoldState(before);
 }
 
+const REPAIRED_READINESS =
+  "KAGGLE_LAUNCH_REPAIRED_AUTHORIZED_AWAITING_RETRY";
+const REPAIRED_NOTEBOOK =
+  "be4af0d4f9a492e7c6b5a2b713b205e17adf7d34d0d0f62aaf1589977cec54ba";
+const REPAIRED_LAUNCH_BUNDLE =
+  "4380da6382a1484ed41388661057c4a9c1c60f7ae34d612380a4b6f36da21230";
+const REPAIR_CODE_SNAPSHOT = "200c1b7b2da65922489b88f4d180499d0afdd2dd";
+
+/**
+ * DEC-0028 repairs the launch artifact after the first DEC-0027 launch failed at
+ * KernelWorkerStatus.ERROR inside the notebook's pinned-engine install cell.
+ *
+ * The governed recipe / model / dataset / splits / dependency set / TEST policy are
+ * unchanged: only the notebook implementation and the launch-bundle generator moved.
+ * DEC-0027 remains the historical record for the artifact it anchored and is
+ * superseded for launch purposes only.
+ */
+export function isKaggleLaunchRepairedGoldState(state) {
+  const training = state?.training;
+  const authorization = training?.authorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  const launch = training?.kaggleLaunchAuthorization;
+
+  if (!launch ||
+      state?.masterStateVersion !== "1.9.0" ||
+      training?.status !== "NOT_STARTED" ||
+      training?.hasStarted !== false ||
+      state?.currentState?.trainingStatus !== "NOT_STARTED" ||
+      state?.currentState?.trainingHasStarted !== false ||
+      authorization?.status !== REPAIRED_READINESS ||
+      authorization?.kaggleStartAuthorized !== true ||
+      authorization?.executionStarted !== false ||
+      experiment?.readinessStatus !== REPAIRED_READINESS ||
+      experiment?.runStatus !== "QUEUED" ||
+      launch?.status !== "KAGGLE_LAUNCH_REPAIRED_AUTHORIZED" ||
+      launch?.decisionId !== "DEC-0028" ||
+      launch?.packageId !== ISSUED_PACKAGE ||
+      launch?.runId !== ISSUED_RUN ||
+      launch?.issuanceReceiptHash !== ISSUANCE_RECEIPT ||
+      launch?.executionAuthorizationHash !== EXECUTION_AUTHORIZATION_HASH ||
+      launch?.startAuthorizationHash !== DEC0027_START_AUTHORIZATION_HASH ||
+      launch?.supersededNotebookSha256 !== DEC0027_NOTEBOOK_SHA256 ||
+      launch?.supersededLaunchBundleHash !== DEC0027_LAUNCH_BUNDLE_HASH ||
+      launch?.notebookSha256 !== REPAIRED_NOTEBOOK ||
+      launch?.launchBundleHash !== REPAIRED_LAUNCH_BUNDLE ||
+      launch?.authorizedCodeSnapshot !== REPAIR_CODE_SNAPSHOT ||
+      launch?.recipeHash !== RECIPE ||
+      launch?.qualificationHash !== ACCEPTED_QUALIFICATION_HASH ||
+      launch?.engineFreeze !== FREEZE ||
+      launch?.datasetHash !== ACCEPTED_GOLD_HASHES.dataset ||
+      ["train", "validation", "test"].some(
+        (split) => launch?.splitHashes?.[split] !== ACCEPTED_GOLD_HASHES[split],
+      ) ||
+      launch?.recordFormat !== "harmony-messages-v1" ||
+      launch?.testUsage !== "HASH_INTEGRITY_ONLY" ||
+      launch?.testPayloadIncluded !== false ||
+      launch?.testPayloadAccessed !== false ||
+      launch?.worker !== "kaggle" ||
+      launch?.accelerator !== "NvidiaTeslaT4" ||
+      launch?.expectedRunStatus !== "QUEUED" ||
+      launch?.startAuthorized !== true ||
+      launch?.launchAttempted !== false ||
+      launch?.launchAccepted !== false ||
+      launch?.executionStarted !== false ||
+      launch?.trainingHasStarted !== false ||
+      !/^[0-9a-f]{64}$/.test(launch?.launchAuthorizationHash ?? "")) {
+    return false;
+  }
+
+  // The repair must not have moved the governed recipe or the physical data contract.
+  const repair = launch?.repair;
+  if (!repair ||
+      !Array.isArray(repair.scope) || repair.scope.length === 0 ||
+      ["recipeChanged", "modelChanged", "datasetChanged", "splitsChanged",
+        "testPolicyChanged", "dependencySetChanged"].some((key) => repair[key] !== false)) {
+    return false;
+  }
+
+  // Attempt 1 must be recorded truthfully: attempted, accepted, ERROR, no training.
+  const attempts = launch?.launchAttemptHistory;
+  if (!Array.isArray(attempts) || attempts.length !== 1) return false;
+  const attempt = attempts[0];
+  if (attempt?.attemptNumber !== 1 || attempt?.decisionId !== "DEC-0027" ||
+      attempt?.artifactNotebookSha256 !== DEC0027_NOTEBOOK_SHA256 ||
+      attempt?.artifactLaunchBundleHash !== DEC0027_LAUNCH_BUNDLE_HASH ||
+      attempt?.externalStatus !== "KernelWorkerStatus.ERROR" ||
+      attempt?.rootCauseClass !== "DEPENDENCY_INSTALL_FAILURE_WITH_DIAGNOSTIC_SUPPRESSED" ||
+      attempt?.trainingStarted !== false ||
+      attempt?.testPayloadUploaded !== false ||
+      attempt?.testPayloadAccessed !== false) {
+    return false;
+  }
+
+  // The governed recipe must be byte-identical to the DEC-0027 recipe.
+  if (!state?.training?.kaggleStartAuthorization) return false;
+  const sortedRecipe = (value) =>
+    Array.isArray(value)
+      ? value.map(sortedRecipe)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.keys(value).sort().map((key) => [key, sortedRecipe(value[key])]),
+          )
+        : value;
+  if (
+    JSON.stringify(sortedRecipe(launch.recipe)) !==
+    JSON.stringify(sortedRecipe(state.training.kaggleStartAuthorization.recipe))
+  ) {
+    return false;
+  }
+
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  const checkpoint = decisions.filter((decision) => decision?.id === "DEC-0028");
+  const previous = decisions.filter((decision) => decision?.id === "DEC-0027");
+
+  if (checkpoint.length !== 1 ||
+      checkpoint[0].status !== "ACCEPTED" ||
+      checkpoint[0].supersededBy !== null ||
+      checkpoint[0].supersedes !== "DEC-0027" ||
+      previous.length !== 1 ||
+      previous[0].status !== "SUPERSEDED" ||
+      previous[0].supersededBy !== "DEC-0028") {
+    return false;
+  }
+
+  const sorted = (value) =>
+    Array.isArray(value)
+      ? value.map(sorted)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.keys(value).sort().map((key) => [key, sorted(value[key])]),
+          )
+        : value;
+
+  const { launchAuthorizationHash, ...rest } = launch;
+  if (
+    createHash("sha256").update(JSON.stringify(sorted(rest))).digest("hex") !==
+    launchAuthorizationHash
+  ) {
+    return false;
+  }
+
+  // Reconstruct the immediately previous DEC-0027 launch-start checkpoint.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.8.0";
+  before.training.authorization.status = KAGGLE_START_READINESS;
+  before.experiments["GHARIBO-exp-001"].readinessStatus = KAGGLE_START_READINESS;
+  delete before.training.kaggleLaunchAuthorization;
+  const previous0027 = before.decisions.find((decision) => decision?.id === "DEC-0027");
+  previous0027.status = "ACCEPTED";
+  previous0027.supersededBy = null;
+  before.decisions = before.decisions.filter((decision) => decision?.id !== "DEC-0028");
+
+  return isKaggleStartAuthorizedGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
     isIssuedGoldState(state) ||
     isExecutionAuthorizedGoldState(state) ||
-    isKaggleStartAuthorizedGoldState(state)
+    isKaggleStartAuthorizedGoldState(state) ||
+    isKaggleLaunchRepairedGoldState(state)
   );
 }

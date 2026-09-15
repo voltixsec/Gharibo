@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.8.0 |
+| **Version** | 1.9.0 |
 | **Last Updated** | 2026-09-15 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | NOT_STARTED |
 | Training invariant | TRAINING HAS NOT STARTED |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | DEC-0027 authorizes the exact QUEUED GHARIBO-exp-001 run for private Kaggle submission using the governed safe launch bundle. No launch acceptance or RUNNING evidence has yet been recorded. TRAINING HAS NOT STARTED. |
+| Blocker summary | DEC-0028 supersedes the DEC-0027 launch artifact. The first Kaggle launch (attempt 1) was accepted and then failed at KernelWorkerStatus.ERROR inside the notebook's pinned-engine install cell; the committed worker is repaired and a committed reproducible launch-bundle generator now produces the authorized artifact. One retry is authorized. TRAINING HAS NOT STARTED. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -70,7 +70,7 @@
 | Environment qualification | QUALIFIED |
 | Qualification hash | 6d15bcf5ff7b120f34c7cb968eab196be285ad92b4ad2e76c44412360113dcc0 |
 | Package preview | PREVIEW_ONLY |
-| Authorization status | KAGGLE_START_AUTHORIZED_AWAITING_LAUNCH |
+| Authorization status | KAGGLE_LAUNCH_REPAIRED_AUTHORIZED_AWAITING_RETRY |
 | Authorization decision | DEC-0025 |
 | Authorized code snapshot | ad1e011c55729f5447b324d35b4ad88d0a47d10f |
 | Authorized preview package ID | f11e9c8eeac34888b3ca6679348093cd3a96a46fb95fd42ef3dd36cf8b18709c |
@@ -93,6 +93,16 @@
 | Launch notebook hash | f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf |
 | Kaggle start authorized | true |
 | Launch attempted | false |
+| Kaggle launch repair status | KAGGLE_LAUNCH_REPAIRED_AUTHORIZED |
+| Kaggle launch repair decision | DEC-0028 |
+| Kaggle launch repair authorization hash | 4dbbed5874ff54de9b7ffe1c57dd135d654e665828ee5a3b590d7efe2cb5f851 |
+| Repaired launch bundle hash | 4380da6382a1484ed41388661057c4a9c1c60f7ae34d612380a4b6f36da21230 |
+| Repaired launch notebook hash | be4af0d4f9a492e7c6b5a2b713b205e17adf7d34d0d0f62aaf1589977cec54ba |
+| Superseded launch bundle hash | fec22ca290645035fc807f3cc6dec40c5f26389b18f490e932c4bd05e31cb4c0 |
+| Superseded launch notebook hash | f849aa41a8c4affbaae9b4e0d5cf049d14c818df3289619eba8b0a1471e33ddf |
+| Launch attempts recorded | 1 |
+| Launch attempt 1 external status | KernelWorkerStatus.ERROR |
+| Launch attempt 1 root cause | DEPENDENCY_INSTALL_FAILURE_WITH_DIAGNOSTIC_SUPPRESSED |
 | Authorized recipe hash | c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd |
 | Candidate recipe hash | c2360979bf3de8d91a01ec1c9fe792acc7207ba25a20a94c610fa7084c7fdcdd |
 | Historical preview evidence package ID | 3bbe5626119fa5f8d58a362f722775a0cc3a5a019e8bc5a5324bb033cb1faa76 |
@@ -140,7 +150,7 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | KAGGLE_START_AUTHORIZED_AWAITING_LAUNCH | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | KAGGLE_LAUNCH_REPAIRED_AUTHORIZED_AWAITING_RETRY | 9/12 | GHARIBO-V0.1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** Promotion requires at least one evaluation result and a training-run reference; neither exists.
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -343,7 +353,8 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0024 | 2026-09-15 | Governed physical Gold package preview with explicit candidate recipe | ACCEPTED | `docs/adr/ADR-0019-governed-gold-package-preview.md` |
 | DEC-0025 | 2026-09-15 | Explicitly authorize GHARIBO-exp-001 for immutable package and run issuance | ACCEPTED | `docs/adr/ADR-0019-governed-gold-package-preview.md` |
 | DEC-0026 | 2026-09-15 | Authorize the exact issued GHARIBO-exp-001 run for QUEUED execution preparation | ACCEPTED | — |
-| DEC-0027 | 2026-09-15 | Authorize the exact queued GHARIBO-exp-001 run for Kaggle start | ACCEPTED | — |
+| DEC-0027 | 2026-09-15 | Authorize the exact queued GHARIBO-exp-001 run for Kaggle start | SUPERSEDED | — |
+| DEC-0028 | 2026-09-15 | Repair the governed Kaggle launch artifact and re-authorize a single retry | ACCEPTED | — |
 
 ## Validation
 
