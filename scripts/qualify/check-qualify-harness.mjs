@@ -575,8 +575,8 @@ const contractChecks = [
   ["§5 derivation disclosed in warnings", /was DERIVED from compute capability/],
   ["§5 driver_version from nvidia-smi", /--query-gpu=driver_version/],
   ["§6 two passes", /'pass_index': 2/],
-  ["§6 comparison literal", /'comparison': 'exact-string-equality-per-name'/],
-  ["§6.3 compares the frozen spec", /frozen spec %s != pass-2 %s/],
+  ["contract comparison literal", /'comparison'\s*:\s*'exact-string-equality-per-name'/],
+  ["contract frozen spec comparison", /if a\.get\('spec'\) != b\.get\('spec'\):/],
   ["§6.3 per-name comparison", /def compare_records\(/],
   ["§7 unknowns enumeration", /def collect_unknowns\(/],
   ["§7 unknowns field paths", /'%s\[%s\]\.%s' % \(key, dep\['name'\], field\)|'%s\[%s\]' % \(key, dep\['name'\]\)/],
@@ -725,7 +725,7 @@ const installChecks = [
   // Dry-run probe before mutating the environment
   ["dry-run probe present", /--dry-run/],
   ["dry-run uses exact stage command", /run_install_command\(\[\*cmd, '--dry-run'\], timeout=timeout, phase=phase \+ '-dry-run'\)/],
-  // No -qqq on the main install (only uv bootstrap and pass 2 may keep it)
+  // No -qqq on the governed install stages; resolver diagnostics must remain visible
   ["install uses same stage command", /run_install_command\(cmd, timeout=timeout, phase=phase\)/],
   // Preinstalled torch/triton preservation
   ["preservation uses a fresh interpreter", /probe_modules\(sys\.executable, dep\['modules'\]\)/],
@@ -743,7 +743,7 @@ const installChecks = [
   ["skips recorded", /'skipped_dependencies':/],
   ["export retains general inventory", /for requested in INVENTORY\['pinned_dependencies'\]:/],
   ["export retains runtime-only requests", /requested\['name'\] in PRESERVED or requested\['name'\] in skipped_names/],
-  ["pass 2 uses shared plan", /fresh_plan = build_install_plan\(\['--python', fresh_python\], fresh=True\)/],
+  ["fresh passes use shared install plan", /fresh_plan = build_install_plan\([\s\S]*?fresh=True,[\s\S]*?\)/],
   // v4 regression: huggingface-hub in resolver-managed stage
   ["huggingface-hub in import smoke modules", /"huggingface_hub"/],
   ["huggingface-hub resolver-managed spec", /huggingface-hub>=0\.34\.0,<1\.0/],
@@ -752,21 +752,34 @@ const installChecks = [
   ["constraint flags skipped in fresh pass", /constraint_flags = \[\] if fresh else CONSTRAINT_FLAGS/],
   ["fresh pass disables transitive runtime deps", /fresh_no_deps_flags = \(/],
   ["fresh pass requires binary wheels", /fresh_binary_flags = \(/],
-  ["pass 2 requires exactly one no-deps", /cmd\.count\('--no-deps'\) != 1/],
-  ["pass 2 rejects missing or duplicate no-deps", /pass 2 stage permits transitive runtime dependencies or has duplicate/],
-  ["pass 2 requires exactly one binary guard", /cmd\.count\('--only-binary'\) != 1/],
-  ["pass 2 rejects source builds", /pass 2 stage permits source-build dependencies or has a duplicate/],
-  ["pass 2 rejects direct preserved requests", /pass 2 directly requests preserved dependency/],
-  ["fresh resolution excludes preserved", /fresh_repro_specs = \[[\s\S]*?d\['name'\] not in PRESERVED/],
-  ["fresh pinned records exclude preserved", /fresh_pinned_specs = \[[\s\S]*?d\['name'\] not in PRESERVED/],
-  ["pass 1 reproducibility hash excludes preserved", /PASS_1_REPRO_DEPENDENCIES = \[[\s\S]*?d\['name'\] not in PRESERVED/],
+  ["fresh pass requires exactly one no-deps", /cmd\.count\('--no-deps'\) != 1/],
+  ["fresh pass rejects missing or duplicate no-deps", /if cmd\.count\('--no-deps'\) != 1:[\s\S]*?raise RuntimeError\(/],
+  ["fresh pass requires exactly one binary guard", /cmd\.count\('--only-binary'\) != 1/],
+  ["fresh pass rejects source builds", /fresh pass %d stage permits source-build dependencies/],
+  ["fresh pass rejects direct preserved requests", /if direct_preserved:[\s\S]*?raise RuntimeError\(/],
+  ["fresh resolution excludes preserved", /fresh_repro_specs = \[[\s\S]*?if dep\['name'\] not in PRESERVED/],
+  ["fresh pinned records exclude preserved", /fresh_pinned_specs = \[[\s\S]*?if dep\['name'\] not in PRESERVED/],
+  ["v6 fresh reproducibility helper exists", /def run_fresh_repro_pass\(pass_index\):/],
   // v4 regression: preserved environment facts in reproducibility context
   ["preserved_environment_facts in reproducibility", /'preserved_environment_facts'/],
   ["preserved facts marked environment-preserved", /'source': 'environment-preserved'/],
   // v4 regression: pass 2 comparison excludes preserved deps
-  ["pass 2 excludes preserved from comparison", /non_preserved_pass1 = \[d for d in dependencies if d\['name'\] not in PRESERVED\]/],
-  ["pass 2 fresh excludes preserved", /non_preserved_pass2 = \[d for d in fresh_pinned if d\['name'\] not in PRESERVED\]/],
+  ["v6 fresh pass 1 executes", /fresh_pass_1 = run_fresh_repro_pass\(\s*1\s*\)/],
+  ["v6 fresh pass 2 executes", /fresh_pass_2 = run_fresh_repro_pass\(\s*2\s*\)/],
   // v4 regression: cross-list name uniqueness check
+  // v6 regression: contract ?6 is TWO independent fresh environments
+  ["v6 uses distinct fresh venv names", /gharibo-qualify-repro-pass-%d/],
+  ["v6 verifies fresh python identity", /base_python != hardware_after\['python_version'\]/],
+  ["v6 compares fresh pinned pass 1 vs pass 2", /compare_records\(\s*fresh_pass_1\['pinned'\],\s*fresh_pass_2\['pinned'\]/],
+  ["v6 compares fresh additional pass 1 vs pass 2", /compare_records\(\s*fresh_pass_1\['additional'\],\s*fresh_pass_2\['additional'\]/],
+  ["v6 active runtime exact specs derive from fresh pass 1", /exact_runtime_records = \(\s*fresh_pass_1\['pinned'\][\s\S]*?fresh_pass_1\['additional'\]/],
+  ["v6 active runtime alignment stage", /'active-runtime-align'/],
+  ["v6 active runtime alignment uses no-deps", /alignment_cmd = \[[\s\S]*?'--no-deps'/],
+  ["v6 active runtime alignment uses binary wheels", /alignment_cmd = \[[\s\S]*?'--only-binary'[\s\S]*?':all:'/],
+  ["v6 preserved runtime rechecked after alignment", /measured_version[\s\S]*?!=[\s\S]*?expected_version[\s\S]*?raise RuntimeError\(/],
+  ["v6 import smoke reruns after alignment", /if failed_imports:[\s\S]*?raise RuntimeError\(/],
+  ["v6 active runtime alignment is recorded", /'active_runtime_alignment'/],
+  ["v6 active runtime is compared against fresh pass 1", /compare_records\(\s*active_non_preserved,\s*fresh_pass_1\['pinned'\]/],
   ["cross-list uniqueness validation", /cross-list name uniqueness violation/],
   // v4 regression: harmony not duplicated when already pinned
   ["harmony already pinned guard", /_harmony_already_pinned/],
@@ -774,6 +787,20 @@ const installChecks = [
 ];
 for (const [label, re] of installChecks) {
   if (!re.test(notebookSource)) fail("install", `missing: ${label}`);
+}
+
+for (const stale of [
+  "PASS_1_STARTED_AT",
+  "PASS_1_FINISHED_AT",
+  "PASS_1_REPRO_DEPENDENCIES",
+  "PASS_1_DEPENDENCY_SET_HASH",
+]) {
+  if (notebookSource.includes(stale)) {
+    fail(
+      "install",
+      `v6 must not label the active Kaggle runtime as reproducibility pass 1: ${stale}`,
+    );
+  }
 }
 
 const expectedRecipe = new Map([
@@ -797,7 +824,7 @@ for (const name of ['torch', 'triton']) {
 if (/WARNING \(preserved\)/.test(notebookSource)) fail('install', 'preserved version mismatches must fail equality');
 
 // Regression: the main install command must NOT use -qqq (it hides resolver errors).
-// The only sanctioned -qqq uses are: uv bootstrap and pass-2 (throwaway venv).
+// The bootstrap may use -qqq; governed install stages must not suppress resolver diagnostics.
 const qqqInstallRe = /run_install_command\([^)]*-qqq[^)]*\)/s;
 if (qqqInstallRe.test(notebookSource)) {
   fail("install", "run_install_command must not use -qqq (it hides the resolver reason)");

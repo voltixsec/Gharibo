@@ -442,7 +442,7 @@ const INVENTORY_JSON = JSON.stringify(
     harmony_candidates: HARMONY_CANDIDATES,
     import_smoke_modules: IMPORT_SMOKE_MODULES,
     contract_schema_version: "1.1.0",
-    harness_version: "2.3.0",
+    harness_version: "2.4.0",
     experiment_id: "GHARIBO-exp-001",
     // ---- Model-compatibility qualification (contract §14) -------------------
     model_compatibility: {
@@ -1320,7 +1320,7 @@ train_lines = None`,
 # run_install_command captures complete stdout + stderr, persists a small
 # redacted diagnostic artifact on failure, and raises an exception that
 # INCLUDES the actual resolver/package failure reason.
-PASS_1_STARTED_AT = utc_now()
+ACTIVE_RUNTIME_INSTALL_STARTED_AT = utc_now()
 INSTALL_DIAGNOSTIC_PATH = WORKING / 'qualification-install-diagnostic.json'
 
 def uv_executable():
@@ -1749,7 +1749,7 @@ extra_resolution = resolve_versions(sys.executable, extra_targets)
 dependencies = build_dependency_records(PINNED_DEPENDENCIES, pinned_resolution)
 additional_dependencies = build_dependency_records(ADDITIONAL_DEPENDENCIES, extra_resolution,
                                                    mark_unpinned=True)
-PASS_1_FINISHED_AT = utc_now()
+ACTIVE_RUNTIME_INSTALL_FINISHED_AT = utc_now()
 
 def print_records(records, title):
     print('--- %s ---' % title)
@@ -1764,12 +1764,12 @@ def print_records(records, title):
 print_records(dependencies, 'dependencies[] (contract 4.3 rule 1: exactly PINNED_ENGINE_DEPENDENCIES)')
 print_records(additional_dependencies, 'additional_dependencies[] (contract 4.5: recipe-required, not pinned)')
 
-PASS_1_REPRO_DEPENDENCIES = [
+ACTIVE_RUNTIME_REPRO_DEPENDENCIES = [
     d for d in dependencies if d['name'] not in PRESERVED
 ]
-PASS_1_DEPENDENCY_SET_HASH = sha256_canonical(PASS_1_REPRO_DEPENDENCIES)
+ACTIVE_RUNTIME_DEPENDENCY_SET_HASH = sha256_canonical(ACTIVE_RUNTIME_REPRO_DEPENDENCIES)
 print('')
-print('pass 1 dependency_set_hash:', PASS_1_DEPENDENCY_SET_HASH)`,
+print('active runtime dependency_set_hash:', ACTIVE_RUNTIME_DEPENDENCY_SET_HASH)`,
 
   String.raw`# --- Section 8: Determine the Harmony package ---
 # gpt-oss uses the Harmony format, but the harness does not assume the distribution
@@ -1829,150 +1829,725 @@ REPRODUCIBILITY_SPECS = PINNED_DEPENDENCIES + ADDITIONAL_DEPENDENCIES
 if not _harmony_already_pinned:
     REPRODUCIBILITY_SPECS = REPRODUCIBILITY_SPECS + [HARMONY_SPEC]`,
 
-  String.raw`# --- Section 9: Reproducibility assertion - pass 2 (contract 6) ---
-# A pin is only a pin if a second, fresh environment resolves the same set.
-# pass 1 = the primary install above; pass 2 = a throwaway venv with no cache.
+  String.raw`# --- Section 9: Reproducibility assertion - TWO fresh passes (contract 6) ---
+# v6 correction:
+#
+# The ACTIVE Kaggle runtime is used for real model compatibility, but it is NOT
+# counted as a reproducibility pass.
+#
+# Contract ?6 reproducibility is measured using TWO independent fresh venvs:
+#
+#   fresh pass 1
+#       ?
+#   fresh independent resolution
+#
+#   fresh pass 2
+#       ?
+#   fresh independent resolution
+#
+#   exact comparison
+#       ?
+#   IDENTICAL or MISMATCH
+#
+# Only after the two fresh passes agree is the ACTIVE Kaggle runtime aligned to
+# the exact winning dependency set. Model compatibility then exercises that
+# aligned runtime.
+#
+# Preserved Kaggle torch/triton remain environment-provided runtime facts and
+# are excluded from the PyPI reproduction claim.
+
 def fresh_env_base_dir():
     for candidate in ('/kaggle/temp', tempfile.gettempdir()):
         if candidate and os.path.isdir(candidate):
             return pathlib.Path(candidate)
     return pathlib.Path.cwd()
 
+
 def venv_python(venv_dir):
-    for relative in (('Scripts', 'python.exe'), ('bin', 'python')):
+    for relative in (
+        ('Scripts', 'python.exe'),
+        ('bin', 'python'),
+    ):
         candidate = venv_dir.joinpath(*relative)
         if candidate.exists():
             return str(candidate)
     return None
 
+
+def python_version_of(python_executable):
+    proc = subprocess.run(
+        [
+            python_executable,
+            '-c',
+            'import platform; print(platform.python_version())',
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            'could not read fresh-environment python version: '
+            + redact((proc.stderr or '')[-1000:])
+        )
+
+    return (proc.stdout or '').strip()
+
+
 def compare_records(left, right, label, mismatches):
-    '''Contract 6.3: exact equality for compared NON-PRESERVED dependency records.'''
-    left_by_name = {item['name']: item for item in left}
-    right_by_name = {item['name']: item for item in right}
-    for name in sorted(set(left_by_name) | set(right_by_name)):
-        a, b = left_by_name.get(name), right_by_name.get(name)
+    left_by_name = {
+        item['name']: item
+        for item in left
+    }
+
+    right_by_name = {
+        item['name']: item
+        for item in right
+    }
+
+    all_names = sorted(
+        set(left_by_name)
+        | set(right_by_name)
+    )
+
+    for name in all_names:
+        a = left_by_name.get(name)
+        b = right_by_name.get(name)
+
         if a is None or b is None:
-            mismatches.append('%s: %s present in only one pass' % (label, name))
+            mismatches.append(
+                '%s: %s present in only one pass'
+                % (label, name)
+            )
             continue
+
         if a.get('spec') != b.get('spec'):
-            mismatches.append('%s: %s frozen spec %s != pass-2 %s'
-                              % (label, name, a.get('spec'), b.get('spec')))
-        for key in ('resolved_version', 'source', 'resolved_commit'):
+            mismatches.append(
+                '%s: %s frozen spec %s != %s'
+                % (
+                    label,
+                    name,
+                    a.get('spec'),
+                    b.get('spec'),
+                )
+            )
+
+        for key in (
+            'resolved_version',
+            'source',
+            'resolved_commit',
+        ):
             if a.get(key) != b.get(key):
-                mismatches.append('%s: %s %s differs between passes' % (label, name, key))
+                mismatches.append(
+                    '%s: %s %s differs between passes'
+                    % (
+                        label,
+                        name,
+                        key,
+                    )
+                )
+
+
+def validate_fresh_plan(plan, pass_index):
+    if not PRESERVED:
+        return
+
+    for phase, cmd in plan:
+
+        # Fresh reproducibility stages must be isolated from
+        # transitive torch/triton dependency resolution.
+        if cmd.count('--no-deps') != 1:
+            raise RuntimeError(
+                'fresh pass %d stage permits transitive runtime '
+                'dependencies or has duplicate --no-deps: %s'
+                % (
+                    pass_index,
+                    phase,
+                )
+            )
+
+        # Fresh reproduction must use wheels only.
+        if (
+            cmd.count('--only-binary') != 1
+            or cmd.count(':all:') != 1
+        ):
+            raise RuntimeError(
+                'fresh pass %d stage permits source-build dependencies '
+                'or has a duplicate binary-only guard: %s'
+                % (
+                    pass_index,
+                    phase,
+                )
+            )
+
+        direct_preserved = [
+            arg
+            for arg in cmd
+            if isinstance(arg, str)
+            and any(
+                re.match(
+                    r'^%s(?:$|[<>=!~@])'
+                    % re.escape(name),
+                    arg,
+                )
+                for name in PRESERVED
+            )
+        ]
+
+        if direct_preserved:
+            raise RuntimeError(
+                'fresh pass %d directly requests preserved '
+                'dependency: %s'
+                % (
+                    pass_index,
+                    ', '.join(direct_preserved),
+                )
+            )
+
+
+def run_fresh_repro_pass(pass_index):
+    started_at = utc_now()
+
+    venv_dir = (
+        fresh_env_base_dir()
+        / ('gharibo-qualify-repro-pass-%d' % pass_index)
+    )
+
+    shutil.rmtree(
+        venv_dir,
+        ignore_errors=True,
+    )
+
+    try:
+        print(
+            'Creating fresh reproducibility pass %d venv'
+            % pass_index
+        )
+
+        run_command([
+            UV,
+            'venv',
+            '--python',
+            sys.executable,
+            str(venv_dir),
+        ])
+
+        fresh_python = venv_python(
+            venv_dir
+        )
+
+        if fresh_python is None:
+            raise RuntimeError(
+                'could not locate python inside fresh pass %d venv'
+                % pass_index
+            )
+
+        base_python = python_version_of(
+            fresh_python
+        )
+
+        if base_python != hardware_after['python_version']:
+            raise RuntimeError(
+                'fresh pass %d python %s != active base python %s'
+                % (
+                    pass_index,
+                    base_python,
+                    hardware_after['python_version'],
+                )
+            )
+
+        # Both passes use the SAME governed install-plan function.
+        # They are independent because each receives a brand-new venv.
+        fresh_plan = build_install_plan(
+            [
+                '--python',
+                fresh_python,
+            ],
+            fresh=True,
+        )
+
+        validate_fresh_plan(
+            fresh_plan,
+            pass_index,
+        )
+
+        execute_install_plan(
+            fresh_plan,
+            timeout=FRESH_ENV_MAX_SECONDS,
+        )
+
+        fresh_repro_specs = [
+            dep
+            for dep in REPRODUCIBILITY_SPECS
+            if dep['name'] not in PRESERVED
+        ]
+
+        fresh_targets = [
+            {
+                'name': dep['name'],
+                'modules': dep['modules'],
+            }
+            for dep in fresh_repro_specs
+        ]
+
+        fresh_resolution = resolve_versions(
+            fresh_python,
+            fresh_targets,
+            timeout=FRESH_ENV_MAX_SECONDS,
+        )
+
+        fresh_pinned_specs = [
+            dep
+            for dep in PINNED_DEPENDENCIES
+            if dep['name'] not in PRESERVED
+        ]
+
+        fresh_pinned = build_dependency_records(
+            fresh_pinned_specs,
+            fresh_resolution,
+        )
+
+        # Harmony must remain unique across the pinned/additional classes.
+        fresh_extra_specs = [
+            dep
+            for dep in ADDITIONAL_DEPENDENCIES
+            if dep['name'] != HARMONY_SPEC['name']
+        ]
+
+        if not any(
+            dep['name'] == HARMONY_SPEC['name']
+            for dep in PINNED_DEPENDENCIES
+        ):
+            fresh_extra_specs = (
+                fresh_extra_specs
+                + [HARMONY_SPEC]
+            )
+
+        fresh_additional = build_dependency_records(
+            fresh_extra_specs,
+            fresh_resolution,
+            mark_unpinned=True,
+        )
+
+        return {
+            'pass_index': pass_index,
+            'started_at': started_at,
+            'finished_at': utc_now(),
+            'base_python': base_python,
+            'pinned': fresh_pinned,
+            'additional': fresh_additional,
+            'dependency_set_hash':
+                sha256_canonical(
+                    fresh_pinned
+                ),
+        }
+
+    finally:
+        shutil.rmtree(
+            venv_dir,
+            ignore_errors=True,
+        )
+
 
 reproducibility = {
     'assertion': 'NOT_RUN',
-    'passes': [
-        {'pass_index': 1, 'started_at': PASS_1_STARTED_AT, 'finished_at': PASS_1_FINISHED_AT,
-         'dependency_set_hash': PASS_1_DEPENDENCY_SET_HASH,
-         'base_python': hardware_after['python_version']},
-    ],
-    'comparison': 'exact-string-equality-per-name',
-    'dependency_set_hash': PASS_1_DEPENDENCY_SET_HASH,
+    'passes': [],
+    'comparison':
+        'exact-string-equality-per-name',
+    'dependency_set_hash': None,
+
+    # torch/triton are measured Kaggle runtime facts.
+    # They are deliberately not claimed as reproduced from PyPI.
     'preserved_environment_facts': {
-        name: {'version': ver, 'source': 'environment-preserved'}
-        for name, ver in sorted(preserved_versions.items())
+        name: {
+            'version': version,
+            'source': 'environment-preserved',
+        }
+        for name, version
+        in sorted(
+            preserved_versions.items()
+        )
     } if preserved_versions else {},
 }
 
+
 if not RUN_FRESH_ENV_REPRODUCTION:
-    print('fresh-environment reproduction disabled (RUN_FRESH_ENV_REPRODUCTION = False)')
-    print('contract 8: a single pass can only ever be PARTIAL')
+
+    print(
+        'fresh-environment reproduction disabled '
+        '(RUN_FRESH_ENV_REPRODUCTION = False)'
+    )
+
+    print(
+        'contract 6.4: fewer than two fresh passes '
+        'can only ever be PARTIAL'
+    )
+
 else:
-    PASS_2_STARTED_AT = utc_now()
-    venv_dir = fresh_env_base_dir() / 'gharibo-qualify-venv'
-    shutil.rmtree(venv_dir, ignore_errors=True)
+
     try:
-        print('Creating a throwaway venv at', venv_dir)
-        run_command([UV, 'venv', '--python', sys.executable, str(venv_dir)])
-        fresh_python = venv_python(venv_dir)
-        if fresh_python is None:
-            raise RuntimeError('could not locate the python executable inside the fresh venv')
+        # ====================================================
+        # FRESH PASS 1
+        # ====================================================
 
-        # Pass 2 reproduces the NON-PRESERVED governed dependency records.
-        # Preserved Kaggle torch/triton are external runtime facts and are neither
-        # directly requested nor allowed to arrive transitively.
-        fresh_plan = build_install_plan(['--python', fresh_python], fresh=True)
+        fresh_pass_1 = run_fresh_repro_pass(
+            1
+        )
 
-        if PRESERVED:
-            for phase, cmd in fresh_plan:
-                if cmd.count('--no-deps') != 1:
-                    raise RuntimeError(
-                        'pass 2 stage permits transitive runtime dependencies or has duplicate '
-                        '--no-deps: %s' % phase)
-                if cmd.count('--only-binary') != 1 or cmd.count(':all:') != 1:
-                    raise RuntimeError(
-                        'pass 2 stage permits source-build dependencies or has a duplicate '
-                        'binary-only guard: %s' % phase)
-                direct_preserved = [
-                    arg for arg in cmd
-                    if isinstance(arg, str) and any(
-                        re.match(r'^%s(?:$|[<>=!~@])' % re.escape(name), arg)
-                        for name in PRESERVED
-                    )
-                ]
-                if direct_preserved:
-                    raise RuntimeError(
-                        'pass 2 directly requests preserved dependency: %s'
-                        % ', '.join(direct_preserved))
+        # ====================================================
+        # FRESH PASS 2
+        # ====================================================
 
-        execute_install_plan(fresh_plan, timeout=FRESH_ENV_MAX_SECONDS)
+        fresh_pass_2 = run_fresh_repro_pass(
+            2
+        )
 
-        fresh_repro_specs = [
-            d for d in REPRODUCIBILITY_SPECS if d['name'] not in PRESERVED
+        reproducibility['passes'] = [
+            {
+                'pass_index': 1,
+                'started_at':
+                    fresh_pass_1['started_at'],
+                'finished_at':
+                    fresh_pass_1['finished_at'],
+                'dependency_set_hash':
+                    fresh_pass_1[
+                        'dependency_set_hash'
+                    ],
+                'base_python':
+                    fresh_pass_1[
+                        'base_python'
+                    ],
+            },
+            {
+                'pass_index': 2,
+                'started_at':
+                    fresh_pass_2['started_at'],
+                'finished_at':
+                    fresh_pass_2['finished_at'],
+                'dependency_set_hash':
+                    fresh_pass_2[
+                        'dependency_set_hash'
+                    ],
+                'base_python':
+                    fresh_pass_2[
+                        'base_python'
+                    ],
+            },
         ]
-        fresh_targets = [
-            {'name': d['name'], 'modules': d['modules']}
-            for d in fresh_repro_specs
-        ]
-        fresh_resolution = resolve_versions(
-            fresh_python, fresh_targets, timeout=FRESH_ENV_MAX_SECONDS)
 
-        fresh_pinned_specs = [
-            d for d in PINNED_DEPENDENCIES if d['name'] not in PRESERVED
+        reproducibility[
+            'dependency_set_hash'
+        ] = fresh_pass_1[
+            'dependency_set_hash'
         ]
-        fresh_pinned = build_dependency_records(
-            fresh_pinned_specs, fresh_resolution)
-        # Exclude HARMONY_SPEC from fresh_additional if it is already pinned
-        # in PINNED_DEPENDENCIES (prevents cross-list name duplication).
-        _fresh_extra_specs = [s for s in ADDITIONAL_DEPENDENCIES
-                               if s['name'] != HARMONY_SPEC['name']]
-        if not any(d['name'] == HARMONY_SPEC['name'] for d in PINNED_DEPENDENCIES):
-            _fresh_extra_specs = _fresh_extra_specs + [HARMONY_SPEC]
-        fresh_additional = build_dependency_records(_fresh_extra_specs,
-                                                    fresh_resolution, mark_unpinned=True)
 
         mismatches = []
-        # Pass 2 comparison: compare only NON-PRESERVED dependencies.
-        # Preserved torch/triton are environment-provided runtime facts,
-        # not PyPI-resolved versions — excluded from the fresh resolver
-        # comparison and recorded as preserved_environment_facts above.
-        non_preserved_pass1 = [d for d in dependencies if d['name'] not in PRESERVED]
-        non_preserved_pass2 = [d for d in fresh_pinned if d['name'] not in PRESERVED]
-        compare_records(non_preserved_pass1, non_preserved_pass2, 'dependencies', mismatches)
-        compare_records(additional_dependencies, fresh_additional, 'additional_dependencies', mismatches)
 
-        reproducibility['passes'].append({
-            'pass_index': 2,
-            'started_at': PASS_2_STARTED_AT,
-            'finished_at': utc_now(),
-            'dependency_set_hash': sha256_canonical(fresh_pinned),
-            'base_python': fresh_resolution.get('__base_python__', hardware_after['python_version']),
-        })
-        reproducibility['assertion'] = 'IDENTICAL' if not mismatches else 'MISMATCH'
+        # ====================================================
+        # Fresh pass 1 vs fresh pass 2
+        # ====================================================
+
+        compare_records(
+            fresh_pass_1['pinned'],
+            fresh_pass_2['pinned'],
+            'dependencies',
+            mismatches,
+        )
+
+        compare_records(
+            fresh_pass_1['additional'],
+            fresh_pass_2['additional'],
+            'additional_dependencies',
+            mismatches,
+        )
+
+        # ====================================================
+        # Active-runtime alignment
+        #
+        # Only happens AFTER the two fresh passes agree.
+        # ====================================================
+
+        if not mismatches:
+
+            exact_runtime_records = (
+                fresh_pass_1['pinned']
+                + fresh_pass_1['additional']
+            )
+
+            unexpected_non_pip = [
+                record
+                for record
+                in exact_runtime_records
+                if record.get('source') != 'pip'
+            ]
+
+            if unexpected_non_pip:
+                raise RuntimeError(
+                    'active runtime alignment encountered '
+                    'unexpected non-pip fresh records: %s'
+                    % ', '.join(
+                        record['name']
+                        for record
+                        in unexpected_non_pip
+                    )
+                )
+
+            exact_runtime_specs = [
+                record['spec']
+                for record
+                in exact_runtime_records
+                if record['name']
+                not in PRESERVED
+            ]
+
+            if not exact_runtime_specs:
+                raise RuntimeError(
+                    'active runtime alignment produced '
+                    'an empty exact dependency set'
+                )
+
+            alignment_cmd = [
+                UV,
+                'pip',
+                'install',
+                *TARGET_FLAGS,
+                '--no-cache-dir',
+                '--upgrade',
+                '--no-deps',
+                '--only-binary',
+                ':all:',
+                *exact_runtime_specs,
+            ]
+
+            execute_install_plan([
+                (
+                    'active-runtime-align',
+                    alignment_cmd,
+                ),
+            ])
+
+            # -----------------------------------------------
+            # Verify preserved runtime dependencies did not move.
+            # -----------------------------------------------
+
+            for (
+                name,
+                expected_version,
+            ) in preserved_versions.items():
+
+                actual = resolve_versions(
+                    sys.executable,
+                    [{
+                        'name': name,
+                        'modules': [name],
+                    }],
+                )
+
+                measured_version = (
+                    actual
+                    .get(name, {})
+                    .get('version')
+                )
+
+                if (
+                    measured_version
+                    != expected_version
+                ):
+                    raise RuntimeError(
+                        'active runtime alignment changed '
+                        'preserved dependency %s: %s != %s'
+                        % (
+                            name,
+                            measured_version,
+                            expected_version,
+                        )
+                    )
+
+            # -----------------------------------------------
+            # Re-run import smoke after active-runtime alignment.
+            # -----------------------------------------------
+
+            if RUN_IMPORT_SMOKE_TEST:
+
+                import_smoke = _run_probe(
+                    sys.executable,
+                    IMPORT_SMOKE_SOURCE,
+                    IMPORT_SMOKE_MODULES,
+                    '__GHARIBO_IMPORT_JSON__',
+                )
+
+                failed_imports = [
+                    module
+                    for module
+                    in IMPORT_SMOKE_MODULES
+                    if not import_smoke.get(
+                        module,
+                        {},
+                    ).get('ok')
+                ]
+
+                if failed_imports:
+                    raise RuntimeError(
+                        'active runtime import smoke failed '
+                        'after exact alignment: '
+                        + ', '.join(
+                            failed_imports
+                        )
+                    )
+
+            # -----------------------------------------------
+            # Re-resolve ACTIVE runtime after alignment.
+            # -----------------------------------------------
+
+            pinned_resolution = resolve_versions(
+                sys.executable,
+                pinned_targets,
+            )
+
+            extra_resolution = resolve_versions(
+                sys.executable,
+                extra_targets,
+            )
+
+            dependencies = (
+                build_dependency_records(
+                    PINNED_DEPENDENCIES,
+                    pinned_resolution,
+                )
+            )
+
+            additional_dependencies = (
+                build_dependency_records(
+                    ADDITIONAL_DEPENDENCIES,
+                    extra_resolution,
+                    mark_unpinned=True,
+                )
+            )
+
+            # Harmony stays unique.
+            if not _harmony_already_pinned:
+
+                runtime_harmony_resolution = (
+                    resolve_versions(
+                        sys.executable,
+                        [{
+                            'name':
+                                HARMONY_SPEC['name'],
+                            'modules':
+                                HARMONY_SPEC['modules'],
+                        }],
+                    )
+                )
+
+                runtime_harmony_records = (
+                    build_dependency_records(
+                        [HARMONY_SPEC],
+                        runtime_harmony_resolution,
+                        mark_unpinned=True,
+                    )
+                )
+
+                additional_dependencies = sorted(
+                    additional_dependencies
+                    + runtime_harmony_records,
+                    key=lambda item:
+                        item['name'],
+                )
+
+            # -----------------------------------------------
+            # Active runtime MUST now equal fresh pass 1.
+            # -----------------------------------------------
+
+            active_runtime_mismatches = []
+
+            active_non_preserved = [
+                dep
+                for dep in dependencies
+                if dep['name']
+                not in PRESERVED
+            ]
+
+            compare_records(
+                active_non_preserved,
+                fresh_pass_1['pinned'],
+                'active-runtime dependencies',
+                active_runtime_mismatches,
+            )
+
+            compare_records(
+                additional_dependencies,
+                fresh_pass_1['additional'],
+                'active-runtime additional_dependencies',
+                active_runtime_mismatches,
+            )
+
+            reproducibility[
+                'active_runtime_alignment'
+            ] = {
+                'assertion': (
+                    'IDENTICAL'
+                    if not active_runtime_mismatches
+                    else 'MISMATCH'
+                ),
+                'mismatches':
+                    active_runtime_mismatches,
+            }
+
+            mismatches.extend(
+                active_runtime_mismatches
+            )
+
+        # ====================================================
+        # Final reproducibility decision
+        # ====================================================
+
+        reproducibility['assertion'] = (
+            'IDENTICAL'
+            if not mismatches
+            else 'MISMATCH'
+        )
+
         if mismatches:
-            reproducibility['mismatches'] = mismatches
-        print('reproducibility assertion:', reproducibility['assertion'])
+            reproducibility[
+                'mismatches'
+            ] = mismatches
+
+        print(
+            'reproducibility assertion:',
+            reproducibility['assertion'],
+        )
+
         for item in mismatches:
-            print('  MISMATCH', item)
+            print(
+                '  MISMATCH',
+                item,
+            )
+
     except Exception as exc:
-        reproducibility['assertion'] = 'NOT_RUN'
-        reproducibility['error'] = scrub_paths(redact(str(exc)))
-        print('pass 2 did not complete:', redact(str(exc)))
-        print('contract 6.4: NOT_RUN can only ever be PARTIAL')
-    finally:
-        shutil.rmtree(venv_dir, ignore_errors=True)`,
+
+        reproducibility[
+            'assertion'
+        ] = 'NOT_RUN'
+
+        reproducibility[
+            'error'
+        ] = scrub_paths(
+            redact(
+                str(exc)
+            )
+        )
+
+        print(
+            'fresh reproducibility sequence '
+            'did not complete:',
+            redact(str(exc)),
+        )
+
+        print(
+            'contract 6.4: NOT_RUN can '
+            'only ever be PARTIAL'
+        )`,
 
   String.raw`# --- Section 10: Model compatibility I - revision, tokenizer, Harmony, tokenisation ---
 # Part B of the qualification (contract §14). Steps 3-6 of the mission: resolve the
