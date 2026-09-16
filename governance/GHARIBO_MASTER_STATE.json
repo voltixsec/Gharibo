@@ -1932,10 +1932,14 @@
     "diagnosticAuthorization": {
       "decisionId": "DEC-0037",
       "record": "governance/DEC-0037-diagnostic-authorization.json",
-      "status": "AUTHORIZED_SINGLE_PROBE",
+      "status": "COMPLETED_PASS_AUTHORIZATION_CONSUMED",
       "kernelId": "vokaigharibo/gharibo-diagnostic-dec0037",
       "maximumKernelPushes": 1,
-      "evaluationAttempt4Authorized": false
+      "evaluationAttempt4Authorized": false,
+      "kernelVersion": 1,
+      "kernelPushes": 1,
+      "resultRecord": "governance/DEC-0037-diagnostic-authorization.json",
+      "next": "READY_FOR_HUMAN_DECISION_ON_EVALUATION_RETRY"
     }
   },
   "datasets": {
@@ -2583,7 +2587,7 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Execute the single DEC-0037 no-inference loading diagnostic, record its factual outcome, then await a new human decision. Evaluation retries remain halted under DEC-0036. Never attach or open TEST or evaluation prompts.",
+      "action": "Review the passing DEC-0037 no-inference diagnostic and obtain a new explicit human decision before any evaluation retry. One probe completed; all seven markers and loaded identities verified. The optional-folder 404 persisted without blocking load; the earlier fatal cause is unresolved. DEC-0036 remains binding; no evaluation attempt #4 is authorized.",
       "requires": "DEC-0037",
       "references": [
         "governance/DEC-0037-diagnostic-authorization.json",
@@ -2837,13 +2841,14 @@
     {
       "revision": "1.17.0",
       "date": "2026-09-16",
-      "summary": "DEC-0037 authorizes one isolated diagnostic; evaluation remains NOT_RUN and attempt #4 remains unauthorized.",
-      "commit": null,
-      "commitStatus": "PENDING_CHECKPOINT",
-      "commitNote": "Diagnostic authorization only.",
+      "summary": "DEC-0037 authorized and completed one isolated diagnostic: install, tokenizer and BASE load PASS; seven markers verified. Evaluation remains NOT_RUN and attempt #4 remains unauthorized.",
+      "commit": "77bed6405b4d539147d2592f7c0b790f6369054b",
+      "commitStatus": "CHECKPOINTED",
+      "commitNote": "Authorization checkpoint before the single kernel push. This subsequent outcome is anchored by its containing commit; raw Kaggle outputs remain untracked.",
       "changes": [
         "Add isolated loading probe without data attachments or inference",
-        "Preserve DEC-0036 evaluation halt"
+        "Preserve DEC-0036 evaluation halt",
+        "Record verified passing diagnostic and consumed one-probe authorization; require a new human decision for evaluation"
       ],
       "trainingExecuted": true
     }

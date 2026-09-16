@@ -431,7 +431,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Execute the single DEC-0037 no-inference loading diagnostic, record its factual outcome, then await a new human decision. Evaluation retries remain halted under DEC-0036. Never attach or open TEST or evaluation prompts. | DEC-0037 | governance/DEC-0037-diagnostic-authorization.json, governance/DEC-0036-evaluation-escalation.json |
+| ACT-0001 | P0 | Review the passing DEC-0037 no-inference diagnostic and obtain a new explicit human decision before any evaluation retry. One probe completed; all seven markers and loaded identities verified. The optional-folder 404 persisted without blocking load; the earlier fatal cause is unresolved. DEC-0036 remains binding; no evaluation attempt #4 is authorized. | DEC-0037 | governance/DEC-0037-diagnostic-authorization.json, governance/DEC-0036-evaluation-escalation.json |
 | ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
 
 ## History
@@ -450,7 +450,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.11.0 | 2026-09-15 | Post-execution acceptance: DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and recorded the fp16→float32 runtime deviation instead of hiding it. Training state moved to COMPLETED, artifacts were registered, TEST isolation was re-proven, and evaluation stayed NOT_RUN with no model promotion. | — | PENDING_CHECKPOINT |
 | 1.12.0 | 2026-09-15 | Documentation and validator reconciliation: ADR-0020 accepted (DEC-0031). The obsolete "TRAINING HAS NOT STARTED" validator invariant was replaced with post-execution invariants; docs/MODEL_REGISTRY.md and docs/TRAINING_STRATEGY.md gained additive v1.4.0 notes (fp16-only T4 assumption corrected to float32); docs/ROADMAP.md STAGE-1 moved NOT_STARTED -> IN_PROGRESS; docs/ARCHITECTURE.md moved to v1.2.1 for the adrs fact 19 -> 20. No evaluation, no promotion. | — | PENDING_CHECKPOINT |
 | 1.13.0 | 2026-09-15 | Evaluation authorization recorded. DEC-0032 captures the CEO decision AUTHORIZED WITH LIMITS for exactly one governed held-out TEST benchmark, closes BLK-0003 through that decision, and moves evaluation to EVALUATION_AUTHORIZED_AWAITING_EXECUTION. The RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED before any TEST parse. No score is claimed: evaluation has not executed, the adapter stays EXPERIMENTAL and GHARIBO-V0.1 stays NOT_CREATED. | — | PENDING_CHECKPOINT |
-| 1.17.0 | 2026-09-16 | DEC-0037 authorizes one isolated diagnostic; evaluation remains NOT_RUN and attempt #4 remains unauthorized. | — | PENDING_CHECKPOINT |
+| 1.17.0 | 2026-09-16 | DEC-0037 authorized and completed one isolated diagnostic: install, tokenizer and BASE load PASS; seven markers verified. Evaluation remains NOT_RUN and attempt #4 remains unauthorized. | 77bed6405b4d539147d2592f7c0b790f6369054b | CHECKPOINTED |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -603,5 +603,6 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 **1.17.0 — changes**
 - Add isolated loading probe without data attachments or inference
 - Preserve DEC-0036 evaluation halt
-- Diagnostic authorization only.
+- Record verified passing diagnostic and consumed one-probe authorization; require a new human decision for evaluation
+- Authorization checkpoint before the single kernel push. This subsequent outcome is anchored by its containing commit; raw Kaggle outputs remain untracked.
 - Training executed: true

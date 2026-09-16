@@ -25,5 +25,32 @@
     "scripts/diagnostic/build-probe.mjs",
     "scripts/diagnostic/probe.py",
     "scripts/diagnostic/kernel-metadata.json"
-  ]
+  ],
+  "recordRevision": 2,
+  "execution": {
+    "status": "PASS",
+    "authorizationCommit": "77bed6405b4d539147d2592f7c0b790f6369054b",
+    "kernelVersion": 1,
+    "kernelStatus": "COMPLETE",
+    "kernelPushes": 1,
+    "install": "PASS",
+    "tokenizer": "PASS",
+    "modelLoad": "PASS",
+    "baseModel": "openai/gpt-oss-20b",
+    "baseRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "loaderModelId": "unsloth/gpt-oss-20b",
+    "loadedModelId": "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+    "loadedDistributionRevision": "093fba6992ef5a7152481afec0bdfca1ac486998",
+    "tokenizerId": "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+    "markerCountVerified": 7,
+    "remoteDataSourceListsEmpty": true,
+    "kernelPrivate": true,
+    "testAccessed": false,
+    "inferenceExecuted": false,
+    "evaluationAttempt4Authorized": false,
+    "rootCause": "The optional additional_chat_templates directory returned HTTP 404 while the distribution root listed successfully and the unchanged governed loader loaded tokenizer and BASE successfully. Folder absence alone does not establish the cause of the earlier fatal failure; transport causation remains unproven.",
+    "logSha256": "79e0f56451eacd3fc7b767164eb6e91c320b4b00e0f8384abacb37f78a8c2991",
+    "resultSha256": "014a818a2610c96961f4238f8d4c93513898983ff5cd0017dfe63202dd622c48",
+    "next": "READY_FOR_HUMAN_DECISION_ON_EVALUATION_RETRY"
+  }
 }
