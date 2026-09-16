@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.22.0 |
+| **Version** | 1.23.0 |
 | **Last Updated** | 2026-09-16 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | COMPLETED |
 | Training invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=Local-snapshot loader execution is technically proven. The final preflight exceeded its one-push authorization: two actual pushes, one excess. Evaluation attempt #5 remains NOT_AUTHORIZED pending an explicit human decision., note=DEC-0042 remains a historical diagnostic ImportError block. DEC-0043 records v2 stale-content execution and v3 successful execution without retroactive authorization. Evaluation NOT_RUN; M1-M13 null; candidate EXPERIMENTAL_UNPROMOTED; GHARIBO-V0.1 NOT_CREATED. |
+| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=Evaluation Attempt #5 is explicitly authorized by DEC-0044 and prepared for exactly ONE governed Kaggle push. The push has NOT occurred yet; TEST inference has NOT begun., note=The immutable local-snapshot loader remains execution-proven. DEC-0043 preserves the earlier two-push preflight governance deviation without retroactive authorization. DEC-0044 authorizes measurement only: BASE then CANDIDATE over the same 80 held-out TEST prompts. Evaluation remains NOT_RUN until real inference occurs; M1-M13 remain null; candidate remains EXPERIMENTAL_UNPROMOTED; GHARIBO-V0.1 remains NOT_CREATED. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -161,7 +161,7 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | EVALUATION_AUTHORIZED_AWAITING_EXECUTION | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | ATTEMPT_5_AUTHORIZED_AWAITING_EXECUTION | 9/12 | GHARIBO-V0.1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** Training completed, but promotion requires at least one real evaluation result and none exists. Training completion is not model promotion (ADR-0008).
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -381,6 +381,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0041 | 2026-09-16 | Authorize ONE no-inference Kaggle preflight to prove model-load stability; ATTEMPT #5 IS NOT AUTHORIZED | ACCEPTED | — |
 | DEC-0042 | 2026-09-16 | Authorize ONE no-inference local-immutable-snapshot preflight; the loader must receive a local directory, not a repo id; ATTEMPT #5 IS NOT AUTHORIZED | ACCEPTED | — |
 | DEC-0043 | 2026-09-16 | Accept the proven local-snapshot loader execution and record two pushes under one-push authorization | ACCEPTED | — |
+| DEC-0044 | 2026-09-16 | Authorize exactly one governed Evaluation Attempt #5 | ACCEPTED | — |
 
 ## Validation
 
@@ -437,7 +438,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | HUMAN_DECISION_ON_ATTEMPT_5: review the technically proven local-snapshot loader and the recorded two-push deviation before any explicit authorization of evaluation attempt #5. | DEC-0043 | governance/DEC-0043-preflight-reconciliation.json, governance/DEC-0040-evaluation-attempt-4-failure.json |
+| ACT-0001 | P0 | Execute the single DEC-0044-authorized Evaluation Attempt #5 Kaggle benchmark: BASE then CANDIDATE over the same 80 held-out TEST prompts. | DEC-0044 | governance/DEC-0044-evaluation-attempt-5-authorization.json, apps/web/data/kaggle-eval/gharibo-eval-001/launch-plan.json, scripts/eval/build-eval-kernel.mjs |
 | ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
 
 ## History
@@ -458,6 +459,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.13.0 | 2026-09-15 | Evaluation authorization recorded. DEC-0032 captures the CEO decision AUTHORIZED WITH LIMITS for exactly one governed held-out TEST benchmark, closes BLK-0003 through that decision, and moves evaluation to EVALUATION_AUTHORIZED_AWAITING_EXECUTION. The RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED before any TEST parse. No score is claimed: evaluation has not executed, the adapter stays EXPERIMENTAL and GHARIBO-V0.1 stays NOT_CREATED. | — | PENDING_CHECKPOINT |
 | 1.17.0 | 2026-09-16 | DEC-0037 authorized and completed one isolated diagnostic: install, tokenizer and BASE load PASS; seven markers verified. Evaluation remains NOT_RUN and attempt #4 remains unauthorized. | 77bed6405b4d539147d2592f7c0b790f6369054b | CHECKPOINTED |
 | 1.22.0 | 2026-09-16 | DEC-0043: accepted LOCAL_SNAPSHOT_LOADER_EXECUTION_PROVEN and recorded TWO_PUSHES_UNDER_ONE_PUSH_AUTHORIZATION as a post-execution governance deviation. | — | PENDING_CHECKPOINT |
+| 1.23.0 | 2026-09-16 | DEC-0044: explicitly authorized exactly one governed Evaluation Attempt #5 and bound the prepared kernel/bundle to the proven immutable local-snapshot loader. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -621,3 +623,15 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - Kept evaluation NOT_RUN, M1-M13 null, candidate unpromoted, GHARIBO-V0.1 NOT_CREATED, and attempt #5 NOT_AUTHORIZED
 - The containing Git commit anchors this reconciliation and cannot embed its own SHA.
 - Training executed: false
+
+**1.23.0 — changes**
+- Added DEC-0044 to the gapless decision ledger
+- Registered Attempt #5 as AUTHORIZED_NOT_LAUNCHED
+- Bound Attempt #5 to exactly one Kaggle push
+- Bound kernel authorization to DEC-0044 and attemptNumber 5
+- Preserved BASE_THEN_CANDIDATE over the same 80 held-out TEST prompts
+- Preserved immutable local-snapshot loader identity
+- Preserved evaluation NOT_RUN and M1-M13 null before execution
+- Preserved no-promotion/no-retry boundaries
+- The containing Git commit anchors this pre-launch authorization and cannot embed its own SHA.
+- Training executed: —

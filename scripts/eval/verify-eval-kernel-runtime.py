@@ -174,13 +174,13 @@ def main():
     # The kernel now runs under the ATTEMPT #4 authorization (DEC-0038), which amended — and did not
     # replace — DEC-0032. Both facts are pinned: the live authorization must be DEC-0038, and the
     # prior one must still be recorded as DEC-0032, so the delegation chain stays traceable.
-    check("authorization decision pin is DEC-0038 (attempt #4)",
-          PINS.get("authorizationDecisionId") == "DEC-0038",
+    check("authorization decision pin is DEC-0044 (attempt #5)",
+          PINS.get("authorizationDecisionId") == "DEC-0044",
           f"got {PINS.get('authorizationDecisionId')!r}")
-    check("prior authorization pin is DEC-0032 (amended, not replaced)",
-          PINS.get("priorAuthorizationDecisionId") == "DEC-0032",
+    check("prior authorization pin is DEC-0038 (prior evaluation attempt)",
+          PINS.get("priorAuthorizationDecisionId") == "DEC-0038",
           f"got {PINS.get('priorAuthorizationDecisionId')!r}")
-    check("attempt number pin is 4", PINS.get("attemptNumber") == 4,
+    check("attempt number pin is 5", PINS.get("attemptNumber") == 5,
           f"got {PINS.get('attemptNumber')!r}")
     check("the ONE-push bound is pinned",
           PINS.get("maximumKernelPushes") == 1,

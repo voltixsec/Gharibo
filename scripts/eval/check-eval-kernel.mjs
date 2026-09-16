@@ -5,7 +5,7 @@
  * WHAT THIS GUARDS
  * ----------------
  * `scripts/eval/kaggle/gharibo-eval-001.ipynb` is the ONLY thing permitted to run the single
- * authorized held-out TEST benchmark (attempt #4, DEC-0038). This checker re-reads the GENERATED
+ * authorized held-out TEST benchmark (attempt #5, DEC-0044). This checker re-reads the GENERATED
  * and fails if any of the guarantees the authorization depends on has been broken.
  *
  * It exists because the generator alone is not enough. A generator proves the notebook was
@@ -22,7 +22,7 @@
  *   4. NO PROMOTION — no promotion, checkpoint-selection or tuning vocabulary.
  *   5. TEST PRIVACY — the notebook reads `prompts.jsonl` only and REFUSES to run if any gold
  *                     payload is present in the inference environment.
- *   6. AUTHORIZATION— the DEC-0038 pins are present, the decision string is exact, and the
+ *   6. AUTHORIZATION— the DEC-0044 pins are present, the decision string is exact, and the
  *      ONE-push attempt bound is asserted.
  *   7. IDENTITY     — the adapter sha256 and base revision pins are the accepted values.
  *   8. DECODING     — the section 7.1 decoding values are exact and shared by both arms.
@@ -143,26 +143,26 @@ check(
 );
 
 // ---------------------------------------------------------------- 6. authorization pins
-check("authorization decision id is DEC-0038", EVAL_PINS.authorizationDecisionId === "DEC-0038");
+check("authorization decision id is DEC-0044", EVAL_PINS.authorizationDecisionId === "DEC-0044");
 check(
   "authorization decision is AUTHORIZED WITH LIMITS",
   EVAL_PINS.decision === "AUTHORIZED WITH LIMITS",
   `found ${JSON.stringify(EVAL_PINS.decision)}`
 );
-check("the run is bounded to attempt #4", EVAL_PINS.attemptNumber === 4);
+check("the run is bounded to attempt #5", EVAL_PINS.attemptNumber === 5);
 check(
-  "attempt #4 permits exactly ONE kernel push",
+  "attempt #5 permits exactly ONE kernel push",
   EVAL_PINS.maximumKernelPushes === 1,
   `found ${JSON.stringify(EVAL_PINS.maximumKernelPushes)} — an unbounded attempt is not authorized`
 );
 check(
-  "the prior authorization is recorded as DEC-0032",
-  EVAL_PINS.priorAuthorizationDecisionId === "DEC-0032",
+  "the prior authorization is recorded as DEC-0038",
+  EVAL_PINS.priorAuthorizationDecisionId === "DEC-0038",
   "DEC-0038 supersedes DEC-0032 for execution; the notebook must not erase which decision came before"
 );
 check(
   "the notebook asserts its own authorization before doing any work",
-  /assert\s+PINS\['authorizationDecisionId'\]\s*==\s*'DEC-0038'/.test(codeSource),
+  /assert\s+PINS\['authorizationDecisionId'\]\s*==\s*'DEC-0044'/.test(codeSource),
   "a runtime authorization assertion must guard the run"
 );
 check(

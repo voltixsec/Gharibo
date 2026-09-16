@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.22.0",
+  "masterStateVersion": "1.23.0",
   "updatedAt": "2026-09-16",
   "project": {
     "id": "GHARIBO",
@@ -22,8 +22,8 @@
     "blockerSummary": {
       "openBlockers": 0,
       "closedBlockers": 4,
-      "blockingNow": "Local-snapshot loader execution is technically proven. The final preflight exceeded its one-push authorization: two actual pushes, one excess. Evaluation attempt #5 remains NOT_AUTHORIZED pending an explicit human decision.",
-      "note": "DEC-0042 remains a historical diagnostic ImportError block. DEC-0043 records v2 stale-content execution and v3 successful execution without retroactive authorization. Evaluation NOT_RUN; M1-M13 null; candidate EXPERIMENTAL_UNPROMOTED; GHARIBO-V0.1 NOT_CREATED."
+      "blockingNow": "Evaluation Attempt #5 is explicitly authorized by DEC-0044 and prepared for exactly ONE governed Kaggle push. The push has NOT occurred yet; TEST inference has NOT begun.",
+      "note": "The immutable local-snapshot loader remains execution-proven. DEC-0043 preserves the earlier two-push preflight governance deviation without retroactive authorization. DEC-0044 authorizes measurement only: BASE then CANDIDATE over the same 80 held-out TEST prompts. Evaluation remains NOT_RUN until real inference occurs; M1-M13 remain null; candidate remains EXPERIMENTAL_UNPROMOTED; GHARIBO-V0.1 remains NOT_CREATED."
     },
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
@@ -1012,6 +1012,28 @@
       "references": [
         "governance/DEC-0043-preflight-reconciliation.json",
         "governance/DEC-0042-preflight-authorization.json"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0044",
+      "date": "2026-09-16",
+      "title": "Authorize exactly one governed Evaluation Attempt #5",
+      "status": "ACCEPTED",
+      "decision": "Authorize exactly ONE governed held-out TEST benchmark execution as Evaluation Attempt #5: BASE first, then CANDIDATE, over the SAME 80 held-out TEST prompts under the frozen evaluation contract and the execution-proven immutable local-snapshot loader. This decision authorizes TEST access, inference and scoring for that one execution only. It does not authorize retraining, tuning, model selection, promotion, GHARIBO-V0.1 creation, automatic retry, or a second kernel push.",
+      "rationale": "The final preflight established LOCAL_SNAPSHOT_LOADER_EXECUTION_PROVEN. DEC-0043 separately reconciled the preflight push-count deviation. The CEO then explicitly authorized Attempt #5. One push is allowed; once TEST inference begins the authorization is spent regardless of result.",
+      "scope": [
+        "training",
+        "experiments",
+        "models"
+      ],
+      "references": [
+        "governance/DEC-0044-evaluation-attempt-5-authorization.json",
+        "governance/DEC-0043-preflight-reconciliation.json",
+        "governance/DEC-0040-evaluation-attempt-4-failure.json",
+        "scripts/eval/build-eval-kernel.mjs"
       ],
       "supersedes": null,
       "supersededBy": null,
@@ -2329,8 +2351,59 @@
       "evaluationStatus": "NOT_RUN",
       "candidateStatus": "EXPERIMENTAL_UNPROMOTED",
       "ghariboV01Status": "NOT_CREATED",
-      "attempt5Authorized": false,
-      "next": "HUMAN_DECISION_ON_ATTEMPT_5"
+      "attempt5Authorized": true,
+      "next": "ATTEMPT_5_AUTHORIZED_NOT_LAUNCHED",
+      "attempt5AuthorizationDecisionId": "DEC-0044"
+    },
+    "attempt5Authorization": {
+      "decisionId": "DEC-0044",
+      "record": "governance/DEC-0044-evaluation-attempt-5-authorization.json",
+      "authorizationHash": "f46b32607149deb06905263e09ee945c9b24f004d703b282967c0d6036c45f5e",
+      "status": "AUTHORIZED_NOT_LAUNCHED",
+      "attemptNumber": 5,
+      "maximumKernelPushes": 1,
+      "kernelPushesPerformed": 0,
+      "kernelPushesRemaining": 1,
+      "automaticRetryAuthorized": false,
+      "testAccessAuthorized": true,
+      "inferenceAuthorized": true,
+      "scoringAuthorized": true,
+      "promotionAuthorized": false,
+      "ghariboV01CreationAuthorized": false,
+      "retrainingAuthorized": false,
+      "tuningAuthorized": false,
+      "modelSelectionAuthorized": false,
+      "authorizationSpentOnInferenceStart": true,
+      "authorizationSpent": false,
+      "authorizationConsumed": false,
+      "arms": [
+        "base",
+        "candidate"
+      ],
+      "armOrder": "BASE_THEN_CANDIDATE",
+      "sameTestRecordsForBothArms": true,
+      "testRecordCount": 80,
+      "testSplitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+      "candidateArmId": "GHARIBO-exp-001",
+      "candidateAdapterSha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+      "baseModel": "openai/gpt-oss-20b",
+      "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+      "loaderArchitecture": "IMMUTABLE_LOCAL_SNAPSHOT",
+      "loaderArchitectureProvenBy": "DEC-0043",
+      "distributionRepo": "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+      "immutableDistributionRevision": "093fba6992ef5a7152481afec0bdfca1ac486998",
+      "notebookSha256": "49673f97d137445cf9c3ada162d0d70fdf511ff0b308c86681554b472c3e3eb3",
+      "launchBundleHash": "6b27b342d9615ccf6a56ee9303a8e98ce90638de5290dc9301bd93b6ae9db344",
+      "promptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
+      "kernelId": "vokaigharibo/gharibo-eval-001-fec22ca2",
+      "datasetId": "vokaigharibo/gharibo-eval-prompts-fec22ca2",
+      "launchAttempted": false,
+      "testInferenceOccurred": false,
+      "metricValuesProduced": 0,
+      "priorEvaluationAuthorizationDecisionId": "DEC-0038",
+      "priorAttemptOutcomeDecisionId": "DEC-0040",
+      "preflightReconciliationDecisionId": "DEC-0043",
+      "next": "ONE_GOVERNED_KAGGLE_PUSH_FOR_ATTEMPT_5"
     }
   },
   "datasets": {
@@ -2394,7 +2467,7 @@
       "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "EVALUATION_AUTHORIZED_AWAITING_EXECUTION",
+      "readinessStatus": "ATTEMPT_5_AUTHORIZED_AWAITING_EXECUTION",
       "engineDependencyCount": 12,
       "resolvedEngineDependencies": 9,
       "promotionTarget": "GHARIBO-V0.1",
@@ -2421,7 +2494,7 @@
       "effectiveDtype": "float32",
       "runtimeDeviationClassification": "MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION",
       "artifactRollupHash": "788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885",
-      "evaluationAuthorizationDecisionId": "DEC-0032",
+      "evaluationAuthorizationDecisionId": "DEC-0044",
       "evaluationAuthorizationStatus": "AUTHORIZED_WITH_LIMITS"
     }
   },
@@ -2978,14 +3051,15 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "HUMAN_DECISION_ON_ATTEMPT_5: review the technically proven local-snapshot loader and the recorded two-push deviation before any explicit authorization of evaluation attempt #5.",
-      "requires": "DEC-0043",
+      "action": "Execute the single DEC-0044-authorized Evaluation Attempt #5 Kaggle benchmark: BASE then CANDIDATE over the same 80 held-out TEST prompts.",
+      "requires": "DEC-0044",
       "references": [
-        "governance/DEC-0043-preflight-reconciliation.json",
-        "governance/DEC-0040-evaluation-attempt-4-failure.json"
+        "governance/DEC-0044-evaluation-attempt-5-authorization.json",
+        "apps/web/data/kaggle-eval/gharibo-eval-001/launch-plan.json",
+        "scripts/eval/build-eval-kernel.mjs"
       ],
-      "status": "BLOCKED_ON_HUMAN_DECISION",
-      "note": "No further push, retry, evaluation, TEST access, inference, tuning, selection, scoring, promotion, or GHARIBO-V0.1 creation is authorized by this reconciliation."
+      "status": "READY_FOR_EXECUTION",
+      "note": "Exactly one Kaggle push is authorized. Automatic retry is forbidden. No promotion is authorized. Once TEST inference begins the authorization is spent."
     },
     {
       "id": "ACT-0002",
@@ -3259,6 +3333,24 @@
         "Kept evaluation NOT_RUN, M1-M13 null, candidate unpromoted, GHARIBO-V0.1 NOT_CREATED, and attempt #5 NOT_AUTHORIZED"
       ],
       "trainingExecuted": false
+    },
+    {
+      "revision": "1.23.0",
+      "date": "2026-09-16",
+      "summary": "DEC-0044: explicitly authorized exactly one governed Evaluation Attempt #5 and bound the prepared kernel/bundle to the proven immutable local-snapshot loader.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "The containing Git commit anchors this pre-launch authorization and cannot embed its own SHA.",
+      "changes": [
+        "Added DEC-0044 to the gapless decision ledger",
+        "Registered Attempt #5 as AUTHORIZED_NOT_LAUNCHED",
+        "Bound Attempt #5 to exactly one Kaggle push",
+        "Bound kernel authorization to DEC-0044 and attemptNumber 5",
+        "Preserved BASE_THEN_CANDIDATE over the same 80 held-out TEST prompts",
+        "Preserved immutable local-snapshot loader identity",
+        "Preserved evaluation NOT_RUN and M1-M13 null before execution",
+        "Preserved no-promotion/no-retry boundaries"
+      ]
     }
   ]
 }

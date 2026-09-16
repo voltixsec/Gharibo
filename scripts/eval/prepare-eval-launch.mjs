@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * prepare-eval-launch.mjs — build (or verify) the governed Kaggle launch bundle for the ONE
- * authorized held-out TEST benchmark (attempt #4, DEC-0038).
+ * authorized held-out TEST benchmark (attempt #5, DEC-0044).
  *
  * Mirrors scripts/training/prepare-kaggle-start.ts exactly, with one deliberate INVERSION:
  *
@@ -186,6 +186,9 @@ function main() {
     status: "PREPARED_NOT_LAUNCHED",
     authorizationDecisionId: EVAL_PINS.authorizationDecisionId,
     decision: EVAL_PINS.decision,
+    attemptNumber: EVAL_PINS.attemptNumber,
+    maximumKernelPushes: EVAL_PINS.maximumKernelPushes,
+    priorAuthorizationDecisionId: EVAL_PINS.priorAuthorizationDecisionId,
     harnessVersion: EVAL_PINS.harnessVersion,
     kernelId,
     datasetId,
