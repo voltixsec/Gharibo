@@ -2069,6 +2069,184 @@ export function isEvaluationAttempt4FailedGoldState(state) {
   return isEvaluationAttempt4LaunchedGoldState(before);
 }
 
+
+/**
+ * DEC-0044 authorizes exactly ONE Evaluation Attempt #5.
+ *
+ * This is an ADDITIVE authorization layer only. It does not rewrite DEC-0038/39/40
+ * history, does not claim an evaluation result, and does not authorize promotion.
+ *
+ * The predicate strips DEC-0044 back to the already-accepted 1.22.0 state and then
+ * re-runs the full historical governance predicate underneath it.
+ */
+export function isEvaluationAttempt5AuthorizedGoldState(state) {
+  const training = state?.training;
+  const attempt5 = training?.attempt5Authorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+
+  if (state?.masterStateVersion !== "1.23.0") return false;
+  if (!attempt5 || !experiment) return false;
+
+  if (
+    attempt5.decisionId !== "DEC-0044" ||
+    attempt5.status !== "AUTHORIZED_NOT_LAUNCHED" ||
+    attempt5.attemptNumber !== 5 ||
+    attempt5.maximumKernelPushes !== 1 ||
+    attempt5.kernelPushesPerformed !== 0 ||
+    attempt5.kernelPushesRemaining !== 1 ||
+    attempt5.automaticRetryAuthorized !== false ||
+    attempt5.testAccessAuthorized !== true ||
+    attempt5.inferenceAuthorized !== true ||
+    attempt5.scoringAuthorized !== true ||
+    attempt5.promotionAuthorized !== false ||
+    attempt5.ghariboV01CreationAuthorized !== false ||
+    attempt5.retrainingAuthorized !== false ||
+    attempt5.tuningAuthorized !== false ||
+    attempt5.modelSelectionAuthorized !== false ||
+    attempt5.authorizationSpentOnInferenceStart !== true ||
+    attempt5.authorizationSpent !== false ||
+    attempt5.authorizationConsumed !== false ||
+    attempt5.launchAttempted !== false ||
+    attempt5.testInferenceOccurred !== false ||
+    attempt5.metricValuesProduced !== 0
+  ) {
+    return false;
+  }
+
+  if (
+    attempt5.authorizationHash !==
+      "f46b32607149deb06905263e09ee945c9b24f004d703b282967c0d6036c45f5e" ||
+    attempt5.testRecordCount !== 80 ||
+    attempt5.testSplitHash !==
+      "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b" ||
+    attempt5.candidateArmId !== "GHARIBO-exp-001" ||
+    attempt5.candidateAdapterSha256 !==
+      "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f" ||
+    attempt5.baseModel !== "openai/gpt-oss-20b" ||
+    attempt5.baseModelRevision !==
+      "6cee5e81ee83917806bbde320786a8fb61efebee" ||
+    attempt5.loaderArchitecture !== "IMMUTABLE_LOCAL_SNAPSHOT" ||
+    attempt5.loaderArchitectureProvenBy !== "DEC-0043" ||
+    attempt5.distributionRepo !==
+      "unsloth/gpt-oss-20b-unsloth-bnb-4bit" ||
+    attempt5.immutableDistributionRevision !==
+      "093fba6992ef5a7152481afec0bdfca1ac486998" ||
+    attempt5.notebookSha256 !==
+      "49673f97d137445cf9c3ada162d0d70fdf511ff0b308c86681554b472c3e3eb3" ||
+    attempt5.launchBundleHash !==
+      "6b27b342d9615ccf6a56ee9303a8e98ce90638de5290dc9301bd93b6ae9db344" ||
+    attempt5.promptsSha256 !==
+      "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333"
+  ) {
+    return false;
+  }
+
+  if (
+    !Array.isArray(attempt5.arms) ||
+    attempt5.arms.length !== 2 ||
+    attempt5.arms[0] !== "base" ||
+    attempt5.arms[1] !== "candidate" ||
+    attempt5.armOrder !== "BASE_THEN_CANDIDATE" ||
+    attempt5.sameTestRecordsForBothArms !== true
+  ) {
+    return false;
+  }
+
+  if (
+    training?.evaluationResults !== 0 ||
+    experiment.evaluationStatus !== "NOT_RUN" ||
+    experiment.evaluationScore !== null ||
+    experiment.promotable !== false ||
+    experiment.readinessStatus !==
+      "ATTEMPT_5_AUTHORIZED_AWAITING_EXECUTION" ||
+    experiment.evaluationAuthorizationDecisionId !== "DEC-0044" ||
+    experiment.evaluationAuthorizationStatus !== "AUTHORIZED_WITH_LIMITS"
+  ) {
+    return false;
+  }
+
+  const v01 = (state?.models?.derivedModels || []).find(
+    (m) => m?.id === "GHARIBO-V0.1"
+  );
+
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  const preflight = training?.preflightReconciliation;
+
+  if (
+    !preflight ||
+    preflight.loaderExecutionProven !== true ||
+    preflight.attempt5Authorized !== true ||
+    preflight.attempt5AuthorizationDecisionId !== "DEC-0044" ||
+    preflight.next !== "ATTEMPT_5_AUTHORIZED_NOT_LAUNCHED"
+  ) {
+    return false;
+  }
+
+  const decisions = Array.isArray(state?.decisions)
+    ? state.decisions
+    : [];
+
+  const dec44 = decisions.filter((d) => d?.id === "DEC-0044");
+
+  if (
+    dec44.length !== 1 ||
+    dec44[0].status !== "ACCEPTED" ||
+    dec44[0].supersedes !== null ||
+    dec44[0].supersededBy !== null
+  ) {
+    return false;
+  }
+
+  // Strip ONLY the DEC-0044 layer and prove the accepted state underneath.
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.22.0";
+
+  before.decisions = before.decisions.filter(
+    (d) => d?.id !== "DEC-0044"
+  );
+
+  delete before.training.attempt5Authorization;
+
+  if (before.training.preflightReconciliation) {
+    before.training.preflightReconciliation.attempt5Authorized = false;
+
+    delete before.training.preflightReconciliation
+      .attempt5AuthorizationDecisionId;
+
+    before.training.preflightReconciliation.next =
+      "HUMAN_DECISION_ON_ATTEMPT_5";
+  }
+
+  const beforeExperiment =
+    before.experiments?.["GHARIBO-exp-001"];
+
+  if (beforeExperiment) {
+    beforeExperiment.readinessStatus =
+      "EVALUATION_AUTHORIZED_AWAITING_EXECUTION";
+
+    beforeExperiment.evaluationAuthorizationDecisionId =
+      "DEC-0032";
+
+    beforeExperiment.evaluationAuthorizationStatus =
+      "AUTHORIZED_WITH_LIMITS";
+  }
+
+  if (before.training.evaluation) {
+    delete before.training.evaluation.authorizationDecisionId;
+    delete before.training.evaluation.authorizationHash;
+
+    before.training.evaluation.authorizationStatus =
+      "EVALUATION_READY_AWAITING_AUTHORIZATION";
+
+    before.training.evaluation.nextGate =
+      "EXPLICIT_EVALUATION_AUTHORIZATION_REQUIRED";
+  }
+
+  return isAcceptedGoldGovernanceState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -2084,6 +2262,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isEvaluationAttempt4AuthorizedGoldState(state) ||
     isEvaluationAttempt4LaunchedGoldState(state) ||
     isEvaluationAttempt4FailedGoldState(state) ||
+    isEvaluationAttempt5AuthorizedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }
