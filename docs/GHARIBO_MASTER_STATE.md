@@ -378,6 +378,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0038 | 2026-09-16 | Authorize evaluation attempt #4: one governed BASE-then-CANDIDATE TEST benchmark on the DEC-0037 proven loading path | ACCEPTED | — |
 | DEC-0039 | 2026-09-16 | Launch evaluation attempt #4: one kernel push under DEC-0038, zero pushes remaining | ACCEPTED | — |
 | DEC-0040 | 2026-09-16 | Record evaluation attempt #4 as a pre-inference failure, apply no repair, and halt pending a CEO decision | ACCEPTED | — |
+| DEC-0041 | 2026-09-16 | Authorize ONE no-inference Kaggle preflight to prove model-load stability; ATTEMPT #5 IS NOT AUTHORIZED | ACCEPTED | — |
 
 ## Validation
 
