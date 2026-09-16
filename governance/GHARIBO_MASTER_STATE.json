@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.25.0",
+  "masterStateVersion": "1.26.0",
   "updatedAt": "2026-09-16",
   "project": {
     "id": "GHARIBO",
@@ -22,8 +22,8 @@
     "blockerSummary": {
       "openBlockers": 0,
       "closedBlockers": 4,
-      "blockingNow": "Evaluation Attempt #6 is AUTHORIZED WITH LIMITS by DEC-0046 and locally prepared. Exactly ONE Kaggle kernel push is available. No push has occurred yet and TEST inference has not begun.",
-      "note": "Attempt #5 remains a preserved FAILED_PRE_INFERENCE historical fact under DEC-0045. The HF Hub post-install refresh repair passed 9/9 local regression checks and the Attempt #6 kernel passed 64/64 safety checks. Evaluation remains NOT_RUN, M1-M13 remain null, the candidate remains EXPERIMENTAL_UNPROMOTED, and GHARIBO-V0.1 remains NOT_CREATED."
+      "blockingNow": "Attempt #6 is ready for its single authorized Kaggle kernel push after DEC-0047 binds the missing accepted private adapter input. No kernel push or TEST inference has occurred.",
+      "note": "DEC-0046 authorization remains unchanged. DEC-0047 reconciles only the launch artifact: notebook and evaluation semantics unchanged; one push remaining; no automatic retry or promotion."
     },
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
@@ -1083,6 +1083,28 @@
         "scripts/eval/kaggle/gharibo-eval-002.ipynb",
         "scripts/eval/prepare-eval-launch-attempt6.mjs",
         "docs/RESEARCH_BENCHMARK.md"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0047",
+      "date": "2026-09-16",
+      "title": "Reconcile Attempt #6 adapter attachment before its single authorized push",
+      "status": "ACCEPTED",
+      "decision": "Bind the accepted private adapter dataset and corrected launch bundle to existing Evaluation Attempt #6. Preserve DEC-0046 unchanged as the original authorization and DEC-0045 unchanged as historical failure. This amendment is pre-launch artifact reconciliation, not a new attempt or additional authorization. Private adapter dataset: vokaigharibo/gharibo-exp-001-adapter-fec22ca2; accepted weights SHA256 794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f; new launch bundle 1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e; notebook unchanged. One push authorized, zero performed, one remaining; no TEST inference.",
+      "rationale": "The original launch metadata attached only the prompts dataset; the frozen candidate loader requires exactly one input directory containing adapter_config.json and adapter_model.safetensors.",
+      "scope": [
+        "experiments",
+        "models"
+      ],
+      "references": [
+        "governance/DEC-0046-evaluation-attempt-6-authorization.json",
+        "governance/DEC-0045-evaluation-attempt-5-failure.json",
+        "scripts/eval/prepare-eval-launch-attempt6.mjs",
+        "scripts/eval/check-attempt6-authorization-gate.mjs",
+        "governance/DEC-0047-attempt-6-artifact-reconciliation.json"
       ],
       "supersedes": null,
       "supersededBy": null,
@@ -2230,7 +2252,7 @@
       "attempt6KernelPushesRemaining": 1,
       "attempt6AutomaticRetryAuthorized": false,
       "attempt6NotebookSha256": "eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e",
-      "attempt6LaunchBundleHash": "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275",
+      "attempt6LaunchBundleHash": "1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e",
       "attempt6PromptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
       "attempt6KernelId": "vokaigharibo/gharibo-eval-002-fec22ca2",
       "attempt6RepairSourceCommit": "05d923f4ed3cada9093263839ba4f3c25717614b",
@@ -2571,7 +2593,7 @@
       "repairLocallyProven": true,
       "repairRuntimeProvenOnKaggle": false,
       "notebookSha256": "eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e",
-      "launchBundleHash": "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275",
+      "launchBundleHash": "1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e",
       "promptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
       "kernelId": "vokaigharibo/gharibo-eval-002-fec22ca2",
       "datasetId": "vokaigharibo/gharibo-eval-prompts-fec22ca2",
@@ -2581,6 +2603,43 @@
       "priorAttemptFailureDecisionId": "DEC-0045",
       "furtherAttemptRequiresNewHumanDecision": true,
       "next": "ONE_GOVERNED_KAGGLE_PUSH_FOR_ATTEMPT_6"
+    },
+    "attempt6ArtifactReconciliation": {
+      "decisionId": "DEC-0047",
+      "record": "governance/DEC-0047-attempt-6-artifact-reconciliation.json",
+      "reconciliationHash": "0d78ec1a55df0a0d12b3485c87012b1c616a3915f89560e6f8354d9bc51b3243",
+      "authorizationDecisionId": "DEC-0046",
+      "authorizationHash": "3afac20d638e033c13d875381b97005891d3946f3ba2ac336b04093b287bca93",
+      "previousLaunchBundleHash": "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275",
+      "launchBundleHash": "1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e",
+      "notebookSha256": "eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e",
+      "adapterDataset": {
+        "datasetId": "vokaigharibo/gharibo-exp-001-adapter-fec22ca2",
+        "numericDatasetId": 12049617,
+        "visibility": "PRIVATE",
+        "remoteStatus": "ready",
+        "remoteDownloadVerified": true,
+        "exactlyOneAdapterDirectory": true,
+        "files": [
+          {
+            "path": "adapter_config.json",
+            "bytes": 1443,
+            "sha256": "111ee57bd47517bf73c617453f0c00e2d466dd49f18fed4d60050e19fb1f603a"
+          },
+          {
+            "path": "adapter_model.safetensors",
+            "bytes": 15938048,
+            "sha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f"
+          }
+        ]
+      },
+      "candidateAdapterSha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+      "maximumKernelPushes": 1,
+      "kernelPushesPerformed": 0,
+      "kernelPushesRemaining": 1,
+      "automaticRetryAuthorized": false,
+      "testInferenceOccurred": false,
+      "status": "READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH"
     }
   },
   "datasets": {
@@ -3231,15 +3290,17 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Execute the single DEC-0046-authorized Evaluation Attempt #6 Kaggle benchmark: BASE then CANDIDATE over the same 80 held-out TEST prompts using the frozen Attempt #6 artifact.",
-      "requires": "DEC-0046",
+      "action": "READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH: use the DEC-0047 reconciled bundle under the existing DEC-0046 one-push authorization. This preparation task stops before execution.",
+      "requires": "DEC-0046 + DEC-0047",
       "references": [
+        "governance/DEC-0047-attempt-6-artifact-reconciliation.json",
         "governance/DEC-0046-evaluation-attempt-6-authorization.json",
-        "scripts/eval/build-eval-kernel-attempt6.mjs",
-        "scripts/eval/check-hfhub-refresh-barrier-attempt6.mjs"
+        "governance/DEC-0045-evaluation-attempt-5-failure.json",
+        "scripts/eval/prepare-eval-launch-attempt6.mjs",
+        "scripts/eval/check-attempt6-authorization-gate.mjs"
       ],
-      "status": "READY_FOR_EXECUTION",
-      "note": "Exactly one Kaggle push is authorized. No automatic retry. If the run fails pre-inference, record the exact failure and STOP. Once TEST inference materially begins, the authorization is spent."
+      "status": "READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH",
+      "note": "Zero pushes performed; one remaining. No TEST inference, scoring, tuning, training, selection, or promotion performed."
     },
     {
       "id": "ACT-0002",
@@ -3568,6 +3629,20 @@
         "kept evaluation NOT_RUN and GHARIBO-V0.1 NOT_CREATED"
       ],
       "trainingExecuted": true
+    },
+    {
+      "revision": "1.26.0",
+      "date": "2026-09-16",
+      "summary": "DEC-0047 pre-launch artifact reconciliation: attach the accepted private adapter dataset to Attempt #6 without changing notebook bytes, evaluation semantics, or the single-push authorization.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "The containing commit anchors this reconciliation; DEC-0045 and DEC-0046 remain byte-for-byte historical records.",
+      "changes": [
+        "bound vokaigharibo/gharibo-exp-001-adapter-fec22ca2 with independently verified remote weights hash 794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+        "reconciled bundle 598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275 -> 1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e",
+        "preserved notebook SHA, 0 kernel pushes, 1 remaining, TEST inference false, and no promotion"
+      ],
+      "trainingExecuted": false
     }
   ]
 }

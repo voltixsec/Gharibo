@@ -1,0 +1,102 @@
+{
+  "decisionId": "DEC-0047",
+  "recordKind": "PRE_LAUNCH_ARTIFACT_RECONCILIATION_NOT_A_NEW_EVALUATION_ATTEMPT",
+  "recordRevision": 1,
+  "recordDate": "2026-09-16",
+  "status": "READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH",
+  "amendsDecisionId": "DEC-0046",
+  "supersedesDecisionId": null,
+  "authority": "Explicit human instruction to reconcile the missing adapter input, create a private minimal adapter dataset, and prepare the existing authorized attempt without executing a kernel push.",
+  "decision": "Bind the accepted private adapter dataset and corrected launch bundle to existing Evaluation Attempt #6. Preserve DEC-0046 unchanged as the original authorization and DEC-0045 unchanged as historical failure. This amendment is pre-launch artifact reconciliation, not a new attempt or additional authorization.",
+  "defect": "The original launch metadata attached only the prompts dataset; the frozen candidate loader requires exactly one input directory containing adapter_config.json and adapter_model.safetensors.",
+  "baselineCommit": "9abfe97e4c951ca47155481b5454e09fbcc6b187",
+  "authorizationDecisionId": "DEC-0046",
+  "authorizationHash": "3afac20d638e033c13d875381b97005891d3946f3ba2ac336b04093b287bca93",
+  "previousLaunchBundleHash": "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275",
+  "launchBundleHash": "1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e",
+  "notebookSha256": "eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e",
+  "notebookBytesChanged": false,
+  "promptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
+  "kernelId": "vokaigharibo/gharibo-eval-002-fec22ca2",
+  "kernelPrivate": true,
+  "datasetSources": [
+    "vokaigharibo/gharibo-eval-prompts-fec22ca2",
+    "vokaigharibo/gharibo-exp-001-adapter-fec22ca2"
+  ],
+  "adapterDataset": {
+    "datasetId": "vokaigharibo/gharibo-exp-001-adapter-fec22ca2",
+    "numericDatasetId": 12049617,
+    "visibility": "PRIVATE",
+    "remoteStatus": "ready",
+    "remoteDownloadVerified": true,
+    "exactlyOneAdapterDirectory": true,
+    "files": [
+      {
+        "path": "adapter_config.json",
+        "bytes": 1443,
+        "sha256": "111ee57bd47517bf73c617453f0c00e2d466dd49f18fed4d60050e19fb1f603a"
+      },
+      {
+        "path": "adapter_model.safetensors",
+        "bytes": 15938048,
+        "sha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f"
+      }
+    ]
+  },
+  "candidateAdapterSha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+  "adapterPackagePurpose": "PeftModel.from_pretrained on the already-loaded base model; only adapter config and accepted safetensors weights are required. No tokenizer or checkpoint copies included.",
+  "remoteVerificationMethod": "Authenticated dataset metadata confirmed PRIVATE; remote file listing contained exactly two root files; independently downloaded ZIP contained exactly those two files and both bytes matched the canonical adapter package.",
+  "datasetMutationScope": "Creation of a private transport copy of the accepted adapter only. No evaluation, training, prompt, gold, or split data mutated.",
+  "attemptNumber": 6,
+  "newEvaluationAttempt": false,
+  "maximumKernelPushes": 1,
+  "kernelPushesPerformed": 0,
+  "kernelPushesRemaining": 1,
+  "additionalKernelPushesAuthorized": 0,
+  "automaticRetryAuthorized": false,
+  "launchAttempted": false,
+  "testInferenceOccurred": false,
+  "executionInThisTaskPermitted": false,
+  "trainingAuthorized": false,
+  "tuningAuthorized": false,
+  "checkpointSelectionAuthorized": false,
+  "modelSelectionAuthorized": false,
+  "promotionAuthorized": false,
+  "ghariboV01CreationAuthorized": false,
+  "testRecordCount": 80,
+  "testSplitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+  "arms": [
+    "base",
+    "candidate"
+  ],
+  "armOrder": "BASE_THEN_CANDIDATE",
+  "decoding": {
+    "temperature": 0,
+    "doSample": false,
+    "topP": 1,
+    "topK": 0,
+    "maxNewTokens": 1024,
+    "seed": 0,
+    "repeats": 1,
+    "maxSeqLength": 1024,
+    "reasoningEffort": "medium"
+  },
+  "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+  "immutableDistributionRevision": "093fba6992ef5a7152481afec0bdfca1ac486998",
+  "evaluationSemanticsChanged": false,
+  "goldPayloadIncluded": false,
+  "trainPayloadIncluded": false,
+  "validationPayloadIncluded": false,
+  "evaluationStatus": "NOT_RUN",
+  "metricValuesProduced": 0,
+  "candidateStatus": "EXPERIMENTAL_UNPROMOTED",
+  "ghariboV01Status": "NOT_CREATED",
+  "next": "READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH",
+  "references": [
+    "governance/DEC-0046-evaluation-attempt-6-authorization.json",
+    "governance/DEC-0045-evaluation-attempt-5-failure.json",
+    "scripts/eval/prepare-eval-launch-attempt6.mjs",
+    "scripts/eval/check-attempt6-authorization-gate.mjs"
+  ],
+  "reconciliationHash": "0d78ec1a55df0a0d12b3485c87012b1c616a3915f89560e6f8354d9bc51b3243"
+}

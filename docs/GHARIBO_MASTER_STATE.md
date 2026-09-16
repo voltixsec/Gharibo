@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.25.0 |
+| **Version** | 1.26.0 |
 | **Last Updated** | 2026-09-16 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | COMPLETED |
 | Training invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=Evaluation Attempt #6 is AUTHORIZED WITH LIMITS by DEC-0046 and locally prepared. Exactly ONE Kaggle kernel push is available. No push has occurred yet and TEST inference has not begun., note=Attempt #5 remains a preserved FAILED_PRE_INFERENCE historical fact under DEC-0045. The HF Hub post-install refresh repair passed 9/9 local regression checks and the Attempt #6 kernel passed 64/64 safety checks. Evaluation remains NOT_RUN, M1-M13 remain null, the candidate remains EXPERIMENTAL_UNPROMOTED, and GHARIBO-V0.1 remains NOT_CREATED. |
+| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=Attempt #6 is ready for its single authorized Kaggle kernel push after DEC-0047 binds the missing accepted private adapter input. No kernel push or TEST inference has occurred., note=DEC-0046 authorization remains unchanged. DEC-0047 reconciles only the launch artifact: notebook and evaluation semantics unchanged; one push remaining; no automatic retry or promotion. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -384,6 +384,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0044 | 2026-09-16 | Authorize exactly one governed Evaluation Attempt #5 | ACCEPTED | — |
 | DEC-0045 | 2026-09-16 | Record Evaluation Attempt #5 pre-inference failure and exhaust its one-push authorization | ACCEPTED | — |
 | DEC-0046 | 2026-09-16 | Authorize exactly one governed Evaluation Attempt #6 using the locally proven HF Hub post-install refresh repair | ACCEPTED | — |
+| DEC-0047 | 2026-09-16 | Reconcile Attempt #6 adapter attachment before its single authorized push | ACCEPTED | — |
 
 ## Validation
 
@@ -440,7 +441,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Execute the single DEC-0046-authorized Evaluation Attempt #6 Kaggle benchmark: BASE then CANDIDATE over the same 80 held-out TEST prompts using the frozen Attempt #6 artifact. | DEC-0046 | governance/DEC-0046-evaluation-attempt-6-authorization.json, scripts/eval/build-eval-kernel-attempt6.mjs, scripts/eval/check-hfhub-refresh-barrier-attempt6.mjs |
+| ACT-0001 | P0 | READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH: use the DEC-0047 reconciled bundle under the existing DEC-0046 one-push authorization. This preparation task stops before execution. | DEC-0046 + DEC-0047 | governance/DEC-0047-attempt-6-artifact-reconciliation.json, governance/DEC-0046-evaluation-attempt-6-authorization.json, governance/DEC-0045-evaluation-attempt-5-failure.json, scripts/eval/prepare-eval-launch-attempt6.mjs, scripts/eval/check-attempt6-authorization-gate.mjs |
 | ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
 
 ## History
@@ -464,6 +465,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.23.0 | 2026-09-16 | DEC-0044: explicitly authorized exactly one governed Evaluation Attempt #5 and bound the prepared kernel/bundle to the proven immutable local-snapshot loader. | — | PENDING_CHECKPOINT |
 | 1.24.0 | 2026-09-16 | DEC-0045: recorded Attempt #5 as FAILED_PRE_INFERENCE, exhausted its one-push authorization, and preserved the local repair as unmerged/unproven/unexecuted. | — | PENDING_CHECKPOINT |
 | 1.25.0 | 2026-09-16 | Accepted DEC-0046: one bounded Evaluation Attempt #6 using a distinct repaired artifact. Attempt #5 remains immutable historical evidence; no Kaggle push or TEST inference has occurred at this checkpoint. | — | PENDING_CHECKPOINT |
+| 1.26.0 | 2026-09-16 | DEC-0047 pre-launch artifact reconciliation: attach the accepted private adapter dataset to Attempt #6 without changing notebook bytes, evaluation semantics, or the single-push authorization. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -663,3 +665,10 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - kept evaluation NOT_RUN and GHARIBO-V0.1 NOT_CREATED
 - This revision authorizes and binds the exact Attempt #6 artifact before execution. The containing Git commit is recorded externally after checkpointing.
 - Training executed: true
+
+**1.26.0 — changes**
+- bound vokaigharibo/gharibo-exp-001-adapter-fec22ca2 with independently verified remote weights hash 794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f
+- reconciled bundle 598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275 -> 1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e
+- preserved notebook SHA, 0 kernel pushes, 1 remaining, TEST inference false, and no promotion
+- The containing commit anchors this reconciliation; DEC-0045 and DEC-0046 remain byte-for-byte historical records.
+- Training executed: false

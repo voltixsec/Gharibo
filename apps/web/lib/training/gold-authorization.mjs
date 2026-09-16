@@ -2515,6 +2515,34 @@ export function isEvaluationAttempt5FailedGoldState(state) {
  * Attempt #5 history remains immutable; no result or promotion is created here.
  */
 export function isEvaluationAttempt6AuthorizedGoldState(state) {
+  if (state?.masterStateVersion === "1.26.0") {
+    const r = state.training?.attempt6ArtifactReconciliation;
+    const bundle = "1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e";
+    if (r?.decisionId !== "DEC-0047" ||
+        r.reconciliationHash !== "0d78ec1a55df0a0d12b3485c87012b1c616a3915f89560e6f8354d9bc51b3243" ||
+        r.authorizationDecisionId !== "DEC-0046" ||
+        r.authorizationHash !== "3afac20d638e033c13d875381b97005891d3946f3ba2ac336b04093b287bca93" ||
+        r.previousLaunchBundleHash !== "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275" ||
+        r.launchBundleHash !== bundle ||
+        state.training.attempt6Authorization?.launchBundleHash !== bundle ||
+        state.training.evaluationAuthorization?.attempt6LaunchBundleHash !== bundle ||
+        r.adapterDataset?.datasetId !== "vokaigharibo/gharibo-exp-001-adapter-fec22ca2" ||
+        r.adapterDataset.visibility !== "PRIVATE" || r.adapterDataset.remoteDownloadVerified !== true ||
+        r.adapterDataset.exactlyOneAdapterDirectory !== true ||
+        r.candidateAdapterSha256 !== "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f" ||
+        r.maximumKernelPushes !== 1 || r.kernelPushesPerformed !== 0 || r.kernelPushesRemaining !== 1 ||
+        r.automaticRetryAuthorized !== false || r.testInferenceOccurred !== false ||
+        state.decisions?.filter(d => d.id === "DEC-0047" && d.status === "ACCEPTED" && d.supersedes === null && d.supersededBy === null).length !== 1) return false;
+    // Remove only the new artifact-binding layer, then verify the original authorization.
+    const before = structuredClone(state);
+    before.masterStateVersion = "1.25.0";
+    before.training.attempt6Authorization.launchBundleHash = r.previousLaunchBundleHash;
+    before.training.evaluationAuthorization.attempt6LaunchBundleHash = r.previousLaunchBundleHash;
+    delete before.training.attempt6ArtifactReconciliation;
+    before.decisions = before.decisions.filter(d => d.id !== "DEC-0047");
+    before.history = before.history.filter(h => h.revision !== "1.26.0");
+    return isEvaluationAttempt6AuthorizedGoldState(before);
+  }
   const training = state?.training;
   const attempt6 = training?.attempt6Authorization;
   const experiment =

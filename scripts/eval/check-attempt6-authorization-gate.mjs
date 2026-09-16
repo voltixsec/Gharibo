@@ -2,6 +2,7 @@
 
 import {
   existsSync,
+  readdirSync,
   readFileSync,
 } from "node:fs";
 
@@ -22,6 +23,8 @@ const NOTEBOOK =
 
 const PLAN =
   "apps/web/data/kaggle-eval/gharibo-eval-002/launch-plan.json";
+const RECONCILIATION = "governance/DEC-0047-attempt-6-artifact-reconciliation.json";
+const BUNDLE = "apps/web/data/kaggle-eval/gharibo-eval-002";
 
 const failures = [];
 
@@ -67,6 +70,7 @@ for (const path of [
   MASTER,
   NOTEBOOK,
   PLAN,
+  RECONCILIATION,
 ]) {
   check(`${path} exists`, existsSync(path));
 }
@@ -75,7 +79,7 @@ if (
   !existsSync(AUTH) ||
   !existsSync(MASTER) ||
   !existsSync(NOTEBOOK) ||
-  !existsSync(PLAN)
+  !existsSync(PLAN) || !existsSync(RECONCILIATION)
 ) {
   process.exit(1);
 }
@@ -88,6 +92,43 @@ const state =
 
 const plan =
   JSON.parse(readFileSync(PLAN, "utf8"));
+const reconciliation = JSON.parse(readFileSync(RECONCILIATION, "utf8"));
+const { reconciliationHash, ...reconciliationBody } = reconciliation;
+check("DEC-0047 exact reconciliation hash is valid",
+  createHash("sha256").update(JSON.stringify(canonical(reconciliationBody))).digest("hex") === reconciliationHash &&
+  reconciliationHash === "0d78ec1a55df0a0d12b3485c87012b1c616a3915f89560e6f8354d9bc51b3243" &&
+  state.training?.attempt6ArtifactReconciliation?.reconciliationHash === reconciliationHash);
+check("DEC-0047 preserves DEC-0046 authorization and reconciles only its artifact",
+  reconciliation.authorizationHash === auth.authorizationHash && reconciliation.previousLaunchBundleHash === auth.launchBundleHash &&
+  reconciliation.attemptNumber === 6 && reconciliation.newEvaluationAttempt === false &&
+  reconciliation.additionalKernelPushesAuthorized === 0 && reconciliation.executionInThisTaskPermitted === false &&
+  reconciliation.notebookBytesChanged === false && reconciliation.evaluationSemanticsChanged === false);
+const metadata = JSON.parse(readFileSync(`${BUNDLE}/kernel/kernel-metadata.json`, "utf8"));
+const sources = [auth.datasetId, "vokaigharibo/gharibo-exp-001-adapter-fec22ca2"];
+check("private kernel attaches exactly the prompts and accepted adapter datasets",
+  JSON.stringify(metadata.dataset_sources) === JSON.stringify(sources) && metadata.is_private === true &&
+  ["competition_sources", "kernel_sources", "model_sources"].every(k => Array.isArray(metadata[k]) && metadata[k].length === 0));
+const adapter = reconciliation.adapterDataset;
+check("private adapter identity and independently verified minimal package are governed",
+  adapter?.datasetId === sources[1] && adapter.visibility === "PRIVATE" && adapter.remoteDownloadVerified === true &&
+  adapter.exactlyOneAdapterDirectory === true && adapter.remoteStatus === "ready" &&
+  JSON.stringify(adapter.files?.map(f => f.path)) === JSON.stringify(["adapter_config.json", "adapter_model.safetensors"]) &&
+  adapter.files[1].sha256 === auth.candidateAdapterSha256 && reconciliation.candidateAdapterSha256 === auth.candidateAdapterSha256 &&
+  plan.candidateAdapterSha256 === auth.candidateAdapterSha256 && plan.adapterDatasetId === sources[1]);
+check("prompts dataset contains exactly metadata and prompts, with no gold/test/train/validation payload",
+  JSON.stringify(readdirSync(`${BUNDLE}/dataset`).sort()) === JSON.stringify(["dataset-metadata.json", "prompts.jsonl"]));
+check("kernel upload contains only notebook and metadata",
+  JSON.stringify(readdirSync(`${BUNDLE}/kernel`).sort()) === JSON.stringify(["gharibo-eval-002.ipynb", "kernel-metadata.json"]));
+const payload = ["dataset/dataset-metadata.json", "dataset/prompts.jsonl", "kernel/gharibo-eval-002.ipynb", "kernel/kernel-metadata.json"];
+const computedBundle = createHash("sha256").update(payload.map(p => `${sha256File(`${BUNDLE}/${p}`)}  ${p}`).sort().join("\n") + "\n").digest("hex");
+check("actual payload bytes match the reconciled bundle and frozen notebook/prompts",
+  computedBundle === reconciliation.launchBundleHash && computedBundle === plan.launchBundleHash &&
+  sha256File(`${BUNDLE}/kernel/gharibo-eval-002.ipynb`) === auth.notebookSha256 &&
+  sha256File(`${BUNDLE}/dataset/prompts.jsonl`) === auth.promptsSha256);
+check("all pre-launch counters preserve one push, zero performed, no inference or retry",
+  [plan, reconciliation, state.training?.attempt6Authorization, state.training?.attempt6ArtifactReconciliation].every(r =>
+    r?.maximumKernelPushes === 1 && r.kernelPushesPerformed === 0 && r.kernelPushesRemaining === 1 &&
+    r.testInferenceOccurred === false && r.automaticRetryAuthorized === false));
 
 const {
   authorizationHash,
@@ -124,7 +165,7 @@ check(
 check(
   "launch bundle identity is exact",
   plan.launchBundleHash ===
-    "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275",
+    "1d98de8ad3d0342232bb653bb4e78889565f9b6a7a49ab41ece13171cf68867e",
 );
 
 check(
@@ -151,8 +192,8 @@ check(
 );
 
 check(
-  "master state version is 1.25.0",
-  state.masterStateVersion === "1.25.0",
+  "master state version is 1.26.0",
+  state.masterStateVersion === "1.26.0",
 );
 
 check(

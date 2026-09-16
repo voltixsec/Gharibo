@@ -141,6 +141,7 @@ function main() {
 
   // ---------------------------------------------------------------- metadata
   const datasetId = "vokaigharibo/gharibo-eval-prompts-fec22ca2";
+  const adapterDatasetId = "vokaigharibo/gharibo-exp-001-adapter-fec22ca2";
   const kernelId = "vokaigharibo/gharibo-eval-002-fec22ca2";
 
   const datasetMetadata = {
@@ -166,7 +167,7 @@ function main() {
     enable_gpu: true,
     enable_internet: true,
     machine_shape: "NvidiaTeslaT4",
-    dataset_sources: [datasetId],
+    dataset_sources: [datasetId, adapterDatasetId],
     competition_sources: [],
     kernel_sources: [],
     model_sources: [],
@@ -192,6 +193,11 @@ function main() {
     harnessVersion: EVAL_PINS.harnessVersion,
     kernelId,
     datasetId,
+    adapterDatasetId,
+    artifactReconciliationDecisionId: "DEC-0047",
+    kernelPushesPerformed: 0,
+    kernelPushesRemaining: 1,
+    automaticRetryAuthorized: false,
     notebookSha256: notebookSha,
     launchBundleHash: bundleHash,
     launchBundleHashAlgorithm:
@@ -232,8 +238,8 @@ function main() {
       problems.push("missing launch-plan.json");
     } else {
       const onDiskPlan = JSON.parse(readFileSync(planPath, "utf8"));
-      if (onDiskPlan.launchBundleHash !== bundleHash) {
-        problems.push(`recorded launchBundleHash ${onDiskPlan.launchBundleHash} != computed ${bundleHash}`);
+      if (JSON.stringify(onDiskPlan) !== JSON.stringify(launchPlan)) {
+        problems.push("launch-plan.json differs from the deterministic pre-launch plan");
       }
     }
     // THE INVARIANT: no answer-bearing file may exist anywhere in the bundle.
