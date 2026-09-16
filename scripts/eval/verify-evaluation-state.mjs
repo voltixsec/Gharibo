@@ -34,6 +34,7 @@
  *   node scripts/eval/verify-evaluation-state.mjs --verbose
  */
 import { readFileSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -777,6 +778,69 @@ check(
     /^[0-9a-f]{40}$/.test(evalAuth.baseModelRevision),
   `baseModelRevision=${evalAuth.baseModelRevision}`,
 );
+
+// Final preflight reconciliation reads governance records only; never raw outputs or TEST.
+const reconciliation = training.preflightReconciliation;
+const reconciliationRecord = readJson("governance/DEC-0043-preflight-reconciliation.json");
+check("final preflight reconciliation is registered", reconciliation?.decisionId === "DEC-0043" &&
+  reconciliation?.record === "governance/DEC-0043-preflight-reconciliation.json" &&
+  state.decisions?.some(d => d.id === "DEC-0043" && d.status === "ACCEPTED") &&
+  reconciliationRecord?.decisionId === "DEC-0043");
+if (reconciliationRecord) {
+  const r = reconciliationRecord;
+  const { reconciliationHash, ...body } = r;
+  const canonical = v => Array.isArray(v) ? v.map(canonical) : v && typeof v === "object"
+    ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])) : v;
+  check("reconciliation hash binds the complete record and master state",
+    reconciliationHash === createHash("sha256").update(JSON.stringify(canonical(body))).digest("hex") &&
+    reconciliation?.reconciliationHash === reconciliationHash);
+  check("technical acceptance and governance noncompliance remain distinct",
+    r.technicalResult === "LOCAL_SNAPSHOT_LOADER_EXECUTION_PROVEN" && r.loaderExecutionProven === true &&
+    r.governanceCompliance === "NON_COMPLIANT" && r.deviation === "TWO_PUSHES_UNDER_ONE_PUSH_AUTHORIZATION" &&
+    r.deviationClassification === "POST_EXECUTION_GOVERNANCE_DEVIATION");
+  check("push accounting preserves one authorized, two actual, one excess",
+    r.authorizedPushes === 1 && r.actualPushes === 2 && r.excessPushes === 1 && r.remainingAuthorizedPushes === 0 &&
+    r.actualPushes - r.authorizedPushes === r.excessPushes);
+  check("master state reflects the final preflight outcome and push accounting",
+    ["technicalResult", "loaderExecutionProven", "governanceCompliance", "deviation", "authorizedPushes",
+      "actualPushes", "excessPushes", "remainingAuthorizedPushes", "retroactiveAuthorization", "kernelId",
+      "testAttached", "testAccessed", "inferenceExecuted", "evaluationStatus", "candidateStatus",
+      "ghariboV01Status", "attempt5Authorized", "next"].every(k => reconciliation?.[k] === r[k]));
+  const [v2, v3] = r.executions ?? [];
+  check("both final-preflight pushes and their distinct outcomes survive",
+    r.executions?.length === 2 && v2?.pushNumber === 1 && v2?.kernelVersion === 2 &&
+    v2?.pushReportedSuccess === true && v2?.outcome === "STALE_NOTEBOOK_CONTENT_EXECUTED" &&
+    v2?.intendedCorrectedArchitectureExercised === false && v3?.pushNumber === 2 && v3?.kernelVersion === 3 &&
+    v3?.kernelStatus === "COMPLETE" && v3?.outcome === r.technicalResult &&
+    v3?.exceedsAuthorization === true && v3?.retroactivelyAuthorized === false &&
+    [v2, v3].every(v => v?.kernelId === r.kernelId && v?.testAttached === false && v?.testAccessed === false && v?.inferenceExecuted === false));
+  const requiredMarkers = ["SNAPSHOT_PASS", "LOCAL_PATH_PASS", "TOKENIZER_PASS", "MODEL_LOAD_PASS",
+    "DISTRIBUTION_REVISION_PASS", "NO_MUTABLE_MAIN", "TEST_ACCESS_NO", "INFERENCE_NO", "COMPLETE"];
+  check("v3 success markers and immutable local loader identity are preserved",
+    requiredMarkers.every(m => v3?.markersVerified?.includes(`PREFLIGHT3_${m}`)) &&
+    v3?.observedDistributionRevision === "093fba6992ef5a7152481afec0bdfca1ac486998" &&
+    v3?.actualLoaderInput === v3?.snapshotDirectory && v3?.snapshotDirectory?.startsWith("/") &&
+    v3?.snapshotDirectory?.endsWith("/" + v3?.observedDistributionRevision) &&
+    v3?.mutableMainResolutionDuringGovernedLoad === false && v3?.correctedContentVerifiedBeforeExecution === true &&
+    [v3?.notebookSha256, v3?.pulledNotebookSha256, v3?.normalizedCellContentSha256, v3?.logSha256].every(isSha256) &&
+    reconciliation?.version3LogSha256 === v3?.logSha256 &&
+    r.evidence?.length === 4 && r.evidence.every(e => isSha256(e.sha256) && e.committed === false));
+  const previous = readJson("governance/DEC-0042-preflight-authorization.json");
+  check("the earlier DEC-0042 diagnostic block is preserved as history",
+    previous?.execution?.status === "BLOCKED" && previous?.execution?.failureException === "ImportError" &&
+    previous?.execution?.modelLoad === false && r.previousPreflight?.authorizationHash === previous?.authorizationHash &&
+    training.preflightAuthorization?.decisionId === "DEC-0042" && training.preflightAuthorization?.execution?.status === "BLOCKED");
+  check("reconciliation neither retroactively authorizes nor opens another execution",
+    ["retroactiveAuthorization", "retryAuthorized", "automaticRetryAuthorized", "attempt5Authorized",
+      "evaluationAuthorized", "newKernelPushAuthorized"].every(k => r[k] === false) &&
+    r.next === "HUMAN_DECISION_ON_ATTEMPT_5");
+  check("preflight reconciliation preserves all contamination and promotion boundaries",
+    ["testAttached", "testAccessed", "inferenceExecuted", "evaluationExecuted", "tuningPerformed",
+      "checkpointSelectionPerformed", "scoringPerformed", "promotionPerformed"].every(k => r[k] === false) &&
+    r.evaluationStatus === "NOT_RUN" && r.evaluationResults === 0 && r.metricValuesProduced === 0 &&
+    Object.keys(r.metrics ?? {}).length === 13 && Array.from({length: 13}, (_, i) => `M${i + 1}`).every(k => r.metrics?.[k] === null) &&
+    r.candidateStatus === "EXPERIMENTAL_UNPROMOTED" && r.ghariboV01Status === "NOT_CREATED");
+}
 
 report();
 

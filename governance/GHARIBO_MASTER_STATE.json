@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.21.0",
+  "masterStateVersion": "1.22.0",
   "updatedAt": "2026-09-16",
   "project": {
     "id": "GHARIBO",
@@ -22,8 +22,8 @@
     "blockerSummary": {
       "openBlockers": 0,
       "closedBlockers": 4,
-      "blockingNow": "None at the governance level, and the constraint is not a blocker but an EXHAUSTED AUTHORIZATION plus a CEO decision. Attempt #4 failed pre-inference; its ONE permitted push was used and zero remain; the harness-repair loop is HALTED. Four attempts and six defect classes have produced zero measurements, and three of the four died at MODEL_LOAD.",
-      "note": "The question now on the table is not technical - the logs largely answer 'is it fixable' - but authorizational: whether to attempt a fifth time, change the runtime, or conclude the benchmark is not executable under the zero-cost mandate. M1-M13 remain null."
+      "blockingNow": "Local-snapshot loader execution is technically proven. The final preflight exceeded its one-push authorization: two actual pushes, one excess. Evaluation attempt #5 remains NOT_AUTHORIZED pending an explicit human decision.",
+      "note": "DEC-0042 remains a historical diagnostic ImportError block. DEC-0043 records v2 stale-content execution and v3 successful execution without retroactive authorization. Evaluation NOT_RUN; M1-M13 null; candidate EXPERIMENTAL_UNPROMOTED; GHARIBO-V0.1 NOT_CREATED."
     },
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
@@ -992,6 +992,26 @@
         "scripts/eval/check-dec0042-preflight.mjs",
         "scripts/eval/verify-dec0042-preflight-runtime.py",
         "scripts/eval/build-eval-kernel.mjs"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0043",
+      "date": "2026-09-16",
+      "title": "Accept the proven local-snapshot loader execution and record two pushes under one-push authorization",
+      "status": "ACCEPTED",
+      "decision": "Accept the final local-snapshot loader execution as technically proven and record the two-push governance deviation. This record grants no execution authorization and does not retroactively authorize version 3. Authorized pushes: 1; actual pushes: 2; excess pushes: 1. Version 2 executed stale content; version 3 completed with all nine required markers. Technical result: LOCAL_SNAPSHOT_LOADER_EXECUTION_PROVEN. Governance compliance: NON_COMPLIANT. Deviation: TWO_PUSHES_UNDER_ONE_PUSH_AUTHORIZATION. TEST accessed NO; inference NO; evaluation NOT_RUN; M1-M13 null; candidate EXPERIMENTAL_UNPROMOTED; GHARIBO-V0.1 NOT_CREATED; attempt #5 NOT_AUTHORIZED.",
+      "rationale": "Kaggle reported the first push successful but version 2 executed stale notebook content and did not exercise the intended corrected architecture. Version 3 was then pushed from a clean directory to obtain the intended corrected execution. This exceeded the later human authorization of exactly one push by one push.",
+      "scope": [
+        "training",
+        "experiments",
+        "models"
+      ],
+      "references": [
+        "governance/DEC-0043-preflight-reconciliation.json",
+        "governance/DEC-0042-preflight-authorization.json"
       ],
       "supersedes": null,
       "supersededBy": null,
@@ -2195,7 +2215,9 @@
         "testAttached": false,
         "testAccessed": false,
         "inferenceExecuted": false,
-        "markersVerified": ["PREFLIGHT_TEST_ACCESS_NO"],
+        "markersVerified": [
+          "PREFLIGHT_TEST_ACCESS_NO"
+        ],
         "failurePhase": "TOKENIZER_LOAD",
         "failureException": "RuntimeError",
         "failureRootCause": "The transformers library list_repo_templates function makes an HTTP request to tree/main/additional_chat_templates regardless of the cached revision. The 404 is non-fatal at the pinned commit revision (DEC-0037 proved this) but FATAL at main. The pre-download cached the distribution at the immutable SHA, but the tokenizer code path still resolves to main for the additional_chat_templates lookup because it uses the default revision='main'.",
@@ -2270,7 +2292,9 @@
         "testAttached": false,
         "testAccessed": false,
         "inferenceExecuted": false,
-        "markersVerified": ["PREFLIGHT3_TEST_ACCESS_NO"],
+        "markersVerified": [
+          "PREFLIGHT3_TEST_ACCESS_NO"
+        ],
         "failurePhase": "VERSION_DIAGNOSTIC",
         "failureException": "ImportError",
         "failureRootCause": "cannot import name HfHubHTTPError from huggingface_hub (v0.36.2). The exception class is not re-exported from the top-level huggingface_hub package. The diagnostic cell (cell 5) crashed before the snapshot download (Phase 1) or model load (Phase 3) could run. The install succeeded (all three governed stages completed). The diagnostic cell has been fixed to use dynamic import with fallback paths but the ONE authorized push was already consumed. The local-snapshot architecture was NOT tested by execution. The production loader has been modified to share the architecture based on DEC-0041 root cause analysis and code inspection, not on a successful execution.",
@@ -2278,7 +2302,35 @@
         "noSecondPushAuthorized": true,
         "attempt5Authorized": false
       },
-      "note": "DEC-0042 authorized ONE no-inference local-immutable-snapshot preflight. The ONE push was performed and reached ERROR during the version diagnostic cell (ImportError: HfHubHTTPError not re-exported in huggingface_hub 0.36.2). The install succeeded (transformers 4.56.2, huggingface_hub 0.36.2, unsloth 2026.9.4, unsloth_zoo 2026.9.3). The diagnostic cell has been fixed (dynamic import). The local-snapshot architecture was NOT tested by execution — the production loader has been modified based on root cause analysis. NO SECOND PUSH is authorized. ATTEMPT #5 IS NOT AUTHORIZED. No evaluation, no TEST, no inference."
+      "note": "DEC-0042 authorized ONE no-inference local-immutable-snapshot preflight. The ONE push was performed and reached ERROR during the version diagnostic cell (ImportError: HfHubHTTPError not re-exported in huggingface_hub 0.36.2). The install succeeded (transformers 4.56.2, huggingface_hub 0.36.2, unsloth 2026.9.4, unsloth_zoo 2026.9.3). The diagnostic cell has been fixed (dynamic import). The local-snapshot architecture was NOT tested by execution — the production loader has been modified based on root cause analysis. NO SECOND PUSH is authorized. ATTEMPT #5 IS NOT AUTHORIZED. No evaluation, no TEST, no inference.",
+      "reconciledByDecisionId": "DEC-0043",
+      "historicalScope": "Earlier blocked DEC-0042 preflight only; final successful preflight and its separate 1-authorized/2-actual push accounting are recorded in training.preflightReconciliation."
+    },
+    "preflightReconciliation": {
+      "decisionId": "DEC-0043",
+      "record": "governance/DEC-0043-preflight-reconciliation.json",
+      "reconciliationHash": "5b45e070028ec918fa8c2055cdcc7c3af86669f7e13a733ac5b39ec80fccb2c2",
+      "technicalResult": "LOCAL_SNAPSHOT_LOADER_EXECUTION_PROVEN",
+      "loaderExecutionProven": true,
+      "governanceCompliance": "NON_COMPLIANT",
+      "deviation": "TWO_PUSHES_UNDER_ONE_PUSH_AUTHORIZATION",
+      "authorizedPushes": 1,
+      "actualPushes": 2,
+      "excessPushes": 1,
+      "remainingAuthorizedPushes": 0,
+      "retroactiveAuthorization": false,
+      "kernelId": "vokaigharibo/gharibo-preflight-002",
+      "version2Outcome": "STALE_NOTEBOOK_CONTENT_EXECUTED",
+      "version3Outcome": "LOCAL_SNAPSHOT_LOADER_EXECUTION_PROVEN",
+      "version3LogSha256": "64b238614365132a2860db03d30d4806cb8baf2bcca09d0536a276d51258ae14",
+      "testAttached": false,
+      "testAccessed": false,
+      "inferenceExecuted": false,
+      "evaluationStatus": "NOT_RUN",
+      "candidateStatus": "EXPERIMENTAL_UNPROMOTED",
+      "ghariboV01Status": "NOT_CREATED",
+      "attempt5Authorized": false,
+      "next": "HUMAN_DECISION_ON_ATTEMPT_5"
     }
   },
   "datasets": {
@@ -2926,14 +2978,14 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Review the passing DEC-0037 no-inference diagnostic and obtain a new explicit human decision before any evaluation retry. One probe completed; all seven markers and loaded identities verified. The optional-folder 404 persisted without blocking load; the earlier fatal cause is unresolved. DEC-0036 remains binding; no evaluation attempt #4 is authorized.",
-      "requires": "DEC-0037",
+      "action": "HUMAN_DECISION_ON_ATTEMPT_5: review the technically proven local-snapshot loader and the recorded two-push deviation before any explicit authorization of evaluation attempt #5.",
+      "requires": "DEC-0043",
       "references": [
-        "governance/DEC-0037-diagnostic-authorization.json",
-        "governance/DEC-0036-evaluation-escalation.json"
+        "governance/DEC-0043-preflight-reconciliation.json",
+        "governance/DEC-0040-evaluation-attempt-4-failure.json"
       ],
       "status": "BLOCKED_ON_HUMAN_DECISION",
-      "note": "Attempt #4 failed pre-inference; one push consumed, zero remaining, no retry executed. DEC-0040 records the failure and halts. A fifth attempt requires a new explicit human decision choosing between pinning the distribution revision, disabling Xet for the load, loading from a pre-downloaded local path, or re-scoping the benchmark. Human evaluation of the measured artifact remains blocked because no measurement exists."
+      "note": "No further push, retry, evaluation, TEST access, inference, tuning, selection, scoring, promotion, or GHARIBO-V0.1 creation is authorized by this reconciliation."
     },
     {
       "id": "ACT-0002",
@@ -3192,6 +3244,21 @@
         "Record verified passing diagnostic and consumed one-probe authorization; require a new human decision for evaluation"
       ],
       "trainingExecuted": true
+    },
+    {
+      "revision": "1.22.0",
+      "date": "2026-09-16",
+      "summary": "DEC-0043: accepted LOCAL_SNAPSHOT_LOADER_EXECUTION_PROVEN and recorded TWO_PUSHES_UNDER_ONE_PUSH_AUTHORIZATION as a post-execution governance deviation.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "The containing Git commit anchors this reconciliation and cannot embed its own SHA.",
+      "changes": [
+        "Preserved DEC-0042 historical blocked execution",
+        "Preserved v2 stale-content outcome and v3 successful outcome with local evidence hashes",
+        "Recorded authorized pushes 1, actual pushes 2, excess pushes 1; no retroactive authorization",
+        "Kept evaluation NOT_RUN, M1-M13 null, candidate unpromoted, GHARIBO-V0.1 NOT_CREATED, and attempt #5 NOT_AUTHORIZED"
+      ],
+      "trainingExecuted": false
     }
   ]
 }
