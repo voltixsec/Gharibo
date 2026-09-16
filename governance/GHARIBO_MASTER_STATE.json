@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.20.0",
+  "masterStateVersion": "1.21.0",
   "updatedAt": "2026-09-16",
   "project": {
     "id": "GHARIBO",
@@ -968,6 +968,30 @@
         "scripts/eval/check-preflight-kernel.mjs",
         "scripts/eval/verify-preflight-kernel-runtime.py",
         "governance/DEC-0041-preflight-authorization.json"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0042",
+      "date": "2026-09-16",
+      "title": "Authorize ONE no-inference local-immutable-snapshot preflight; the loader must receive a local directory, not a repo id; ATTEMPT #5 IS NOT AUTHORIZED",
+      "status": "ACCEPTED",
+      "decision": "Authorize ONE private Kaggle NO-INFERENCE preflight kernel push to prove the LOCAL IMMUTABLE SNAPSHOT model-loading architecture. The preflight captures the returned local snapshot path from snapshot_download at the immutable SHA 093fba6992ef5a7152481afec0bdfca1ac486998 and passes it as model_name to FastLanguageModel.from_pretrained with local_files_only=True. The primary invariant: THE LOADER RECEIVES A LOCAL DIRECTORY, NOT A REPO ID. This closes the DEC-0041 gap where the snapshot path was discarded and the loader was called with the repo id unsloth/gpt-oss-20b, allowing Hub resolution to hit tree/main/additional_chat_templates (404 at main, fatal). The ONE authorized push consumed its budget and reached ERROR due to an unrelated diagnostic import failure (HfHubHTTPError not re-exported in huggingface_hub 0.36.2). The diagnostic cell has been fixed (dynamic import with fallback paths). The production eval kernel loader has been migrated to the same local-snapshot architecture. ATTEMPT #5 IS NOT AUTHORIZED. M1-M13 remain null. evaluationStatus remains NOT_RUN. GHARIBO-V0.1 remains NOT_CREATED.",
+      "rationale": "DEC-0041 preflight executed snapshot_download at the immutable SHA but DISCARDED the returned local path. The loader was then called with model_name=unsloth/gpt-oss-20b, which allowed Hub resolution to occur again and hit tree/main/additional_chat_templates (fatal at main). DEC-0042 closes that gap by requiring the loader to receive the captured local snapshot directory, not a repo id. The ONE authorized push reached ERROR before Phase 1 or Phase 3 could run, due to an unrelated diagnostic import failure. The production loader has been modified to share the architecture based on DEC-0041 root cause analysis and code inspection. This is NOT an evaluation authorization and does not spend or consume the evaluation authorization. A future evaluation requires a separate explicit human decision.",
+      "scope": [
+        "training",
+        "experiments",
+        "models"
+      ],
+      "references": [
+        "governance/DEC-0041-preflight-authorization.json",
+        "governance/DEC-0042-preflight-authorization.json",
+        "scripts/eval/build-dec0042-preflight.mjs",
+        "scripts/eval/check-dec0042-preflight.mjs",
+        "scripts/eval/verify-dec0042-preflight-runtime.py",
+        "scripts/eval/build-eval-kernel.mjs"
       ],
       "supersedes": null,
       "supersededBy": null,
@@ -2001,7 +2025,7 @@
       "relaunchFailureTestInferenceOccurred": false,
       "relaunchFailureEvidence": "scripts/eval/verify-eval-failure-evidence.py",
       "harnessRepairsWithoutReachingInference": 2,
-      "preflightControls": 6,
+      "preflightControls": 7,
       "preflightControlsAllHold": true,
       "escalationDecisionId": "DEC-0036",
       "escalationHash": "c5c770c16ada8c3a57b10f71946257cd366d6cfbed4f3fc11e1772c1d37d4654",
@@ -2123,7 +2147,7 @@
       "evaluationAttempt4AuthorizationBasis": "DEC-0037 returned PASS and answered the DEC-0036 escalation; attempt #4 is authorized as one bounded execution on the proven loading path.",
       "note": "Diagnostic completed and consumed; the escalation it answered is closed by DEC-0038, which authorizes attempt #4 at one kernel push."
     },
-    "preflightAuthorization": {
+    "preflight1Authorization": {
       "decisionId": "DEC-0041",
       "record": "governance/DEC-0041-preflight-authorization.json",
       "authorizationHash": "9cc160d42967c0e1c61c033562471388638ef6304aa986eeed792a20b5acd0ad",
@@ -2180,6 +2204,81 @@
         "attempt5Authorized": false
       },
       "note": "DEC-0041 authorized ONE no-inference preflight. The ONE push was performed and reached ERROR. Install and base-revision verification PASSED. Distribution pre-download at the immutable SHA PASSED. The tokenizer load FAILED because transformers list_repo_templates hits main/additional_chat_templates (404, fatal at main). Root cause identified: HF_HUB_OFFLINE=1 must be set after snapshot_download to force local cache usage. NO SECOND PUSH is authorized. ATTEMPT #5 IS NOT AUTHORIZED. No evaluation, no TEST, no inference."
+    },
+    "preflightAuthorization": {
+      "decisionId": "DEC-0042",
+      "record": "governance/DEC-0042-preflight-authorization.json",
+      "authorizationHash": "797ca4596f31213aec97b3a888ce280d21231f4c88044fd7699ab55b2673ac7c",
+      "status": "PREFLIGHT_AUTHORIZED_AND_SPENT",
+      "recordKind": "PREFLIGHT_AUTHORIZATION_NOT_AN_EVALUATION_RESULT",
+      "maximumKernelPushes": 1,
+      "kernelPushesPerformed": 1,
+      "kernelPushesRemaining": 0,
+      "attempt5Authorized": false,
+      "evaluationAuthorized": false,
+      "testDataAttached": false,
+      "inferenceAuthorized": false,
+      "generationAuthorized": false,
+      "promotionAuthorized": false,
+      "metricsAuthorized": false,
+      "tuningAuthorized": false,
+      "modelSelectionAuthorized": false,
+      "ghariboV01CreationAuthorized": false,
+      "datasetMutationAuthorized": false,
+      "testDrivenCodeOptimisationAuthorized": false,
+      "automaticRetryAuthorized": false,
+      "retryAuthorized": false,
+      "authorizationSpent": true,
+      "authorizationConsumed": true,
+      "authorizationState": "PREFLIGHT_AUTHORIZED_AND_SPENT",
+      "architecture": "LOCAL_IMMUTABLE_SNAPSHOT",
+      "primaryInvariant": "THE LOADER RECEIVES A LOCAL DIRECTORY, NOT A REPO ID",
+      "immutableDistributionRevision": "093fba6992ef5a7152481afec0bdfca1ac486998",
+      "distributionRepo": "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+      "mutableRefThatMustNotResolve": "main",
+      "phase1Download": "snapshot_download(repo_id, revision) → CAPTURE returned path",
+      "phase2SealNetwork": "HF_HUB_OFFLINE=1 + TRANSFORMERS_OFFLINE=1 (defense-in-depth, NOT primary)",
+      "phase3Load": "FastLanguageModel.from_pretrained(model_name=SNAPSHOT_DIR, local_files_only=True)",
+      "xetHardening": "HF_HUB_DISABLE_XET=1 (preventive, not causal — recorded explicitly)",
+      "preDownloadMechanism": "huggingface_hub.snapshot_download at the immutable revision (CAPTURED, not discarded)",
+      "productionLoaderSharedWithPreflight": true,
+      "sharedCodeSource": "scripts/eval/build-eval-kernel.mjs (install cell + base-revision cell extracted verbatim)",
+      "notebookSha256": "3c19bf631b0831d1a579376f50a27d984f4adb88073f9fc60590f1a46afed96d",
+      "notebookPath": "scripts/eval/kaggle/gharibo-preflight-002.ipynb",
+      "kernelId": "vokaigharibo/gharibo-preflight-002",
+      "execution": {
+        "status": "BLOCKED",
+        "kernelPushes": 1,
+        "kernelStatus": "ERROR",
+        "install": true,
+        "versionDiagnostics": {
+          "transformers": "4.56.2",
+          "huggingface_hub": "0.36.2",
+          "unsloth": "2026.9.4",
+          "unsloth_zoo": "2026.9.3",
+          "mroDiagnosticCompleted": false,
+          "mroDiagnosticError": "ImportError: cannot import name HfHubHTTPError from huggingface_hub (v0.36.2)"
+        },
+        "snapshotDownload": false,
+        "snapshotLocalPath": null,
+        "tokenizer": false,
+        "modelLoad": false,
+        "observedDistributionId": null,
+        "observedDistributionRevision": null,
+        "actualLoaderInput": null,
+        "mutableMainObserved": null,
+        "testAttached": false,
+        "testAccessed": false,
+        "inferenceExecuted": false,
+        "markersVerified": ["PREFLIGHT3_TEST_ACCESS_NO"],
+        "failurePhase": "VERSION_DIAGNOSTIC",
+        "failureException": "ImportError",
+        "failureRootCause": "cannot import name HfHubHTTPError from huggingface_hub (v0.36.2). The exception class is not re-exported from the top-level huggingface_hub package. The diagnostic cell (cell 5) crashed before the snapshot download (Phase 1) or model load (Phase 3) could run. The install succeeded (all three governed stages completed). The diagnostic cell has been fixed to use dynamic import with fallback paths but the ONE authorized push was already consumed. The local-snapshot architecture was NOT tested by execution. The production loader has been modified to share the architecture based on DEC-0041 root cause analysis and code inspection, not on a successful execution.",
+        "identifiedFix": "The diagnostic cell now uses dynamic import with __import__ and getattr fallback across huggingface_hub and huggingface_hub.errors. This is NOT monkey-patching. A second push is NOT authorized.",
+        "noSecondPushAuthorized": true,
+        "attempt5Authorized": false
+      },
+      "note": "DEC-0042 authorized ONE no-inference local-immutable-snapshot preflight. The ONE push was performed and reached ERROR during the version diagnostic cell (ImportError: HfHubHTTPError not re-exported in huggingface_hub 0.36.2). The install succeeded (transformers 4.56.2, huggingface_hub 0.36.2, unsloth 2026.9.4, unsloth_zoo 2026.9.3). The diagnostic cell has been fixed (dynamic import). The local-snapshot architecture was NOT tested by execution — the production loader has been modified based on root cause analysis. NO SECOND PUSH is authorized. ATTEMPT #5 IS NOT AUTHORIZED. No evaluation, no TEST, no inference."
     }
   },
   "datasets": {

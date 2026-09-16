@@ -42,7 +42,7 @@
     "eval:launch:evidence": "python scripts/eval/verify-eval-failure-evidence.py --log gharibo-eval-001-fec22ca2.log",
     "eval:bundle": "node scripts/eval/prepare-eval-launch.mjs",
     "eval:bundle:verify": "python scripts/eval/verify-eval-bundle.py",
-    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:launch && npm run eval:audit:relaunch && npm run eval:audit:escalation && npm run eval:audit:attempt4:auth && npm run eval:audit:attempt4:launch && npm run eval:audit:attempt4:failure && npm run eval:audit:leakage && npm run eval:verify && npm run eval:gate:attempt4 && npm run eval:check && npm run eval:kernel:runtime && npm run eval:bundle:verify && npm run verify:preflight",
+    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:launch && npm run eval:audit:relaunch && npm run eval:audit:escalation && npm run eval:audit:attempt4:auth && npm run eval:audit:attempt4:launch && npm run eval:audit:attempt4:failure && npm run eval:audit:leakage && npm run eval:verify && npm run eval:gate:attempt4 && npm run eval:check && npm run eval:kernel:runtime && npm run eval:bundle:verify && npm run eval:audit:dec0042 && npm run verify:preflight",
     "eval:audit:escalation": "node scripts/eval/build-dec0036-escalation.mjs --check",
     "eval:audit:attempt4:auth": "node scripts/eval/build-dec0038-authorization.mjs --check",
     "eval:audit:attempt4:launch": "node scripts/eval/build-dec0039-launch.mjs --check",
@@ -52,7 +52,12 @@
     "preflight:check": "node scripts/eval/build-preflight-kernel.mjs --check && node scripts/eval/check-preflight-kernel.mjs",
     "preflight:runtime": "python scripts/eval/verify-preflight-kernel-runtime.py",
     "eval:audit:preflight": "node scripts/eval/build-dec0041-preflight.mjs --check",
-    "verify:preflight": "npm run eval:audit:preflight && npm run preflight:check && npm run preflight:runtime"
+    "eval:audit:preflight2": "node scripts/eval/build-dec0042-preflight.mjs --check",
+    "eval:audit:dec0042": "node scripts/eval/build-dec0042-record.mjs --check",
+    "preflight2:render": "node scripts/eval/build-dec0042-preflight.mjs",
+    "preflight2:check": "node scripts/eval/build-dec0042-preflight.mjs --check && node scripts/eval/check-dec0042-preflight.mjs",
+    "preflight2:runtime": "python scripts/eval/verify-dec0042-preflight-runtime.py",
+    "verify:preflight": "npm run eval:audit:preflight && npm run preflight:check && npm run preflight:runtime && npm run eval:audit:preflight2 && npm run preflight2:check && npm run preflight2:runtime"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

@@ -379,23 +379,49 @@ check(
 );
 
 // ---------------------------------------------------------------- loader invocation
-// These checks exist because of the DEC-0035 RELAUNCH failure: the loader call passed
-// `revision=<base repo sha>` to `FastLanguageModel.from_pretrained`. `unsloth/gpt-oss-20b` is a
-// DISTRIBUTION repo id that Unsloth resolves internally, so the revision was ignored, a substitute
-// repo (`...-unsloth-bnb-4bit`) was chosen, and the load failed outright:
+// These checks exist because of the DEC-0035 RELAUNCH failure AND the DEC-0040/DEC-0041
+// model-load failures. The original DEFECT 4 was passing `revision=<base repo sha>` to
+// FastLanguageModel.from_pretrained. DEC-0040/DEC-0041 then showed that even without a
+// revision= argument, passing the repo id `unsloth/gpt-oss-20b` allowed Hub resolution to
+// hit tree/main/additional_chat_templates (404 at 'main', fatal).
 //
-//   RuntimeError: Unsloth: Failed to load model. Both AutoConfig and PeftConfig loading failed.
-//
-// The accepted qualification and the GHARIBO-exp-001 training notebook both load with a model_name
-// and NO revision. Reproducing that is the point; the pin is enforced elsewhere.
+// DEC-0042 architecture: the loader receives the LOCAL SNAPSHOT DIRECTORY (captured from
+// snapshot_download), not a repo id. local_files_only=True prevents any network resolution.
+// The primary invariant: THE LOADER RECEIVES A LOCAL DIRECTORY, NOT A REPO ID.
 check(
   "the loader call passes NO revision argument",
   !/FastLanguageModel\.from_pretrained\([\s\S]{0,400}?revision\s*=/.test(executableLines),
   "DEFECT 4 of DEC-0035: a revision on the Unsloth distribution id makes the load fail"
 );
 check(
-  "the loader call uses the pinned loader model id",
-  /model_name=PINS\['loaderModelId'\]/.test(executableLines)
+  "the loader call uses the LOCAL SNAPSHOT DIRECTORY (not a repo id)",
+  /model_name=SNAPSHOT_DIR/.test(executableLines),
+  "DEC-0042: the loader must receive the local snapshot directory, not PINS['loaderModelId']"
+);
+check(
+  "the loader call passes local_files_only=True",
+  /local_files_only=True/.test(executableLines),
+  "DEC-0042: local_files_only=True prevents network resolution during load"
+);
+check(
+  "snapshot_download captures the returned local path",
+  /SNAPSHOT_DIR\s*=\s*snapshot_download/.test(executableLines),
+  "DEC-0042: the returned snapshot path must be captured, not discarded"
+);
+check(
+  "HF_HUB_OFFLINE=1 is set after snapshot download",
+  /os\.environ\['HF_HUB_OFFLINE'\]\s*=\s*'1'/.test(executableLines),
+  "DEC-0042: network must be sealed after download (defense-in-depth)"
+);
+check(
+  "TRANSFORMERS_OFFLINE=1 is set after snapshot download",
+  /os\.environ\['TRANSFORMERS_OFFLINE'\]\s*=\s*'1'/.test(executableLines),
+  "DEC-0042: network must be sealed after download (defense-in-depth)"
+);
+check(
+  "the loader call does NOT pass the repo id",
+  !/model_name=PINS\['loaderModelId'\]/.test(executableLines),
+  "DEC-0042: the repo id must not be passed to the actual loader call"
 );
 check(
   "the pinned base revision is asserted against the LIVE base repo revision",

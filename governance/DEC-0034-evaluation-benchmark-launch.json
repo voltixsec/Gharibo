@@ -40,8 +40,8 @@
   "datasetVisibility": "PRIVATE",
   "payloadBasis": "PROMPTS_ONLY",
   "promptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
-  "notebookSha256": "a494c7b40229a8b79698daf372834d6ac73cc9243ca92a251281c71c76c7536d",
-  "launchBundleHash": "5c09fbf6796364fa6610a49ff248fe926ade219e099328343e3a48dc74c43096",
+  "notebookSha256": "17d039523896cb514b55bb46580afb03f1a9ce4d90ea0ccf85bd611688c1d4bb",
+  "launchBundleHash": "2b9e7fe0de265ccf8c1b800bc8158b330a7d5095f169b5cee9bdbb013fd6ee6c",
   "identityNote": "notebookSha256 and launchBundleHash are read from the committed notebook and launch plan at generation time, so this record cannot quote an artifact it does not match. The values here are the REPAIRED artifact (the one pushed after the DEF-0035-D repair); the defective notebook that this launch actually ran is identified by its own hash below.",
   "notebookSha256AsRan": "ec0d45ecf51b46d2ebe6f73fa4cdada938990f8cee0915cb41979bd9e277eab4",
   "launchBundleHashAsRan": "5eb5e2dc00f33a679c566b20b1211245c186bc4a9d793bbf2307b1e770d39645",
@@ -98,5 +98,5 @@
     "docs/EVALUATION_EXECUTION_BLOCKER.md",
     "docs/RESEARCH_BENCHMARK.md"
   ],
-  "launchHash": "0353b50694e43663a735f021ea24818624bfe45066815721e8ede58e97cf7ac4"
+  "launchHash": "f45d923463b5a28063c546e390ec8507cb589285a77afcac6a0f74a350cb27ac"
 }

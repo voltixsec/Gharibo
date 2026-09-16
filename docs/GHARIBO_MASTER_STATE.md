@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.20.0 |
+| **Version** | 1.21.0 |
 | **Last Updated** | 2026-09-16 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -379,6 +379,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0039 | 2026-09-16 | Launch evaluation attempt #4: one kernel push under DEC-0038, zero pushes remaining | ACCEPTED | — |
 | DEC-0040 | 2026-09-16 | Record evaluation attempt #4 as a pre-inference failure, apply no repair, and halt pending a CEO decision | ACCEPTED | — |
 | DEC-0041 | 2026-09-16 | Authorize ONE no-inference Kaggle preflight to prove model-load stability; ATTEMPT #5 IS NOT AUTHORIZED | ACCEPTED | — |
+| DEC-0042 | 2026-09-16 | Authorize ONE no-inference local-immutable-snapshot preflight; the loader must receive a local directory, not a repo id; ATTEMPT #5 IS NOT AUTHORIZED | ACCEPTED | — |
 
 ## Validation
 

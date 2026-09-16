@@ -765,6 +765,7 @@ const COMPLETED_MASTER_STATE_VERSIONS = [
   "1.18.0", // DEC-0038 attempt-#4 authorization only; accepted training facts are unchanged.
   "1.19.0", // DEC-0039 attempt-#4 launch only; no result claimed, evaluation still NOT_RUN.
   "1.20.0", // DEC-0040 attempt-#4 pre-inference FAILURE; zero metrics, evaluation still NOT_RUN.
+  "1.21.0", // DEC-0042 local-immutable-snapshot preflight; BLOCKED (diagnostic ImportError), zero metrics, evaluation still NOT_RUN.
 ];
 
 /**
@@ -980,6 +981,7 @@ export function isKaggleExecutionCompletedGoldState(state) {
     "1.18.0",
     "1.19.0",
     "1.20.0",
+    "1.21.0",
   ];
   if (!ADVANCED_READINESS_VERSIONS.includes(state?.masterStateVersion) &&
       (state?.training?.authorization?.status !== COMPLETED_READINESS ||

@@ -133,8 +133,8 @@
   "datasetMutated": false,
   "testDrivenCodeOptimisationPerformed": false,
   "ghariboV01Created": false,
-  "notebookSha256AsPushed": "a494c7b40229a8b79698daf372834d6ac73cc9243ca92a251281c71c76c7536d",
-  "launchBundleHashAsPushed": "5c09fbf6796364fa6610a49ff248fe926ade219e099328343e3a48dc74c43096",
+  "notebookSha256AsPushed": "17d039523896cb514b55bb46580afb03f1a9ce4d90ea0ccf85bd611688c1d4bb",
+  "launchBundleHashAsPushed": "2b9e7fe0de265ccf8c1b800bc8158b330a7d5095f169b5cee9bdbb013fd6ee6c",
   "note": "Attempt #4 failed pre-inference and is recorded as a failure. No TEST inference occurred (8 markers scanned, none present), so no measurement exists and M1-M13 remain null. The decisive finding is that the 404 which killed the run is NOT inherently fatal — DEC-0037 survived the identical 404 at the pinned commit SHA — and that attempt #4 hit it at revision 'main'. Whether the Xet transport error caused that fallback is UNPROVEN and is not asserted. The plausible remedies are named and NONE is applied: this attempt was bounded to one push, zero pushes remain, and a fifth attempt requires a new explicit human decision. The harness-repair loop stays halted.",
   "references": [
     "governance/DEC-0038-evaluation-attempt-4-authorization.json",
@@ -146,5 +146,5 @@
     "docs/RESEARCH_BENCHMARK.md",
     "scripts/eval/verify-eval-failure-evidence.py"
   ],
-  "failureHash": "10a44b694543ffd81b21cce5094b192c93fc9ce2ac0617d51896b34ccdb8fb90"
+  "failureHash": "178f016aec471d99097ee67d093e2376ec900f8baad3319998d1ce3265a58754"
 }
