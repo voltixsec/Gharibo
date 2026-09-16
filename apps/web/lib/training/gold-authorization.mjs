@@ -754,7 +754,7 @@ const COMPLETED_ACCEPTANCE_HASH =
  *   run, same package, same artifacts, same hashes, same dtype deviation, evaluation still
  *   NOT_RUN and still unpromoted — so the 1.11.0 acceptance holds verbatim inside it too.
  */
-const COMPLETED_MASTER_STATE_VERSIONS = ["1.11.0", "1.12.0", "1.13.0", "1.14.0"];
+const COMPLETED_MASTER_STATE_VERSIONS = ["1.11.0", "1.12.0", "1.13.0", "1.14.0", "1.15.0"];
 
 /**
  * The DEC-0030 acceptance core, independent of the master-state revision.
@@ -955,11 +955,12 @@ export function isKaggleExecutionCompletedGoldState(state) {
   if (!COMPLETED_MASTER_STATE_VERSIONS.includes(state?.masterStateVersion)) return false;
   // At the revisions this predicate froze (1.11.0 / 1.12.0) the readiness marker is pinned
   // exactly. Later revisions legitimately advanced it — 1.13.0 is DEC-0032 (authorization),
-  // 1.14.0 is DEC-0033 (the infrastructure blocker) — and those are accepted through their
+  // 1.14.0 is DEC-0033 (the infrastructure blocker), 1.15.0 is DEC-0034/DEC-0035 (the launch,
+  // its pre-inference failure and the repaired relaunch) — and those are accepted through their
   // own predicates, which each re-run this core underneath. Listing them here keeps the
   // "current tip is an accepted completed execution" contract true without weakening it:
   // every post-1.12.0 revision still has to pass `acceptsCompletedExecutionCore` verbatim.
-  const ADVANCED_READINESS_VERSIONS = ["1.13.0", "1.14.0"];
+  const ADVANCED_READINESS_VERSIONS = ["1.13.0", "1.14.0", "1.15.0"];
   if (!ADVANCED_READINESS_VERSIONS.includes(state?.masterStateVersion) &&
       (state?.training?.authorization?.status !== COMPLETED_READINESS ||
         state?.experiments?.["GHARIBO-exp-001"]?.readinessStatus !== COMPLETED_READINESS)) {
@@ -1076,7 +1077,15 @@ export function isEvaluationAuthorizedGoldState(state) {
  * edits the state to look like "we measured". An infrastructure blocker is not a score, and
  * the one thing it must never become is a null dressed up as a zero.
  */
-export function isEvaluationInfrastructureBlockedGoldState(state) {
+export function isEvaluationInfrastructureBlockedGoldState(
+  state,
+  {
+    expectedBlockerStatus = "OPEN",
+    expectedTestInferenceOccurred = false,
+    expectedPostAttemptStatus = EVALUATION_AUTHORIZED_READINESS,
+    expectedAuthorizationConsumed = false,
+  } = {},
+) {
   const training = state?.training;
   const evalAuthorization = training?.evaluationAuthorization;
   const experiment = state?.experiments?.["GHARIBO-exp-001"];
@@ -1100,16 +1109,22 @@ export function isEvaluationInfrastructureBlockedGoldState(state) {
   }
 
   // No measurement happened, and the state has to say so in machine-readable form.
+  //
+  // The four "advanced" fields below accept an override for the same reason `expectedBlockerStatus`
+  // does: a later predicate that legitimately moves them (by LAUNCHING, without measuring) must be
+  // able to re-run this predicate underneath without loosening it. Each override keeps exactly the
+  // same strictness — the value must EQUAL what the caller declares — so omitting an override can
+  // never disable a check, and declaring the wrong value still fails. What the override cannot do
+  // is relax the invariant that actually matters here: no metric value was produced.
   if (evalAuthorization.executionAttempted !== true) return false;
   if (evalAuthorization.executionSucceeded !== false) return false;
-  if (evalAuthorization.testInferenceOccurred !== false) return false;
+  if (evalAuthorization.testInferenceOccurred !== expectedTestInferenceOccurred) return false;
   if (evalAuthorization.testRecordsParsed !== 0) return false;
   if (evalAuthorization.metricValuesProduced !== 0) return false;
-  if (evalAuthorization.evaluationStatusAfterExecutionAttempt !==
-      EVALUATION_AUTHORIZED_READINESS) {
+  if (evalAuthorization.evaluationStatusAfterExecutionAttempt !== expectedPostAttemptStatus) {
     return false;
   }
-  if (evalAuthorization.authorizationConsumed !== false) return false;
+  if (evalAuthorization.authorizationConsumed !== expectedAuthorizationConsumed) return false;
 
   // Evaluation must still not have moved.
   if (training?.evaluationResults !== 0) return false;
@@ -1117,8 +1132,14 @@ export function isEvaluationInfrastructureBlockedGoldState(state) {
   if (experiment?.promotable !== false) return false;
 
   // The blocker must be recorded, OPEN, and attributable to this decision.
+  //
+  // `expectedBlockerStatus` exists so that later predicates which legitimately CLOSE this blocker
+  // can still re-run this predicate underneath without having to loosen the assertion. The default
+  // is "OPEN", so every existing caller keeps the original, strict behaviour; only a caller that
+  // explicitly re-states the blocker's closed state passes anything else. Allowing the status to be
+  // *omitted* would turn the check into a no-op, so it is a required-for-equality comparison.
   const blocker = (state?.blockers || []).find((b) => b?.id === "BLK-0004");
-  if (!blocker || blocker.status !== "OPEN") return false;
+  if (!blocker || blocker.status !== expectedBlockerStatus) return false;
 
   // GHARIBO-V0.1 must still not exist.
   const v01 = (state?.models?.derivedModels || []).find((m) => m?.id === "GHARIBO-V0.1");
@@ -1155,6 +1176,177 @@ export function isEvaluationInfrastructureBlockedGoldState(state) {
 }
 
 /**
+ * DEC-0034 / DEC-0035 record the LAUNCH of the authorized benchmark, its PRE-INFERENCE failure,
+ * and the repaired RELAUNCH. The kernel is in flight; no score exists.
+ *
+ * This is the most dangerous state the predicate layer has had to handle, because it is the first
+ * in which TEST inference may ALREADY be happening. Two opposite failure modes have to be blocked
+ * at once:
+ *
+ *   (a) ROUNDING UP. A launch is not a result. The state must not carry a single M1-M13 value,
+ *       `evaluationResults` must stay 0, evaluation must stay NOT_RUN, and the model must stay
+ *       unpromoted. If someone later writes a score into this state without a real
+ *       metric-producing execution, this predicate fails.
+ *
+ *   (b) ROUNDING DOWN. The first launch genuinely FAILED, and that failure is a fact of the
+ *       record — not a gap to be quietly overwritten by the successful relaunch. The predicate
+ *       therefore requires the failure to still be stated, together with the machine-checkable
+ *       claim that it occurred BEFORE any inference, which is exactly what makes the relaunch a
+ *       RESTART of the same execution rather than a second (unauthorized) one.
+ *
+ * It also requires the forward-looking guarantee that closes the loop: no further attempt is
+ * authorized, and any further attempt requires a new human decision. Without that, "one
+ * execution" is a slogan rather than a constraint.
+ *
+ * LAYERING NOTE. This sits on `isEvaluationInfrastructureBlockedGoldState`, which asserts
+ * BLK-0004 is OPEN — correct for the DEC-0033 tip it was written for, and false at this tip,
+ * where the blocker is legitimately CLOSED. The predicate therefore passes the expected status
+ * through explicitly and reconstructs the OPEN state before re-running the layer beneath. Passing
+ * the status explicitly, rather than dropping the assertion, keeps the check strict: an omitted
+ * status would silently disable it.
+ */
+export function isEvaluationBenchmarkLaunchedGoldState(state) {
+  const training = state?.training;
+  const evalAuthorization = training?.evaluationAuthorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+
+  // The DEC-0033 blocker record must still hold underneath, with the launch-layer values
+  // passed through explicitly rather than by weakening the assertions in the layer below.
+  const launchLayerAccepted = isEvaluationInfrastructureBlockedGoldState(state, {
+    expectedBlockerStatus: "CLOSED",
+    expectedTestInferenceOccurred: "POSSIBLY_IN_FLIGHT",
+    // NOTE: `evaluationStatusAfterExecutionAttempt` is deliberately NOT overridden. The DEC-0033
+    // value (`EVALUATION_AUTHORIZED_READINESS`) still holds at this tip — it describes the state
+    // after the failed attempt, which the launch did not change — so the layer below must keep
+    // asserting it verbatim.
+    expectedAuthorizationConsumed: true,
+  });
+  if (!launchLayerAccepted) return false;
+
+  if (!evalAuthorization) return false;
+
+  // ------------------------------------------------ the launch (DEC-0034)
+  if (evalAuthorization.launchDecisionId !== "DEC-0034" ||
+      evalAuthorization.launchRecord !==
+        "governance/DEC-0034-evaluation-benchmark-launch.json") {
+    return false;
+  }
+  if (typeof evalAuthorization.launchHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(evalAuthorization.launchHash)) {
+    return false;
+  }
+
+  // (b) ROUNDING DOWN: the failure must still be stated, and stated as pre-inference.
+  if (evalAuthorization.launchOutcome !== "FAILED_PRE_INFERENCE") return false;
+  if (evalAuthorization.launchFailureClass !== "HARNESS_DEFECT_NO_EXECUTION") return false;
+  if (evalAuthorization.launchFailurePhase !== "CELL_1_PIN_LOADING") return false;
+  if (evalAuthorization.launchFailureTestInferenceOccurred !== false) return false;
+
+  // ------------------------------------------------ the relaunch (DEC-0035)
+  if (evalAuthorization.relaunchDecisionId !== "DEC-0035" ||
+      evalAuthorization.relaunchRecord !==
+        "governance/DEC-0035-evaluation-kernel-relaunch.json") {
+    return false;
+  }
+  if (typeof evalAuthorization.relaunchHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(evalAuthorization.relaunchHash)) {
+    return false;
+  }
+  if (evalAuthorization.activeKernelId !== "vokaigharibo/gharibo-eval-001-fec22ca2") return false;
+  if (evalAuthorization.payloadBasis !== "PROMPTS_ONLY") return false;
+  if (evalAuthorization.datasetVisibility !== "PRIVATE") return false;
+
+  // The one permitted execution is committed and may not be quietly re-used.
+  if (evalAuthorization.authorizationConsumed !== true) return false;
+  if (evalAuthorization.furtherAttemptAuthorized !== false) return false;
+  if (evalAuthorization.furtherAttemptRequiresNewDecision !== true) return false;
+
+  // (a) ROUNDING UP: nothing may have been scored, and the run must be in flight, not finished.
+  if (evalAuthorization.evaluationStatusAfterLaunch !== "EVALUATION_BENCHMARK_IN_FLIGHT") {
+    return false;
+  }
+  if (evalAuthorization.testInferenceOccurred !== "POSSIBLY_IN_FLIGHT") return false;
+  if (evalAuthorization.testRecordsParsedLocally !== 0) return false;
+  if (evalAuthorization.metricValuesProduced !== 0) return false;
+  if (evalAuthorization.executionSucceeded !== false) return false;
+
+  // Evaluation must still not have moved.
+  if (training?.evaluationResults !== 0) return false;
+  if (experiment?.evaluationStatus !== "NOT_RUN") return false;
+  if (experiment?.promotable !== false) return false;
+
+  // GHARIBO-V0.1 must still not exist, even though a launch has now occurred.
+  const v01 = (state?.models?.derivedModels || []).find((m) => m?.id === "GHARIBO-V0.1");
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  // Both decisions must be present exactly once and neither may have been superseded.
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  for (const id of ["DEC-0034", "DEC-0035"]) {
+    const found = decisions.filter((d) => d?.id === id);
+    if (found.length !== 1 ||
+        found[0].status !== "ACCEPTED" ||
+        found[0].supersedes !== null ||
+        found[0].supersededBy !== null) {
+      return false;
+    }
+  }
+
+  // BLK-0004 must be CLOSED, and closed through these decisions.
+  const blocker = (state?.blockers || []).find((b) => b?.id === "BLK-0004");
+  if (!blocker || blocker.status !== "CLOSED") return false;
+  if (!Array.isArray(blocker.closedBy) || !blocker.closedBy.includes("DEC-0035")) return false;
+
+  // Rebuild the DEC-0033-only tip and require the previous predicate to still accept it
+  // with its own OPEN expectation intact.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.14.0";
+  const ea = before.training.evaluationAuthorization;
+  for (const key of [
+    "launchDecisionId",
+    "launchHash",
+    "launchRecord",
+    "launchOutcome",
+    "launchFailureClass",
+    "launchFailurePhase",
+    "launchFailureTestInferenceOccurred",
+    "launchFailureEvidence",
+    "relaunchDecisionId",
+    "relaunchHash",
+    "relaunchRecord",
+    "repairCommit",
+    "activeKernelId",
+    "activeKernelVersion",
+    "activeKernelStatusAtRecordTime",
+    "supersededKernelId",
+    "supersededKernelFailureClass",
+    "payloadBasis",
+    "datasetId",
+    "datasetVisibility",
+    "evaluationStatusAfterLaunch",
+    "authorizationConsumedMeaning",
+    "furtherAttemptAuthorized",
+    "furtherAttemptRequiresNewDecision",
+    "furtherAttemptRequiresNewDecisionReason",
+  ]) {
+    delete ea[key];
+  }
+  // Restore the DEC-0033 shape of the fields that advanced.
+  ea.testInferenceOccurred = false;
+  ea.testRecordsParsed = 0;
+  ea.authorizationConsumed = false;
+  ea.evaluationStatusAfterExecutionAttempt = EVALUATION_AUTHORIZED_READINESS;
+  const blk4 = before.blockers.find((b) => b?.id === "BLK-0004");
+  if (blk4) {
+    blk4.status = "OPEN";
+    delete blk4.closedBy;
+  }
+  before.decisions = before.decisions.filter((d) => !["DEC-0034", "DEC-0035"].includes(d?.id));
+  // Re-run the DEC-0033 layer with its OWN original expectations, so the launch layer cannot be
+  // satisfied by a state in which the DEC-0033 record itself has been tampered with.
+  return isEvaluationInfrastructureBlockedGoldState(before);
+}
+
+/**
  * Reconstructs the DEC-0029 launch checkpoint exactly as it stood BEFORE DEC-0030
  * accepted the completed execution. DEC-0029 stays an ACCEPTED decision: DEC-0030
  * accepts its outcome rather than replacing its authority.
@@ -1188,6 +1380,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isKaggleLaunchReauthorizedGoldState(state) ||
     isEvaluationAuthorizedGoldState(state) ||
     isEvaluationInfrastructureBlockedGoldState(state) ||
+    isEvaluationBenchmarkLaunchedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

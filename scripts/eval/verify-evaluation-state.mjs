@@ -229,6 +229,65 @@ if (infraBlocker && infraBlocker.status === "OPEN") {
     infraBlocker?.status === "CLOSED",
     `BLK-0004 status=${JSON.stringify(infraBlocker?.status)}`,
   );
+} else if (infraBlocker && infraBlocker.status === "CLOSED") {
+  // The third legitimate case: the blocker is CLOSED by a LAUNCH, but no result exists yet
+  // because the run is still in flight. This is the state the DEC-0034/DEC-0035 checkpoint
+  // introduced, and it is the one that most invites a fabricated score — a closed blocker looks
+  // like progress, and "the run is finished, here is the number" is the natural next line to
+  // write. So this branch is deliberately the STRICTEST of the three: closing the blocker
+  // without a result is only coherent while nothing has been measured, and the state must carry
+  // the machine-readable promise that a further attempt needs a new human decision.
+  check(
+    "BLK-0004 CLOSED without results implies the run is still in flight",
+    evalAuth.evaluationStatusAfterLaunch === "EVALUATION_BENCHMARK_IN_FLIGHT",
+    `evaluationStatusAfterLaunch=${JSON.stringify(evalAuth.evaluationStatusAfterLaunch)}`,
+  );
+  check(
+    "BLK-0004 CLOSED without results implies no metric value was produced",
+    evalAuth.metricValuesProduced === 0,
+    `metricValuesProduced=${JSON.stringify(evalAuth.metricValuesProduced)}`,
+  );
+  check(
+    "BLK-0004 CLOSED without results implies nothing was parsed locally",
+    evalAuth.testRecordsParsedLocally === 0,
+    `testRecordsParsedLocally=${JSON.stringify(evalAuth.testRecordsParsedLocally)}`,
+  );
+  check(
+    "BLK-0004 CLOSED without results implies executionSucceeded === false",
+    evalAuth.executionSucceeded === false,
+    `executionSucceeded=${JSON.stringify(evalAuth.executionSucceeded)}`,
+  );
+  check(
+    "BLK-0004 CLOSED by the launch decisions, not annotatively",
+    Array.isArray(infraBlocker.closedBy) && infraBlocker.closedBy.includes("DEC-0035"),
+    `closedBy=${JSON.stringify(infraBlocker.closedBy)}`,
+  );
+  check(
+    "the launch records its PRE-INFERENCE failure rather than dropping it",
+    evalAuth.launchOutcome === "FAILED_PRE_INFERENCE" &&
+      evalAuth.launchFailureTestInferenceOccurred === false,
+    `launchOutcome=${JSON.stringify(evalAuth.launchOutcome)}`,
+  );
+  check(
+    "the authorization is consumed exactly once and no further attempt is authorized",
+    evalAuth.authorizationConsumed === true &&
+      evalAuth.furtherAttemptAuthorized === false &&
+      evalAuth.furtherAttemptRequiresNewDecision === true,
+    `consumed=${JSON.stringify(evalAuth.authorizationConsumed)} further=${JSON.stringify(evalAuth.furtherAttemptAuthorized)}`,
+  );
+  check(
+    "DEC-0034 and DEC-0035 are both ACCEPTED and unsuperseded",
+    ["DEC-0034", "DEC-0035"].every((id) => {
+      const d = decisions.filter((x) => x?.id === id);
+      return (
+        d.length === 1 &&
+        d[0].status === "ACCEPTED" &&
+        d[0].supersedes === null &&
+        d[0].supersededBy === null
+      );
+    }),
+    "DEC-0034/DEC-0035 status/supersession",
+  );
 } else {
   check("BLK-0004 state is coherent", false, "BLK-0004 missing while evaluationResults is 0");
 }

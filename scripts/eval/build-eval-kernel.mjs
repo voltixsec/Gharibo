@@ -153,8 +153,168 @@ export const FORBIDDEN_TOKENS = Object.freeze([
 const md = (lines) => lines.join("\n");
 const code = (lines) => lines.join("\n");
 
+/**
+ * The canonical JSON encoding of the pins, embedded into the notebook as a STRING.
+ *
+ * Canonical means: object keys sorted RECURSIVELY at every level. This is deliberately NOT
+ * `JSON.stringify(p, Object.keys(p).sort(), 4)` — an array passed as the second argument is a
+ * property ALLOW-LIST that is applied at every nesting level, so it silently shreds nested
+ * objects into `{}`. That failure mode is the same species as the one this function exists to
+ * prevent: a shape that looks right and is quietly empty.
+ */
+function canonicalJson(value, indent = 4) {
+  const sortDeep = (v) => {
+    if (Array.isArray(v)) return v.map(sortDeep);
+    if (v && typeof v === "object") {
+      const out = {};
+      for (const k of Object.keys(v).sort()) out[k] = sortDeep(v[k]);
+      return out;
+    }
+    return v;
+  };
+  return JSON.stringify(sortDeep(value), null, indent);
+}
+
+/** Re-encoding a decoded pin object must reproduce the injected text byte-for-byte. */
+function pinsJsonText(pins) {
+  return canonicalJson(pins);
+}
+
+/**
+ * Guard the ORIGINAL defect: a JSON `true`/`false`/`null` emitted into Python SOURCE position,
+ * where Python has no such names and raises NameError.
+ *
+ * The scan must NOT look at the whole JSON text, because the sanctioned design embeds that text
+ * inside a quoted string, where those literals are inert data. So the check is deliberately
+ * narrow: it fails only if the emitted text appears as Python code with an UNQUOTED JSON literal.
+ *
+ * A line is treated as "quoted" when it sits inside a triple-quoted block or contains an odd
+ * number of the quote character to its left. That is enough to distinguish the embedded payload
+ * from a literal assignment, which is the only distinction that matters here.
+ */
+export function containsJsonOnlyLiterals(pythonSource) {
+  const literal = /(^|[\s:,{\[])(true|false|null)([\s,}\]\n]|$)/;
+  let inTriple = false;
+  for (const line of pythonSource.split("\n")) {
+    const stripped = line.trim();
+    if (stripped.startsWith("#")) continue; // comment, never executed
+    const triples = line.match(/'''|"""/g);
+    if (inTriple) {
+      if (triples && triples.length % 2 === 1) inTriple = false;
+      continue; // inside a quoted payload: literals are data, not code
+    }
+    if (triples && triples.length % 2 === 1) {
+      inTriple = true;
+      continue;
+    }
+    // Strip quoted string contents, then look for a bare JSON-only literal in code position.
+    const codeOnly = line.replace(/'''[\s\S]*?'''|"""[\s\S]*?"""|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, '""');
+    if (literal.test(codeOnly)) return true;
+  }
+  return false;
+}
+
+/** The emitted pins cell only, for the guard above and for the checker. */
+export function pinsCellSource() {
+  return pinsCell(EVAL_PINS);
+}
+
+/**
+ * True if any nested object was emptied. Catches the `Object.keys(...).sort()` allow-list
+ * mistake, which produces well-formed JSON with silently missing data.
+ */
+function hasEmptyObject(value) {
+  if (Array.isArray(value)) return value.some(hasEmptyObject);
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value);
+    if (keys.length === 0) return true;
+    return keys.some((k) => hasEmptyObject(value[k]));
+  }
+  return false;
+}
+
+/**
+ * The governed-pins cell, in isolation. Extracted so the build-time guards and the checker can
+ * inspect exactly this cell without re-entering `cells()`.
+ */
+export function pinsCell(p) {
+  const pinsJson = pinsJsonText(p);
+  return code([
+    "# --- governed pins (injected by the generator; do not hand-edit) ---",
+    "# The pins arrive as an EMBEDDED JSON STRING and are decoded with json.loads().",
+    "# They are deliberately NOT emitted as Python literals: JSON and Python disagree on",
+    "# true/false/null, and a JSON-literal emission (PINS = {...\"doSample\": false...}) is a",
+    "# NameError in Python that kills the notebook in cell 1, before any inference. Round-",
+    "# tripping through a string makes this artifact structurally immune to that class of",
+    "# defect, and the round-trip is asserted below rather than assumed.",
+    `_PINS_JSON = r'''${pinsJson}'''`,
+    "",
+    "import hashlib, json, os, sys, time",
+    "",
+    "PINS = json.loads(_PINS_JSON)",
+    "",
+    "# The pins must survive the round-trip EXACTLY. A silent coercion here would change the",
+    "# measurement contract, so the decoded object is compared against a re-encoding of itself",
+    "# and against the injected source text.",
+    "assert json.loads(json.dumps(PINS, sort_keys=True)) == PINS, 'pin round-trip is not stable'",
+    "assert _PINS_JSON == json.dumps(json.loads(_PINS_JSON), indent=4, sort_keys=True, ensure_ascii=False), \\",
+    "    'injected pin text is not canonical'",
+    "",
+    "# Decoding pins are the measurement contract (RESEARCH_BENCHMARK.md 7.1). JSON has no",
+    "# int/float distinction, so the round-trip through JSON degrades a JSON `0.0` to a Python",
+    "# `int`. The declared TYPES are therefore restored explicitly below and then asserted - a",
+    "# truthiness check or an `==` check would both silently accept the degraded value.",
+    "PINS['temperature'] = float(PINS['temperature'])",
+    "PINS['topP'] = float(PINS['topP'])",
+    "",
+    "# The declared contract, as a single table so a mismatch names itself.",
+    "_DECODING_CONTRACT = {",
+    "    'temperature': (0.0, float),",
+    "    'topP': (1.0, float),",
+    "    'topK': (0, int),",
+    "    'maxNewTokens': (1024, int),",
+    "    'seed': (0, int),",
+    "    'repeats': (1, int),",
+    "}",
+    "for _k, (_want, _type) in _DECODING_CONTRACT.items():",
+    "    _got = PINS[_k]",
+    "    assert type(_got) is _type, f'decoding pin {_k} has type {type(_got).__name__}, expected {_type.__name__}'",
+    "    assert _got == _want, f'decoding pin {_k} is {_got!r}, expected {_want!r}'",
+    "assert PINS['doSample'] is False, 'doSample must be the boolean False'",
+    "",
+    "# A stripped nested object would make the install stage iterate over nothing.",
+    "assert all(isinstance(d, dict) and d.get('name') and d.get('spec') for d in PINS['engineDependencies']), \\",
+    "    'engineDependencies must carry name+spec; an empty entry means the pin set was shredded'",
+    "assert len(PINS['engineDependencies']) == 9, 'engineDependencies must carry all 9 frozen specs'",
+    "",
+    "assert PINS['authorizationDecisionId'] == 'DEC-0032', 'unexpected authorization'",
+    "assert PINS['decision'] == 'AUTHORIZED WITH LIMITS', 'unexpected decision scope'",
+    "",
+    "print('authorization :', PINS['authorizationDecisionId'], '-', PINS['decision'])",
+    "print('TEST split    :', PINS['testSplitHash'])",
+    "print('records       :', PINS['testRecordCount'])",
+  ]);
+}
+
 function cells() {
   const p = EVAL_PINS;
+  const pinsJson = pinsJsonText(p);
+  // Fail the BUILD, not the run. An emptied nested object or a Python-incompatible literal here
+  // would otherwise only surface minutes into a GPU execution, or worse, silently.
+  if (hasEmptyObject(p)) {
+    throw new Error(
+      "EVAL_PINS contains an empty nested object; refusing to emit a silently incomplete pin set.",
+    );
+  }
+  if (containsJsonOnlyLiterals(pinsCell(p))) {
+    throw new Error(
+      "the emitted pins cell contains an unquoted JSON-only literal (true/false/null); " +
+        "refusing to emit Python source that would raise NameError.",
+    );
+  }
+  if (pinsJsonText(JSON.parse(pinsJson)) !== pinsJson) {
+    throw new Error("EVAL_PINS does not survive a canonical JSON round-trip; refusing to emit.");
+  }
   return [
     {
       cell_type: "markdown",
@@ -182,19 +342,7 @@ function cells() {
       metadata: {},
       execution_count: null,
       outputs: [],
-      source: code([
-        "# --- governed pins (injected by the generator; do not hand-edit) ---",
-        `PINS = ${JSON.stringify(p, null, 4)}`,
-        "",
-        "import hashlib, json, os, sys, time",
-        "",
-        "assert PINS['authorizationDecisionId'] == 'DEC-0032', 'unexpected authorization'",
-        "assert PINS['decision'] == 'AUTHORIZED WITH LIMITS', 'unexpected decision scope'",
-        "",
-        "print('authorization :', PINS['authorizationDecisionId'], '-', PINS['decision'])",
-        "print('TEST split    :', PINS['testSplitHash'])",
-        "print('records       :', PINS['testRecordCount'])",
-      ]),
+      source: pinsCell(p),
     },
     {
       cell_type: "code",
@@ -233,6 +381,43 @@ function cells() {
         "",
         "print(json.dumps(ENV, indent=2))",
         "assert ENV.get('cuda_available'), 'this evaluation requires a GPU'",
+      ]),
+    },
+    {
+      cell_type: "code",
+      metadata: {},
+      execution_count: null,
+      outputs: [],
+      source: code([
+        "# --- enforce the pinned BASE revision against the LIVE base repo ---",
+        "#",
+        "# The loader call deliberately does NOT take a revision (see the BASE-load cell: passing one",
+        "# to the Unsloth distribution id makes the load fail). That makes this cell LOAD-BEARING:",
+        "# without it, nothing in this notebook would tie the measured base to the accepted revision,",
+        "# and the arm could silently evaluate a different snapshot of the base model.",
+        "#",
+        "# The revision is resolved from the REAL base repo (`openai/gpt-oss-20b`), never guessed and",
+        "# never taken from a cached value, and a mismatch aborts the run.",
+        "from huggingface_hub import HfApi",
+        "",
+        "def resolve_base_revision(repo_id):",
+        "    info = HfApi().model_info(repo_id=repo_id)",
+        "    sha = getattr(info, 'sha', None)",
+        "    if not isinstance(sha, str) or len(sha) != 40:",
+        "        raise RuntimeError(f'huggingface_hub reported no 40-hex revision for {repo_id!r}: {sha!r}')",
+        "    return sha",
+        "",
+        "ENV['base_repo'] = PINS['baseModel']",
+        "BASE_MODEL_REVISION = resolve_base_revision(PINS['baseModel'])",
+        "ENV['base_model_revision_resolved'] = BASE_MODEL_REVISION",
+        "print('base repo            :', PINS['baseModel'])",
+        "print('base revision (live) :', BASE_MODEL_REVISION)",
+        "print('base revision (pinned):', PINS['baseModelRevision'])",
+        "assert BASE_MODEL_REVISION == PINS['baseModelRevision'], (",
+        "    f\"REFUSING TO RUN: base revision drifted. pinned {PINS['baseModelRevision']}, \"",
+        "    f\"live {BASE_MODEL_REVISION}\"",
+        ")",
+        "print('base revision pin    : ENFORCED against the live repo')",
       ]),
     },
     {
@@ -425,19 +610,45 @@ function cells() {
       execution_count: null,
       outputs: [],
       source: code([
-        "# --- load BASE, unadapted, at the PINNED revision ---",
+        "# --- load BASE, unadapted ---",
+        "#",
+        "# DEFECT 4 (the observed DEC-0035 relaunch failure) was here: this call used to pass",
+        "#   revision=PINS['baseModelRevision']",
+        "# to the Unsloth loader. `unsloth/gpt-oss-20b` is a DISTRIBUTION repo id that Unsloth",
+        "# resolves internally, and no revision for the underlying base repo exists on it. Unsloth",
+        "# therefore WARNED that it was ignoring the revision, substituted",
+        "# `unsloth/gpt-oss-20b-unsloth-bnb-4bit`, and then failed because that repo does not exist:",
+        "#",
+        "#   RuntimeError: Unsloth: Failed to load model. Both AutoConfig and PeftConfig loading failed.",
+        "#",
+        "# The accepted qualification and the GHARIBO-exp-001 training notebook both load with",
+        "# `model_name=LOADER_MODEL` and NO revision argument. That is the governed convention, and it",
+        "# is what this cell now reproduces.",
+        "#",
+        "# The pinned base revision is NOT dropped: it is asserted against the LIVE revision of the",
+        "# real base repo (`openai/gpt-oss-20b`) in the identity cell, which is where a revision pin",
+        "# can actually be enforced. Passing it to the loader enforced nothing and broke the load.",
         "from unsloth import FastLanguageModel",
         "import torch",
         "",
         "base_model, base_tok = FastLanguageModel.from_pretrained(",
         "    model_name=PINS['loaderModelId'],",
-        "    revision=PINS['baseModelRevision'],",
         "    max_seq_length=PINS['maxSeqLength'],",
         "    dtype=None,",
         "    load_in_4bit=True,",
         ")",
         "FastLanguageModel.for_inference(base_model)",
         "base_model.eval()",
+        "",
+        "# The loader must not have silently substituted a different repo. If Unsloth resolves the",
+        "# distribution id to something other than itself, the arm is no longer loading the accepted",
+        "# base, and the measurement would be of a different model. Fail loudly instead.",
+        "LOADER_NAME = getattr(getattr(base_model, 'config', None), '_name_or_path', None)",
+        "print('base loaded from :', LOADER_NAME)",
+        "assert LOADER_NAME is not None, 'REFUSING TO RUN: could not read the loaded model identity'",
+        "assert 'gpt-oss-20b' in str(LOADER_NAME), (",
+        "    f'REFUSING TO RUN: loader resolved to {LOADER_NAME!r}, which is not the accepted base'",
+        ")",
         "",
         "# A training-capable model must never be reachable in this notebook.",
         "GRADIENT_ENABLED_BASE = any(p.requires_grad for p in base_model.parameters())",
@@ -660,6 +871,8 @@ export function buildNotebook() {
     nbformat_minor: 5,
   };
 }
+
+export { pinsJsonText, hasEmptyObject, canonicalJson };
 
 export function render() {
   return JSON.stringify(buildNotebook(), null, 1) + "\n";

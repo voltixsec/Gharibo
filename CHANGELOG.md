@@ -5,7 +5,7 @@
 | **Document Owner** | Delivery (GHARIBO AI LAB) |
 | **Type** | Delivery note |
 | **Status** | Living |
-| **Version** | 1.3.0 |
+| **Version** | 1.5.0 |
 | **Last Updated** | 2026-09-16 |
 
 All notable changes to GHARIBO AI LAB are recorded here.
@@ -381,6 +381,116 @@ downloaded.
   allowance; GitHub holds source and docs only.
 - **No fabrication.** No datasets, benchmarks, or metrics have been invented. Milestone 2 builds
   the pipeline and stops before execution by design.
+
+---
+
+## [Unreleased] — Held-out TEST benchmark launched (two pre-inference failures, repaired)
+
+**Status: the authorized benchmark has been LAUNCHED TWICE. Both attempts FAILED pre-inference and
+are recorded as failures. No result exists — every M1–M13 value remains `null`, and two launches
+plus four repaired defect classes have produced ZERO metric values.**
+
+#### Added
+
+- `governance/DEC-0034-evaluation-benchmark-launch.json` + `scripts/eval/build-dec0034-launch.mjs`
+  — the launch record, with `--check` drift mode. Records the kernel, dataset, payload hashes and the
+  **failure**: `launchOutcome = FAILED_PRE_INFERENCE`,
+  `failureClass = HARNESS_DEFECT_NO_EXECUTION`, `failurePhase = CELL_1_PIN_LOADING`,
+  `failureMessage = "name 'false' is not defined"`.
+- `governance/DEC-0035-evaluation-kernel-relaunch.json` + `scripts/eval/build-dec0035-relaunch.mjs`
+  — the repaired relaunch. Records all **four** defect classes, the gate hardening, the relaunch's
+  **own pre-inference failure**, a 6-entry pre-flight control table, and the binding forward
+  guarantee: `furtherAttemptAuthorized = false`,
+  `afterThisPoint = NO_FURTHER_RELAUNCH_WITHOUT_A_NEW_HUMAN_DECISION`. Notebook and bundle hashes
+  are read from the committed artifacts at generation time, so the record cannot quote an artifact
+  it does not match.
+- `scripts/eval/verify-eval-kernel-runtime.py` — **22 checks**. Compiles every code cell and
+  **executes the pins cell with its asserts live**. This is the layer that was missing: all 41
+  pre-existing static checks passed on the notebook that crashed, because each inspected the pins
+  object *in Node* rather than the Python actually emitted. Scope is limited to the pre-inference
+  surface, and the file says so rather than implying full coverage.
+- `scripts/eval/verify-eval-failure-evidence.py` — **4 checks** (replaces the misnamed
+  `build-dec0035-failure-evidence.py`). **Derives** the `testInferenceOccurred = false` conclusion
+  from the raw Kaggle log instead of asserting it, and flips to `true` if any inference marker is
+  present. It separates **inference** markers (`torch.inference_mode`, `.generate(`,
+  `predictions-*.jsonl`) from **stage** markers (`Stage 1`, `uv pip install`), because treating an
+  installer log line as inference evidence is exactly how an unspent authorization gets declared
+  spent. Run against both failure logs.
+- `scripts/eval/prepare-eval-launch.mjs` — the governed launch-bundle builder (prompts-only
+  projection, `--check` mode, stray answer-file removal).
+
+#### Fixed
+
+- **`NameError` in cell 1 (the observed launch failure).** The generator emitted the governed pins
+  as a **raw JSON literal** into Python source. JSON and Python disagree on `true`/`false`/`null`,
+  so `PINS = {... "doSample": false ...}` raised `NameError` before the install stage and before any
+  model was loaded. Pins are now injected as an embedded JSON string and decoded with `json.loads()`.
+- **Silent data loss in the canonical encoder.** `JSON.stringify(p, Object.keys(p).sort(), 4)` passes
+  an array as the *replacer* argument, which is a property **allow-list applied at every nesting
+  level** — it shredded `engineDependencies` into nine `{}` objects. Replaced with a recursive
+  key-sorting serializer; `hasEmptyObject()` now fails the build.
+- **Silent contract degradation in the float pins.** JSON has no `int`/`float` distinction, so the
+  round-trip turned `temperature: 0.0` into Python `int 0`. The declared types are now restored
+  explicitly and asserted with `type(x) is float` rather than a truthiness or `==` check.
+- **`RuntimeError` in cell 5 (the observed relaunch failure).** The pinned base revision was passed
+  as `revision=` to Unsloth's **distribution** repo id `unsloth/gpt-oss-20b`, which resolves
+  internally to `unsloth/gpt-oss-20b-unsloth-bnb-4bit`. The revision does not exist on that
+  substitute, so Unsloth warned that it was *ignoring* the pin, substituted the repo, and the load
+  died with `Both AutoConfig and PeftConfig loading failed`. The argument was **removed** — matching
+  the e2e-qualified convention in `scripts/qualify/qualify-kaggle-env.mjs` — and, because a pin that
+  is recorded but never compared to anything is decoration, a dedicated cell now resolves the
+  declared revision against the **live** base repository via `HfApi().model_info` and asserts
+  equality before any model loads. This defect was found because a deliberately weakened check was
+  caught satisfying itself on an unrelated line of source.
+
+#### Changed
+
+- `scripts/eval/check-eval-kernel.mjs` — **41 → 53 checks**. Twelve new checks cover the pin-encoding
+  defect class end to end, including the empty-nested-object and round-trip guards, and assert that
+  the loader call passes **no** `revision` argument while the pinned base revision is enforced
+  against the live base repository.
+- `governance/GHARIBO_MASTER_STATE.json` — master state `1.14.0 → 1.15.0`. 35 decisions. `BLK-0004`
+  is **CLOSED** by `DEC-0033` + `DEC-0034` + `DEC-0035`. `authorizationConsumed` is now `true` with
+  `furtherAttemptAuthorized: false`. `training.status` remains `COMPLETED`.
+- `apps/web/lib/training/gold-authorization.mjs` — added
+  `isEvaluationBenchmarkLaunchedGoldState()`, which re-runs the DEC-0033 layer **with explicit
+  override values** for the fields the launch legitimately advanced (`expectedBlockerStatus:
+  "CLOSED"`, `expectedTestInferenceOccurred: "POSSIBLY_IN_FLIGHT"`, `expectedAuthorizationConsumed:
+  true`) instead of loosening the assertions below. The overrides keep full strictness: each value
+  must still equal what the caller declares, so an omitted override cannot disable a check. The
+  predicate blocks both failure modes at once — rounding a launch up into a result, and rounding the
+  failed attempt down into a gap.
+- `scripts/eval/verify-evaluation-state.mjs` — **30 → 31 checks**. A new third branch handles the
+  *closed-blocker-without-results* state, which is the one that most invites a fabricated score; it
+  requires `evaluationStatusAfterLaunch === "EVALUATION_BENCHMARK_IN_FLIGHT"`,
+  `metricValuesProduced === 0`, `testRecordsParsedLocally === 0`, `executionSucceeded === false`, and
+  the recorded pre-inference failure.
+- `docs/EVALUATION_BENCHMARK_LAUNCH.md` — v1.2.0. New §0 records **both** failures, all four
+  defects, the missing gate layer, the relaunch, the six pre-flight controls, and the escalation
+  rule. `docs/EVALUATION_EXECUTION_BLOCKER.md` — v1.3.0; `BLK-0004` is CLOSED, with the original
+  classification retained as history rather than overwritten.
+- `package.json` — `eval:audit:launch`, `eval:audit:relaunch`, `eval:kernel:runtime`,
+  `eval:launch:evidence`; `verify:eval` composes all of them.
+
+#### Notes
+
+- **A launch is not a result.** `evaluationResults` stays `0`, `evaluationStatus` stays `NOT_RUN`,
+  and every M1–M13 value stays `null` until prediction payloads are retrieved and scored locally.
+- **`GHARIBO-V0.1` remains `NOT_CREATED`. Nothing is promoted.**
+- **The failure is recorded, not smoothed over.** The first launch died in cell 1 with a `NameError`
+  and the relaunch died in cell 5 with a loader `RuntimeError`; both facts are part of the record,
+  the second inside the very record that produced it. Silently repairing and re-pushing would have
+  made a two-attempt path look like a one-attempt path.
+- **Two of the four defects were introduced by the fix for the one before.** That is the load-bearing
+  argument for a gate that **executes** the artifact rather than one that re-reads it.
+- **Escalation rule.** A **third** pre-inference failure must be escalated to the CEO rather than
+  repaired again. Repairs are bounded by the pre-inference test, not by a count — but repeated
+  harness failure is itself evidence about the plan.
+- **Every new gate was adversarially verified** by re-injecting the defect and observing a failure
+  before being trusted. A gate that has never been seen to fail has not been shown to be a gate.
+- **Repository safety.** No raw TEST record, inference transcript, weight, adapter binary, Kaggle
+  output binary, database, or secret is committed. Gold never left the scoring host; the uploaded
+  payload carries 80 model-visible prompts and no answers.
 
 ---
 

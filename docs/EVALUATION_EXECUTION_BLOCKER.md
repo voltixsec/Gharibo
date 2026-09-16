@@ -5,30 +5,65 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Approved |
-| **Version** | 1.1.0 |
+| **Version** | 1.3.0 |
 | **Last Updated** | 2026-09-16 |
 
-## 0. Update — 2026-09-16 (v1.1.0)
+## 0. Update — 2026-09-16 (v1.2.0): BLK-0004 is now CLOSED
 
-Two of the three code-side prerequisites listed in §7 have since been **completed**. The blocker
-itself is **unchanged and still OPEN**: the absence of a GPU execution environment is the remaining
-constraint, and it is not something a code change can resolve.
+**The blocker is resolved.** Both halves were addressed, and the authorized benchmark has been
+launched on the governed Kaggle T4 route.
+
+| §7 step | State | Evidence |
+|---|---|---|
+| 1. Repair the kernel generator | **DONE** | `scripts/eval/build-eval-kernel.mjs` — three-stage governed `uv` discipline and render-then-tokenize, plus four defects repaired |
+| 2. Generate the notebook | **DONE** | `scripts/eval/kaggle/gharibo-eval-001.ipynb` — 12 cells |
+| 3. Add the static safety gate | **DONE** | `scripts/eval/check-eval-kernel.mjs` — **53** checks |
+| 3b. Add a **runtime** gate | **DONE** | `scripts/eval/verify-eval-kernel-runtime.py` — **22** checks, executes the pins cell |
+| 4. Build the prompts-only bundle | **DONE** | 80 prompts, 19/19 privacy checks, no gold |
+| 5. Push dataset + kernel | **DONE ×2** | private dataset; kernel pushed twice, both attempts failed pre-inference |
+| 6–8 (download, score, register) | **PENDING** | neither push reached inference; no score exists |
+
+**The blocker was closed by a launch, not by a result — and that distinction is load-bearing.**
+The first launch failed pre-inference with a `NameError` in cell 1; it was diagnosed, repaired and
+relaunched; the relaunch failed pre-inference with a loader contract error in cell 5. Because no TEST
+inference occurred at any point, the single authorized execution survives intact. Full detail is in
+`docs/EVALUATION_BENCHMARK_LAUNCH.md` §0.
+
+> **The classification in §2 below remains historically accurate for the period it describes.** It
+> is retained as written, because the record of *why* the benchmark could not run is part of the
+> project history and is not improved by being overwritten.
+
+The 41- and 49-check figures quoted below were accurate when written; the static gate has since grown
+to **53** checks, and a runtime gate plus a failure-evidence verifier now exist that did not then.
+
+> **A third pre-inference failure must be escalated to the CEO rather than repaired again.** Repairs
+> are bounded by the pre-inference test, not by a count — but two repairs and four defect classes
+> without a single inference step is itself evidence about the plan.
+
+---
+
+## 0b. Original update — 2026-09-16 (v1.1.0)
+
+Two of the three code-side prerequisites listed in §7 had been **completed**, while the blocker
+itself remained **OPEN**: the absence of a GPU execution environment is the remaining constraint,
+and it is not something a code change can resolve.
 
 | §7 step | State | Evidence |
 |---|---|---|
 | 1. Repair the kernel generator | **DONE** | `scripts/eval/build-eval-kernel.mjs` — three-stage governed `uv` discipline and render-then-tokenize are now the only forms present |
-| 2. Generate the notebook | **DONE** | `scripts/eval/kaggle/gharibo-eval-001.ipynb` — 11 cells, `sha256 de3d396a…c4a4969` |
-| 3. Add the static safety gate | **DONE** | `scripts/eval/check-eval-kernel.mjs` — 41 checks, imports the shared `FORBIDDEN_TOKENS` |
+| 2. Generate the notebook | **DONE** | `scripts/eval/kaggle/gharibo-eval-001.ipynb` — 11 cells |
+| 3. Add the static safety gate | **DONE** | `scripts/eval/check-eval-kernel.mjs` — 41 checks at the time, imports the shared `FORBIDDEN_TOKENS` |
 | 4–8 (dataset, push, run, download, score, register) | **NOT DONE** | still blocked: no GPU execution environment |
 
 The repair was verified by **adversarial injection**, not by reading: re-introducing each original
 defect into the generated notebook made the checker fail with the expected diagnostic, and the
-clean notebook passes 41/41. A repair that cannot be observed to fail is not a repair.
+clean notebook passed 41/41. A repair that cannot be observed to fail is not a repair.
 
-Both gates are now composed into `npm run verify:eval`, which runs the 30 evaluation-honesty checks
-**and** the 41 kernel-safety checks. The blocker is not downgraded by this update: the
-`INFRASTRUCTURE_NO_EXECUTION_ENVIRONMENT` classification and the `PRE_INFERENCE` phase below remain
-exactly correct, `authorizationConsumed` remains `false`, and every M1–M13 value remains `null`.
+Both gates were composed into `npm run verify:eval`, running the 30 evaluation-honesty checks
+**and** the 41 kernel-safety checks. The blocker was not downgraded by that update: the
+`INFRASTRUCTURE_NO_EXECUTION_ENVIRONMENT` classification and the `PRE_INFERENCE` phase below
+remained exactly correct, `authorizationConsumed` remained `false`, and every M1–M13 value
+remained `null`.
 
 ---
 

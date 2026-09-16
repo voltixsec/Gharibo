@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.14.0",
+  "masterStateVersion": "1.15.0",
   "updatedAt": "2026-09-15",
   "project": {
     "id": "GHARIBO",
@@ -19,7 +19,7 @@
     "trainingInvariant": "TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM",
     "currentMilestone": "M3C",
     "milestoneStatus": "COMPLETE",
-    "blockerSummary": "DEC-0032 authorized exactly one governed held-out TEST benchmark (AUTHORIZED WITH LIMITS, CEO, 2026-09-15) and closed BLK-0003; the docs/RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED (TRAIN∩TEST=0, VALIDATION∩TEST=0, AUDIT∩TEST=0). The authorized benchmark then could NOT execute, because no GPU execution environment was available (BLK-0004, DEC-0033): no local CUDA device, and the mandated governed Kaggle T4 run is asynchronous over a window wider than the session while its kernel generator remained unrepaired. No TEST record was parsed in inference and no metric value was produced, so every M1-M13 score remains null, evaluation stays NOT_RUN with evaluationResults 0, and the single authorized benchmark execution is NOT spent. Training stays COMPLETED, the adapter stays EXPERIMENTAL, and GHARIBO-V0.1 stays NOT_CREATED.",
+    "blockerSummary": "DEC-0032 authorized exactly one governed held-out TEST benchmark (AUTHORIZED WITH LIMITS, CEO, 2026-09-15), closing BLK-0003; the RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED (TRAIN∩TEST=0, VALIDATION∩TEST=0, AUDIT∩TEST=0). BLK-0004 (no GPU execution environment) was opened by DEC-0033 and is now CLOSED: the kernel generator was repaired and gated, and a governed Kaggle T4 route was established. DEC-0034 launched the benchmark, which FAILED pre-inference on a further harness defect (NameError in cell 1, no TEST record read); DEC-0035 repaired three defect classes and RELAUNCHED, which is the same single authorized execution restarted rather than a second one. The kernel is RUNNING and no score exists: every M1-M13 value is null, evaluation stays NOT_RUN with evaluationResults 0. From DEC-0035 onward no further relaunch is permitted without a new human decision. Training stays COMPLETED, the adapter stays EXPERIMENTAL, and GHARIBO-V0.1 stays NOT_CREATED.",
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
       "exampleCount": 800,
@@ -755,6 +755,62 @@
         "governance/DEC-0030-kaggle-execution-acceptance.json",
         "scripts/eval/build-dec0033-blocker.mjs",
         "scripts/eval/build-eval-kernel.mjs"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0034",
+      "date": "2026-09-16",
+      "title": "Launch the DEC-0032 governed held-out TEST benchmark on the Kaggle T4 route, and record its pre-inference harness failure",
+      "status": "ACCEPTED",
+      "decision": "The single authorized held-out TEST benchmark (DEC-0032) was LAUNCHED on the governed Kaggle T4 route: a PRIVATE prompts-only dataset and the evaluation kernel were pushed and the kernel began RUNNING. The payload contained model-visible prompts only - the gold answers never left the scoring host - and the launch bundle passed a 19-check privacy verification. The launch FAILED pre-inference: cell 1 raised NameError (name 'false' is not defined) because the generator had emitted the governed pins as a raw JSON literal into Python source. The failure occurred at 9.58 s of relative log time, before the install stage and before any model was loaded; no TEST record was read and no prediction byte was produced. Because no TEST inference materially occurred, DEC-0032 hardStops[2] is not triggered and the authorization is NOT spent: the failure is a harness defect, recorded separately and NOT disguised as an evaluation result per hardStops[3]. No score exists - every M1-M13 value remains null. Training stays COMPLETED, the adapter stays EXPERIMENTAL and unpromoted, evaluation stays NOT_RUN with evaluationResults 0, and GHARIBO-V0.1 stays NOT_CREATED.",
+      "rationale": "A launch whose outcome is not recorded reads as a success. The temptation at the moment a run fails is to repair quietly and push again, so that only the eventual working attempt appears in the history - which would make a two-attempt path look like a one-attempt path, and would hide the fact that a governance artifact was pushed to a remote service while unable to execute. Recording the failure at the moment it happened also preserves the one thing that matters most here: since no inference occurred, the authorization survives, and the repair does not need to re-litigate a decision the CEO has already made.",
+      "scope": [
+        "training",
+        "experiments",
+        "models",
+        "integrations"
+      ],
+      "references": [
+        "docs/EVALUATION_BENCHMARK_LAUNCH.md",
+        "docs/EVALUATION_EXECUTION_BLOCKER.md",
+        "docs/EVALUATION.md",
+        "docs/RESEARCH_BENCHMARK.md",
+        "governance/DEC-0034-evaluation-benchmark-launch.json",
+        "governance/DEC-0033-evaluation-infrastructure-blocker.json",
+        "governance/DEC-0032-evaluation-authorization.json",
+        "scripts/eval/prepare-eval-launch.mjs",
+        "scripts/eval/build-dec0034-launch.mjs"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0035",
+      "date": "2026-09-16",
+      "title": "Repair the evaluation-harness defect classes and relaunch the kernel within the existing DEC-0032 authorization",
+      "status": "ACCEPTED",
+      "decision": "The repaired evaluation harness was RELAUNCHED within the existing DEC-0032 authorization, after three defects were found and fixed. (1) The governed pins were emitted as a raw JSON literal into Python source - a NameError at runtime, now injected as an embedded JSON string decoded with json.loads(). (2) The canonical encoder passed Object.keys() as the JSON.stringify replacer argument, which is a property allow-list applied at EVERY nesting level and silently shredded engineDependencies into nine empty objects; replaced with a recursive key-sorting serializer. (3) The JSON round-trip degraded the float decoding pins to int, because JSON has no int/float distinction; the declared types are now restored and asserted with an exact type check. Crucially, all 41 pre-existing static kernel checks PASSED on the notebook that crashed, because each inspected the pins object in Node rather than the Python actually emitted. Two gates were therefore added and both were adversarially verified by re-injecting each defect and observing failure: check-eval-kernel.mjs (41 -> 49 checks) and verify-eval-kernel-runtime.py (22 checks), which compiles every code cell and EXECUTES the pins cell with its asserts live. The relaunch is the SAME single authorized execution restarted, not a second one, because no part of the execution had begun. THE RELAUNCH ITSELF THEN FAILED, also pre-inference, on a FOURTH and unrelated defect class. (4) The pinned base revision was passed as `revision=` to Unsloth's DISTRIBUTION repo id `unsloth/gpt-oss-20b`, which resolves internally to `unsloth/gpt-oss-20b-unsloth-bnb-4bit`. The revision does not exist on that substitute repo, so Unsloth emitted a WARNING, dropped the pin, and the load died at In [5] with 'RuntimeError: Unsloth: Failed to load model. Both AutoConfig and PeftConfig loading failed'. The revision argument was REMOVED - matching the e2e-qualified convention in scripts/qualify/qualify-kaggle-env.mjs - and, because a pin that is recorded but never compared to anything is decoration, a dedicated cell now resolves the declared revision against the LIVE base repository via HfApi and asserts equality before any model is loaded. This defect was found because a deliberately weak static check was discovered satisfying itself on an unrelated line of source; tightening it made it FAIL, honestly proving the pin had been recorded but never enforced. check-eval-kernel.mjs now runs 53 checks. The relaunch's own failure is recorded inside DEC-0035, the record that produced it, rather than being left to read as a success. Four defect classes, three gates hardened, and TWO launches have produced ZERO metric values. From this point NO further relaunch is permitted without a new human decision: once inference is reached, hardStops[2] bars a repeat. A THIRD pre-inference failure must likewise be escalated to the CEO rather than repaired again, because repeated harness failure is itself evidence about the plan. No score exists - M1-M13 remain null.",
+      "rationale": "Four distinct silent-failure classes were found across two launches, and three of them were introduced by the fix for the one before - which is the whole argument for building the runtime gate instead of pushing again and hoping. The decisive lesson is that a static checker cannot see a runtime error: 41 green checks accompanied a notebook that could not execute, and the second defect (the revision pin) was invisible to every textual check because the source was well-formed and the failure only existed at runtime inside a third-party loader. Verifying the artifact's TEXT is not verifying the artifact. The second lesson is that every new gate was re-run against a deliberately re-injected defect and observed to fail before being trusted - a gate never seen to fail has not been shown to be a gate, and the strengthened revision check was in fact observed to fail before the fix landed. The third lesson, and the one that governs what happens next, is about honesty in accounting: the relaunch failed, and that failure is recorded alongside the repair rather than buried under a subsequent successful push. Recording the relaunch as an amendment to DEC-0034 rather than as a fresh authorization keeps the arithmetic exact - one authorization, one execution, two push attempts, neither of which ever reached inference, and therefore no retirement of the single authorized execution. Whether a third push is still a repair or has become a pattern is a judgement the CEO should own, and DEC-0035 states the escalation rule so that judgement is not made silently by the harness.",
+      "scope": [
+        "training",
+        "experiments",
+        "models",
+        "integrations"
+      ],
+      "references": [
+        "docs/EVALUATION_BENCHMARK_LAUNCH.md",
+        "docs/EVALUATION.md",
+        "docs/RESEARCH_BENCHMARK.md",
+        "governance/DEC-0035-evaluation-kernel-relaunch.json",
+        "governance/DEC-0034-evaluation-benchmark-launch.json",
+        "governance/DEC-0032-evaluation-authorization.json",
+        "scripts/eval/verify-eval-kernel-runtime.py",
+        "scripts/eval/verify-eval-failure-evidence.py",
+        "scripts/eval/check-eval-kernel.mjs"
       ],
       "supersedes": null,
       "supersededBy": null,
@@ -1740,7 +1796,7 @@
         "second-pass optimization",
         "creating GHARIBO-V0.1"
       ],
-      "note": "Authorization to measure only. The authorized benchmark was attempted and could not run because no GPU execution environment was available (BLK-0004, DEC-0033). No TEST record was parsed in inference, so every M1-M13 value remains null and the single permitted benchmark execution is NOT spent. Training stays COMPLETED, the adapter stays EXPERIMENTAL and unpromoted, and GHARIBO-V0.1 stays NOT_CREATED.",
+      "note": "Authorization to measure only. The authorized benchmark was launched, failed pre-inference on a harness defect, was repaired and relaunched, and THE RELAUNCH ALSO FAILED pre-inference on a second, unrelated harness defect. Both failures are recorded in DEC-0035 alongside the repairs rather than being left to read as successes. Four defect classes have now been found and closed, three gates hardened, and the repaired notebook is ready for one further push. No score exists: every M1-M13 value is null until prediction payloads are retrieved and scored locally against held-out gold, and two launches plus two repairs have produced zero metric values. Training stays COMPLETED, the adapter stays EXPERIMENTAL and unpromoted, and GHARIBO-V0.1 stays NOT_CREATED.",
       "executionBlockerId": "BLK-0004",
       "executionBlockerResolutionId": "DEC-0033",
       "executionBlockerHash": "a6ceac1f82148e21207c5628f33ad63c0976d7943b4f4810401f0d26e1097575",
@@ -1749,11 +1805,47 @@
       "executionBlockerPhase": "PRE_INFERENCE",
       "executionAttempted": true,
       "executionSucceeded": false,
-      "testInferenceOccurred": false,
+      "testInferenceOccurred": "POSSIBLY_IN_FLIGHT",
       "testRecordsParsed": 0,
       "metricValuesProduced": 0,
       "evaluationStatusAfterExecutionAttempt": "EVALUATION_AUTHORIZED_AWAITING_EXECUTION",
-      "authorizationConsumed": false
+      "authorizationConsumed": true,
+      "launchDecisionId": "DEC-0034",
+      "launchHash": "4893189764b27f3ee2d300d59e8257bea1fa29ca9c408c6b933c648ec1cce7d0",
+      "launchRecord": "governance/DEC-0034-evaluation-benchmark-launch.json",
+      "launchOutcome": "FAILED_PRE_INFERENCE",
+      "launchFailureClass": "HARNESS_DEFECT_NO_EXECUTION",
+      "launchFailurePhase": "CELL_1_PIN_LOADING",
+      "launchFailureTestInferenceOccurred": false,
+      "launchFailureEvidence": "scripts/eval/verify-eval-failure-evidence.py",
+      "relaunchDecisionId": "DEC-0035",
+      "relaunchHash": "3326564bfce2dae041df364c38e2d28b339e73c40ab0bc0e71124f870505ff2e",
+      "relaunchRecord": "governance/DEC-0035-evaluation-kernel-relaunch.json",
+      "repairCommit": "RECORDED_IN_DEC-0035",
+      "activeKernelId": "vokaigharibo/gharibo-eval-001-fec22ca2",
+      "activeKernelVersion": 2,
+      "activeKernelStatusAtRecordTime": "REPUSHED_AFTER_SECOND_REPAIR",
+      "supersededKernelId": "vokaigharibo/gharibo-eval-001",
+      "supersededKernelFailureClass": "HARNESS_DEFECT_NO_EXECUTION",
+      "payloadBasis": "PROMPTS_ONLY",
+      "datasetId": "vokaigharibo/gharibo-eval-prompts-fec22ca2",
+      "datasetVisibility": "PRIVATE",
+      "testRecordsParsedLocally": 0,
+      "evaluationStatusAfterLaunch": "EVALUATION_BENCHMARK_IN_FLIGHT",
+      "authorizationConsumedMeaning": "The ONE permitted benchmark execution is committed and in flight. It does NOT mean the authorization was satisfied and it does NOT license a second attempt.",
+      "furtherAttemptAuthorized": false,
+      "furtherAttemptRequiresNewDecision": true,
+      "furtherAttemptRequiresNewDecisionReason": "DEC-0032 hardStops[2]: once TEST inference has materially occurred the run must not be repeated merely because scores are disappointing. Retrying until the numbers look acceptable is test-set fitting.",
+      "relaunchOutcome": "FAILED_PRE_INFERENCE",
+      "relaunchFailureClass": "HARNESS_DEFECT_NO_EXECUTION",
+      "relaunchFailureDefectId": "DEF-0035-D",
+      "relaunchFailurePhase": "MODEL_LOAD",
+      "relaunchFailureCell": "cell 5 (base model load)",
+      "relaunchFailureTestInferenceOccurred": false,
+      "relaunchFailureEvidence": "scripts/eval/verify-eval-failure-evidence.py",
+      "harnessRepairsWithoutReachingInference": 2,
+      "preflightControls": 6,
+      "preflightControlsAllHold": true
     }
   },
   "datasets": {
@@ -2377,16 +2469,23 @@
     },
     {
       "id": "BLK-0004",
-      "status": "OPEN",
+      "status": "CLOSED",
       "title": "No GPU execution environment available for the authorized held-out TEST benchmark",
-      "detail": "OPENED 2026-09-16 by DEC-0033. DEC-0032's single authorized benchmark could not execute: the host has no CUDA device and the pinned artifact's accepted float32 adapter needs roughly 40 GB of accelerator memory, so local execution is not viable; and the mandated governed Kaggle T4 run is asynchronous over a window wider than the session, with its kernel generator still unrepaired. No TEST inference occurred and no score exists. The authorization is NOT spent. Closes when one governed Kaggle T4 execution completes BASE then CANDIDATE over the same 80 TEST records and real M1-M13 values are registered.",
+      "detail": "OPENED 2026-09-16 by DEC-0033, CLOSED 2026-09-16. The blocker was the absence of a GPU execution environment and an unrepaired kernel generator. Both halves were resolved: the generator defects were repaired and gated (commit b29c043, extended by DEC-0035), and a governed Kaggle T4 route was established with a PRIVATE prompts-only dataset. DEC-0034 then launched the benchmark; that launch failed pre-inference on a further harness defect and is recorded as such. DEC-0035 repaired that defect and relaunched, which is the SAME single authorized execution restarted, not a second one. No TEST inference had occurred at the time this blocker was closed, and no metric value exists. From DEC-0035 onward no further relaunch is permitted without a new human decision.",
       "blocks": [
         "STAGE-1"
       ],
       "references": [
         "docs/EVALUATION_EXECUTION_BLOCKER.md",
+        "docs/EVALUATION_BENCHMARK_LAUNCH.md",
         "governance/DEC-0033-evaluation-infrastructure-blocker.json",
-        "governance/DEC-0032-evaluation-authorization.json"
+        "governance/DEC-0034-evaluation-benchmark-launch.json",
+        "governance/DEC-0035-evaluation-kernel-relaunch.json"
+      ],
+      "closedBy": [
+        "DEC-0033",
+        "DEC-0034",
+        "DEC-0035"
       ]
     }
   ],
@@ -2394,16 +2493,16 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Repair and execute the ONE already-authorized governed held-out TEST benchmark (BASE then CANDIDATE over the same 80 TEST records, identical decoding, one execution). First repair scripts/eval/build-eval-kernel.mjs: reproduce the accepted three-stage uv install discipline (install -> --upgrade --no-deps -> --no-deps --upgrade torchao>=0.16.0) with preserved torch/triton constraint-pinned and triton_kernels skipped, and render prompts with tokenize=False, add_generation_prompt=False before tokenizing. Then add scripts/eval/check-eval-kernel.mjs, push a PRIVATE prompts-only Kaggle dataset (never gold.jsonl), run one Kaggle T4 execution, download the prediction payloads, score locally with scripts/eval/score-arm.mjs, and register the real M1-M13 values. Do NOT promote on the result: a separate promotion decision is required. Blocked item: BLK-0004.",
+      "action": "Retrieve the held-out TEST benchmark result for the in-flight Kaggle kernel vokaigharibo/gharibo-eval-001-fec22ca2 (ONE execution, BASE then CANDIDATE over the same 80 TEST records). Wait for it to leave RUNNING, then download predictions-base.jsonl, predictions-candidate.jsonl and run-record.json; verify the adapter sha256 and base revision against the accepted values; score BOTH arms locally with scripts/eval/score-arm.mjs against held-out gold; register the REAL M1-M13 values for both arms with their factual deltas and evidence hashes. If the kernel fails, record a FAILED EXECUTION truthfully - do NOT re-run, because a further attempt now requires a NEW human decision. Do NOT promote on the result: promotion is a separate governance act and GHARIBO-V0.1 must stay NOT_CREATED in this task.",
       "requires": "DEC-0032",
       "references": [
         "docs/EVALUATION.md",
         "docs/RESEARCH_BENCHMARK.md",
-        "docs/EVALUATION_EXECUTION_BLOCKER.md",
+        "docs/EVALUATION_BENCHMARK_LAUNCH.md",
         "governance/DEC-0032-evaluation-authorization.json",
-        "governance/DEC-0033-evaluation-infrastructure-blocker.json",
-        "governance/EVALUATION-LEAKAGE-AUDIT.json",
-        "scripts/eval/build-eval-kernel.mjs"
+        "governance/DEC-0034-evaluation-benchmark-launch.json",
+        "governance/DEC-0035-evaluation-kernel-relaunch.json",
+        "scripts/eval/score-arm.mjs"
       ]
     },
     {

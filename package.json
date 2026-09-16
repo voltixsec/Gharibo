@@ -32,11 +32,17 @@
     "verify:result": "python scripts/training/verify-kaggle-result.py",
     "eval:audit:auth": "node scripts/eval/build-dec0032-authorization.mjs --check",
     "eval:audit:blocker": "node scripts/eval/build-dec0033-blocker.mjs --check",
+    "eval:audit:launch": "node scripts/eval/build-dec0034-launch.mjs --check",
+    "eval:audit:relaunch": "node scripts/eval/build-dec0035-relaunch.mjs --check",
     "eval:audit:leakage": "python scripts/eval/leakage-audit.py --check",
     "eval:verify": "node scripts/eval/verify-evaluation-state.mjs",
     "eval:render": "node scripts/eval/build-eval-kernel.mjs",
     "eval:check": "node scripts/eval/build-eval-kernel.mjs --check && node scripts/eval/check-eval-kernel.mjs",
-    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:leakage && npm run eval:verify && npm run eval:check"
+    "eval:kernel:runtime": "python scripts/eval/verify-eval-kernel-runtime.py",
+    "eval:launch:evidence": "python scripts/eval/verify-eval-failure-evidence.py --log gharibo-eval-001-fec22ca2.log",
+    "eval:bundle": "node scripts/eval/prepare-eval-launch.mjs",
+    "eval:bundle:verify": "python scripts/eval/verify-eval-bundle.py",
+    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:launch && npm run eval:audit:relaunch && npm run eval:audit:leakage && npm run eval:verify && npm run eval:check && npm run eval:kernel:runtime && npm run eval:bundle:verify"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

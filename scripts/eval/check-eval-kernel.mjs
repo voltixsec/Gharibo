@@ -35,7 +35,16 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { EVAL_PINS, FORBIDDEN_TOKENS, render, notebookSha256 } from "./build-eval-kernel.mjs";
+import {
+  EVAL_PINS,
+  FORBIDDEN_TOKENS,
+  render,
+  notebookSha256,
+  pinsCellSource,
+  pinsJsonText,
+  containsJsonOnlyLiterals,
+  hasEmptyObject,
+} from "./build-eval-kernel.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const OUT_REL = "scripts/eval/kaggle/gharibo-eval-001.ipynb";
@@ -301,6 +310,91 @@ check(
   "Harmony control tokens are probed before either arm runs",
   /'<\|start\|>' in _probe/.test(codeSource),
   "a mis-rendered template must fail loudly instead of producing plausible garbage"
+);
+
+// ---------------------------------------------------------------- pins must be (a) decodable
+// These checks exist because of the DEC-0035 launch failure: the pins were emitted as raw JSON
+// into Python source, so the notebook died with `NameError: name 'false' is not defined` at
+// 9.58 s, in cell 1. All 41 pre-existing checks PASSED on that broken notebook, because every
+// one of them inspected the pins object in Node rather than the Python that was actually
+// emitted. A checker that never runs the artifact cannot see a runtime error in it.
+check(
+  "pins are injected as an embedded JSON string, not as Python literals",
+  /_PINS_JSON = r'''.*?'''/s.test(codeSource) && /PINS = json\.loads\(_PINS_JSON\)/.test(codeSource),
+  "the DEC-0035 defect: a raw JSON literal in Python source is a NameError"
+);
+check(
+  "no unquoted JSON-only literal appears in Python code position",
+  !containsJsonOnlyLiterals(pinsCellSource()),
+  "true/false/null in code position would raise NameError before any inference"
+);
+check(
+  "the pin set survives a canonical JSON round-trip",
+  pinsJsonText(JSON.parse(pinsJsonText(EVAL_PINS))) === pinsJsonText(EVAL_PINS)
+);
+check(
+  "no nested pin object is empty",
+  !hasEmptyObject(EVAL_PINS),
+  "an Object.keys() allow-list silently shreds nested objects into {}"
+);
+check(
+  "engineDependencies carries all 9 frozen specs with name+spec",
+  Array.isArray(EVAL_PINS.engineDependencies) &&
+    EVAL_PINS.engineDependencies.length === 9 &&
+    EVAL_PINS.engineDependencies.every((d) => d && d.name && d.spec),
+  "a shredded list would make the install stage iterate over nothing"
+);
+check(
+  "the notebook asserts engineDependencies is non-empty before installing",
+  /assert all\(isinstance\(d, dict\) and d\.get\('name'\) and d\.get\('spec'\)/.test(codeSource)
+);
+check(
+  "the notebook restores JSON-degraded float pins before asserting types",
+  /PINS\['temperature'\] = float\(/.test(executableLines) &&
+    /PINS\['topP'\] = float\(/.test(executableLines),
+  "JSON has no int/float distinction, so 0.0 round-trips to int 0"
+);
+check(
+  "the decoding contract is asserted with exact types, not truthiness",
+  /_DECODING_CONTRACT/.test(executableLines) &&
+    /type\(_got\) is _type/.test(executableLines),
+  "truthiness and == both accept the degraded int 0 for a float 0.0"
+);
+
+// ---------------------------------------------------------------- loader invocation
+// These checks exist because of the DEC-0035 RELAUNCH failure: the loader call passed
+// `revision=<base repo sha>` to `FastLanguageModel.from_pretrained`. `unsloth/gpt-oss-20b` is a
+// DISTRIBUTION repo id that Unsloth resolves internally, so the revision was ignored, a substitute
+// repo (`...-unsloth-bnb-4bit`) was chosen, and the load failed outright:
+//
+//   RuntimeError: Unsloth: Failed to load model. Both AutoConfig and PeftConfig loading failed.
+//
+// The accepted qualification and the GHARIBO-exp-001 training notebook both load with a model_name
+// and NO revision. Reproducing that is the point; the pin is enforced elsewhere.
+check(
+  "the loader call passes NO revision argument",
+  !/FastLanguageModel\.from_pretrained\([\s\S]{0,400}?revision\s*=/.test(executableLines),
+  "DEFECT 4 of DEC-0035: a revision on the Unsloth distribution id makes the load fail"
+);
+check(
+  "the loader call uses the pinned loader model id",
+  /model_name=PINS\['loaderModelId'\]/.test(executableLines)
+);
+check(
+  "the pinned base revision is asserted against the LIVE base repo revision",
+  // Strict: the pin must be ENFORCED, not merely carried into the run record. The earlier version
+  // of this check passed on `codeSource.includes("baseModelRevision")`, which is satisfied by the
+  // run-record line alone — a check that could never fail, guarding nothing.
+  /resolve_base_revision|HfApi\(\)\.model_info/.test(executableLines) &&
+    /BASE_MODEL_REVISION/.test(executableLines) &&
+    /PINS\['baseModelRevision'\]/.test(executableLines) &&
+    /assert[\s\S]{0,120}baseModelRevision/.test(executableLines),
+  "dropping the loader argument is only safe because the pin is enforced against the live base repo"
+);
+check(
+  "the notebook verifies the loader did not substitute a different repo",
+  /LOADER_NAME/.test(executableLines) && /'gpt-oss-20b' in str\(LOADER_NAME\)/.test(executableLines),
+  "a silent substitution would mean measuring a different model"
 );
 
 // ---------------------------------------------------------------- report
