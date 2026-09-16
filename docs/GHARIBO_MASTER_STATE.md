@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.23.0 |
+| **Version** | 1.24.0 |
 | **Last Updated** | 2026-09-16 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | COMPLETED |
 | Training invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=Evaluation Attempt #5 is explicitly authorized by DEC-0044 and prepared for exactly ONE governed Kaggle push. The push has NOT occurred yet; TEST inference has NOT begun., note=The immutable local-snapshot loader remains execution-proven. DEC-0043 preserves the earlier two-push preflight governance deviation without retroactive authorization. DEC-0044 authorizes measurement only: BASE then CANDIDATE over the same 80 held-out TEST prompts. Evaluation remains NOT_RUN until real inference occurs; M1-M13 remain null; candidate remains EXPERIMENTAL_UNPROMOTED; GHARIBO-V0.1 remains NOT_CREATED. |
+| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=Evaluation Attempt #5 failed PRE-INFERENCE on Kaggle kernel Version 4 during immutable snapshot_download. Its single authorized push is exhausted. No retry or Attempt #6 is authorized., note=No BASE or CANDIDATE inference occurred, M1-M13 remain null, and the candidate remains EXPERIMENTAL_UNPROMOTED. A Hugging Face Hub post-install refresh repair exists on branch fix/attempt5-v4-hfhub-refresh at commit 05d923f4ed3cada9093263839ba4f3c25717614b; it is locally regression-proven only, not merged to main, not Kaggle-runtime-proven, and not authorized for execution. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -161,7 +161,7 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | ATTEMPT_5_AUTHORIZED_AWAITING_EXECUTION | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | ATTEMPT_5_FAILED_PRE_INFERENCE_AWAITING_HUMAN_DECISION | 9/12 | GHARIBO-V0.1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** Training completed, but promotion requires at least one real evaluation result and none exists. Training completion is not model promotion (ADR-0008).
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -382,6 +382,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0042 | 2026-09-16 | Authorize ONE no-inference local-immutable-snapshot preflight; the loader must receive a local directory, not a repo id; ATTEMPT #5 IS NOT AUTHORIZED | ACCEPTED | — |
 | DEC-0043 | 2026-09-16 | Accept the proven local-snapshot loader execution and record two pushes under one-push authorization | ACCEPTED | — |
 | DEC-0044 | 2026-09-16 | Authorize exactly one governed Evaluation Attempt #5 | ACCEPTED | — |
+| DEC-0045 | 2026-09-16 | Record Evaluation Attempt #5 pre-inference failure and exhaust its one-push authorization | ACCEPTED | — |
 
 ## Validation
 
@@ -438,7 +439,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Execute the single DEC-0044-authorized Evaluation Attempt #5 Kaggle benchmark: BASE then CANDIDATE over the same 80 held-out TEST prompts. | DEC-0044 | governance/DEC-0044-evaluation-attempt-5-authorization.json, apps/web/data/kaggle-eval/gharibo-eval-001/launch-plan.json, scripts/eval/build-eval-kernel.mjs |
+| ACT-0001 | P0 | Human decision required: decide whether any future evaluation execution should be authorized. A locally regression-proven repair candidate exists at 05d923f4ed3cada9093263839ba4f3c25717614b, but it is not merged or execution-authorized. | NEW_EXPLICIT_HUMAN_DECISION_AFTER_DEC-0045 | governance/DEC-0045-evaluation-attempt-5-failure.json, governance/DEC-0044-evaluation-attempt-5-authorization.json, fix/attempt5-v4-hfhub-refresh@05d923f4ed3cada9093263839ba4f3c25717614b |
 | ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
 
 ## History
@@ -460,6 +461,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.17.0 | 2026-09-16 | DEC-0037 authorized and completed one isolated diagnostic: install, tokenizer and BASE load PASS; seven markers verified. Evaluation remains NOT_RUN and attempt #4 remains unauthorized. | 77bed6405b4d539147d2592f7c0b790f6369054b | CHECKPOINTED |
 | 1.22.0 | 2026-09-16 | DEC-0043: accepted LOCAL_SNAPSHOT_LOADER_EXECUTION_PROVEN and recorded TWO_PUSHES_UNDER_ONE_PUSH_AUTHORIZATION as a post-execution governance deviation. | — | PENDING_CHECKPOINT |
 | 1.23.0 | 2026-09-16 | DEC-0044: explicitly authorized exactly one governed Evaluation Attempt #5 and bound the prepared kernel/bundle to the proven immutable local-snapshot loader. | — | PENDING_CHECKPOINT |
+| 1.24.0 | 2026-09-16 | DEC-0045: recorded Attempt #5 as FAILED_PRE_INFERENCE, exhausted its one-push authorization, and preserved the local repair as unmerged/unproven/unexecuted. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -634,4 +636,15 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - Preserved evaluation NOT_RUN and M1-M13 null before execution
 - Preserved no-promotion/no-retry boundaries
 - The containing Git commit anchors this pre-launch authorization and cannot embed its own SHA.
+- Training executed: —
+
+**1.24.0 — changes**
+- Recorded kernel Version 4 ERROR as FAILED_PRE_INFERENCE
+- Recorded snapshot_download AttributeError before model load
+- Recorded TEST inference false and metric values zero
+- Recorded Attempt #5 push accounting as 1 used / 0 remaining
+- Recorded Attempt #6 as NOT_AUTHORIZED
+- Recorded repair commit 05d923f as LOCAL_REGRESSION_PROVEN_ONLY
+- Preserved M1-M13 null, candidate unpromoted and GHARIBO-V0.1 NOT_CREATED
+- The containing Git commit anchors this failure-state checkpoint and cannot embed its own SHA.
 - Training executed: —

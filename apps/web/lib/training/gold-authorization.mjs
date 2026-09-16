@@ -2247,6 +2247,267 @@ export function isEvaluationAttempt5AuthorizedGoldState(state) {
   return isAcceptedGoldGovernanceState(before);
 }
 
+
+/**
+ * DEC-0045 records the terminal PRE-INFERENCE outcome of Attempt #5.
+ *
+ * This layer records failure; it does not create an evaluation result.
+ * The one-push bound is exhausted, inference never began, M1-M13 remain
+ * null, and any future execution requires a new explicit human decision.
+ */
+export function isEvaluationAttempt5FailedGoldState(state) {
+  const training = state?.training;
+  const attempt5 = training?.attempt5Authorization;
+  const failure = training?.attempt5Failure;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+
+  if (state?.masterStateVersion !== "1.24.0") return false;
+  if (!attempt5 || !failure || !experiment) return false;
+
+  if (
+    attempt5.decisionId !== "DEC-0044" ||
+    attempt5.status !== "FAILED_PRE_INFERENCE_ONE_PUSH_CONSUMED" ||
+    attempt5.attemptNumber !== 5 ||
+    attempt5.maximumKernelPushes !== 1 ||
+    attempt5.kernelPushesPerformed !== 1 ||
+    attempt5.kernelPushesRemaining !== 0 ||
+    attempt5.launchAttempted !== true ||
+    attempt5.kernelVersion !== 4 ||
+    attempt5.kernelStatus !== "KernelWorkerStatus.ERROR" ||
+    attempt5.testInferenceOccurred !== false ||
+    attempt5.metricValuesProduced !== 0 ||
+    attempt5.authorizationSpent !== false ||
+    attempt5.authorizationConsumed !== true ||
+    attempt5.automaticRetryAuthorized !== false ||
+    attempt5.retryAuthorized !== false ||
+    attempt5.attempt6Authorized !== false ||
+    attempt5.furtherAttemptAuthorized !== false ||
+    attempt5.furtherAttemptRequiresNewHumanDecision !== true ||
+    attempt5.failureDecisionId !== "DEC-0045" ||
+    attempt5.failureRecord !==
+      "governance/DEC-0045-evaluation-attempt-5-failure.json" ||
+    !/^[0-9a-f]{64}$/.test(attempt5.failureHash ?? "")
+  ) {
+    return false;
+  }
+
+  if (
+    failure.decisionId !== "DEC-0045" ||
+    failure.status !==
+      "EVALUATION_ATTEMPT_5_FAILED_PRE_INFERENCE_ONE_PUSH_EXHAUSTED" ||
+    failure.attemptNumber !== 5 ||
+    failure.kernelVersion !== 4 ||
+    failure.kernelStatus !== "KernelWorkerStatus.ERROR" ||
+    failure.launchOutcome !== "FAILED_PRE_INFERENCE" ||
+    failure.failureDefectId !== "DEF-0045-A" ||
+    failure.failurePhase !== "SNAPSHOT_DOWNLOAD" ||
+    failure.failureException !== "AttributeError" ||
+    failure.testInferenceOccurred !== false ||
+    failure.metricValuesProduced !== 0 ||
+    failure.kernelPushesPerformed !== 1 ||
+    failure.kernelPushesRemaining !== 0 ||
+    failure.retryAuthorized !== false ||
+    failure.attempt6Authorized !== false ||
+    failure.furtherAttemptRequiresNewHumanDecision !== true ||
+    failure.failureHash !== attempt5.failureHash
+  ) {
+    return false;
+  }
+
+  if (
+    training?.evaluationResults !== 0 ||
+    experiment.evaluationStatus !== "NOT_RUN" ||
+    experiment.evaluationScore !== null ||
+    experiment.promotable !== false ||
+    experiment.readinessStatus !==
+      "ATTEMPT_5_FAILED_PRE_INFERENCE_AWAITING_HUMAN_DECISION" ||
+    experiment.evaluationAuthorizationDecisionId !== "DEC-0044" ||
+    experiment.evaluationOutcomeDecisionId !== "DEC-0045" ||
+    experiment.evaluationAuthorizationStatus !==
+      "EXHAUSTED_ONE_PUSH_CONSUMED"
+  ) {
+    return false;
+  }
+
+  const v01 =
+    (state?.models?.derivedModels || [])
+      .find((m) => m?.id === "GHARIBO-V0.1");
+
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  if (
+    failure.repairCandidate?.commit !==
+      "05d923f4ed3cada9093263839ba4f3c25717614b" ||
+    failure.repairCandidate?.status !==
+      "LOCAL_REGRESSION_PROVEN_ONLY" ||
+    failure.repairCandidate?.mergedToMain !== false ||
+    failure.repairCandidate?.runtimeProvenOnKaggle !== false ||
+    failure.repairCandidate?.executionAuthorized !== false
+  ) {
+    return false;
+  }
+
+  const decisions =
+    Array.isArray(state?.decisions)
+      ? state.decisions
+      : [];
+
+  const dec45 =
+    decisions.filter((d) => d?.id === "DEC-0045");
+
+  if (
+    dec45.length !== 1 ||
+    dec45[0].status !== "ACCEPTED" ||
+    dec45[0].supersedes !== null ||
+    dec45[0].supersededBy !== null
+  ) {
+    return false;
+  }
+
+  // Strip DEC-0045 and prove the accepted DEC-0044 state underneath.
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.23.0";
+
+  before.decisions =
+    before.decisions.filter(
+      (d) => d?.id !== "DEC-0045"
+    );
+
+  delete before.training.attempt5Failure;
+
+  const a =
+    before.training.attempt5Authorization;
+
+  a.status = "AUTHORIZED_NOT_LAUNCHED";
+  a.kernelPushesPerformed = 0;
+  a.kernelPushesRemaining = 1;
+  a.launchAttempted = false;
+  a.testInferenceOccurred = false;
+  a.metricValuesProduced = 0;
+  a.authorizationSpent = false;
+  a.authorizationConsumed = false;
+
+  for (const key of [
+    "kernelVersion",
+    "kernelStatus",
+    "retryAuthorized",
+    "attempt6Authorized",
+    "furtherAttemptAuthorized",
+    "furtherAttemptRequiresNewHumanDecision",
+    "failureDecisionId",
+    "failureRecord",
+    "failureHash",
+    "failurePhase",
+    "failureException",
+    "failureLogSha256",
+    "repairCandidateBranch",
+    "repairCandidateCommit",
+    "repairCandidateStatus",
+    "repairMergedToMain",
+    "repairRuntimeProvenOnKaggle",
+    "repairExecutionAuthorized"
+  ]) {
+    delete a[key];
+  }
+
+  const p =
+    before.training.preflightReconciliation;
+
+  delete p.attempt5Outcome;
+  delete p.attempt5OutcomeDecisionId;
+
+  p.next =
+    "ATTEMPT_5_AUTHORIZED_NOT_LAUNCHED";
+
+  if (before.training.evaluation) {
+    before.training.evaluation.status =
+      "NOT_RUN";
+
+    before.training.evaluation.executed =
+      false;
+
+    before.training.evaluation.authorizationStatus =
+      "ATTEMPT_5_AUTHORIZED_NOT_LAUNCHED";
+
+    before.training.evaluation.authorizationDecisionId =
+      "DEC-0044";
+
+    delete before.training.evaluation.outcomeDecisionId;
+
+    before.training.evaluation.nextGate =
+      "ONE_GOVERNED_KAGGLE_PUSH_FOR_ATTEMPT_5";
+
+    before.training.evaluation.note =
+      "DEC-0044 authorizes exactly one Attempt #5 benchmark execution. No push or TEST inference has occurred at this checkpoint.";
+  }
+
+  const e =
+    before.experiments?.["GHARIBO-exp-001"];
+
+  e.readinessStatus =
+    "ATTEMPT_5_AUTHORIZED_AWAITING_EXECUTION";
+
+  e.evaluationAuthorizationDecisionId =
+    "DEC-0044";
+
+  delete e.evaluationOutcomeDecisionId;
+
+  e.evaluationAuthorizationStatus =
+    "AUTHORIZED_WITH_LIMITS";
+
+  if (before.currentState?.blockerSummary) {
+    before.currentState.blockerSummary.blockingNow =
+      "Evaluation Attempt #5 is explicitly authorized by DEC-0044 and prepared for exactly ONE governed Kaggle push. The push has NOT occurred yet; TEST inference has NOT begun.";
+
+    before.currentState.blockerSummary.note =
+      "The immutable local-snapshot loader remains execution-proven. DEC-0043 preserves the earlier two-push preflight governance deviation without retroactive authorization. DEC-0044 authorizes measurement only: BASE then CANDIDATE over the same 80 held-out TEST prompts. Evaluation remains NOT_RUN until real inference occurs; M1-M13 remain null; candidate remains EXPERIMENTAL_UNPROMOTED; GHARIBO-V0.1 remains NOT_CREATED.";
+  }
+
+  if (Array.isArray(before.nextActions)) {
+    const action =
+      before.nextActions.find((x) => x?.id === "ACT-0001");
+
+    if (action) {
+      action.priority = "P0";
+
+      action.action =
+        "Execute the single DEC-0044-authorized Evaluation Attempt #5 Kaggle benchmark: BASE then CANDIDATE over the same 80 held-out TEST prompts.";
+
+      action.requires =
+        "DEC-0044";
+
+      action.references = [
+        "governance/DEC-0044-evaluation-attempt-5-authorization.json",
+        "apps/web/data/kaggle-eval/gharibo-eval-001/launch-plan.json",
+        "scripts/eval/build-eval-kernel.mjs"
+      ];
+
+      action.status =
+        "READY_FOR_EXECUTION";
+
+      action.note =
+        "Exactly one Kaggle push is authorized. Automatic retry is forbidden. No promotion is authorized. Once TEST inference begins the authorization is spent.";
+    }
+  }
+
+  for (const value of Object.values(before)) {
+    if (Array.isArray(value)) {
+      const i =
+        value.findIndex(
+          (x) => x?.revision === "1.24.0"
+        );
+
+      if (i >= 0) {
+        value.splice(i, 1);
+      }
+    }
+  }
+
+  return isEvaluationAttempt5AuthorizedGoldState(before);
+}
+
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -2263,6 +2524,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isEvaluationAttempt4LaunchedGoldState(state) ||
     isEvaluationAttempt4FailedGoldState(state) ||
     isEvaluationAttempt5AuthorizedGoldState(state) ||
+    isEvaluationAttempt5FailedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

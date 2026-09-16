@@ -42,7 +42,7 @@
     "eval:launch:evidence": "python scripts/eval/verify-eval-failure-evidence.py --log gharibo-eval-001-fec22ca2.log",
     "eval:bundle": "node scripts/eval/prepare-eval-launch.mjs",
     "eval:bundle:verify": "python scripts/eval/verify-eval-bundle.py",
-    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:history && npm run eval:audit:leakage && npm run eval:verify && npm run eval:gate:attempt4 && npm run eval:check && npm run eval:kernel:runtime && npm run eval:bundle:verify && npm run eval:audit:dec0042 && npm run verify:preflight && npm run eval:audit:attempt5:auth && npm run eval:gate:attempt5",
+    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:history && npm run eval:audit:leakage && npm run eval:verify && npm run eval:gate:attempt4 && npm run eval:check && npm run eval:kernel:runtime && npm run eval:bundle:verify && npm run eval:audit:dec0042 && npm run verify:preflight && npm run eval:audit:attempt5:auth && npm run eval:audit:attempt5:failure && npm run eval:gate:attempt5:failure",
     "eval:audit:escalation": "node scripts/eval/build-dec0036-escalation.mjs --check",
     "eval:audit:attempt4:auth": "node scripts/eval/build-dec0038-authorization.mjs --check",
     "eval:audit:attempt4:launch": "node scripts/eval/build-dec0039-launch.mjs --check",
@@ -60,7 +60,9 @@
     "verify:preflight": "npm run eval:audit:preflight && npm run preflight:check && npm run preflight:runtime && npm run eval:audit:preflight2 && npm run preflight2:check && npm run preflight2:runtime",
     "eval:audit:attempt5:auth": "node scripts/eval/build-dec0044-authorization.mjs --check",
     "eval:gate:attempt5": "node scripts/eval/check-attempt5-launch-gate.mjs",
-    "eval:audit:history": "node scripts/eval/verify-historical-eval-records.mjs"
+    "eval:audit:history": "node scripts/eval/verify-historical-eval-records.mjs",
+    "eval:audit:attempt5:failure": "node scripts/eval/build-dec0045-failure.mjs --check",
+    "eval:gate:attempt5:failure": "node scripts/eval/check-attempt5-failure-gate.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

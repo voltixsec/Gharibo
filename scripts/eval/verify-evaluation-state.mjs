@@ -801,7 +801,7 @@ if (reconciliationRecord) {
   check("push accounting preserves one authorized, two actual, one excess",
     r.authorizedPushes === 1 && r.actualPushes === 2 && r.excessPushes === 1 && r.remainingAuthorizedPushes === 0 &&
     r.actualPushes - r.authorizedPushes === r.excessPushes);
-  check("master state preserves DEC-0043 preflight truth while DEC-0044 advances attempt #5 authorization",
+  check("master state preserves DEC-0043 truth while DEC-0044/0045 advance attempt #5 lifecycle",
     ["technicalResult", "loaderExecutionProven", "governanceCompliance", "deviation", "authorizedPushes",
       "actualPushes", "excessPushes", "remainingAuthorizedPushes", "retroactiveAuthorization", "kernelId",
       "testAttached", "testAccessed", "inferenceExecuted", "evaluationStatus", "candidateStatus",
@@ -810,7 +810,9 @@ if (reconciliationRecord) {
     r.next === "HUMAN_DECISION_ON_ATTEMPT_5" &&
     reconciliation?.attempt5Authorized === true &&
     reconciliation?.attempt5AuthorizationDecisionId === "DEC-0044" &&
-    reconciliation?.next === "ATTEMPT_5_AUTHORIZED_NOT_LAUNCHED");
+    reconciliation?.attempt5Outcome === "FAILED_PRE_INFERENCE" &&
+    reconciliation?.attempt5OutcomeDecisionId === "DEC-0045" &&
+    reconciliation?.next === "ATTEMPT_5_FAILED_PRE_INFERENCE_AWAITING_HUMAN_DECISION");
   const [v2, v3] = r.executions ?? [];
   check("both final-preflight pushes and their distinct outcomes survive",
     r.executions?.length === 2 && v2?.pushNumber === 1 && v2?.kernelVersion === 2 &&
