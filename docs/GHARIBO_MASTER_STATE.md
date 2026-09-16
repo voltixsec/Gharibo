@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.16.0 |
-| **Last Updated** | 2026-09-15 |
+| **Version** | 1.17.0 |
+| **Last Updated** | 2026-09-16 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
 > from [`governance/GHARIBO_MASTER_STATE.json`](../governance/GHARIBO_MASTER_STATE.json) by
@@ -374,6 +374,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0034 | 2026-09-16 | Launch the DEC-0032 governed held-out TEST benchmark on the Kaggle T4 route, and record its pre-inference harness failure | ACCEPTED | — |
 | DEC-0035 | 2026-09-16 | Repair the evaluation-harness defect classes and relaunch the kernel within the existing DEC-0032 authorization | ACCEPTED | — |
 | DEC-0036 | 2026-09-16 | Halt the evaluation-harness repair loop after a third pre-inference failure and escalate to the CEO | ACCEPTED | — |
+| DEC-0037 | 2026-09-16 | Authorize one isolated no-inference Kaggle model loading diagnostic | ACCEPTED | — |
 
 ## Validation
 
@@ -430,7 +431,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | Retrieve the held-out TEST benchmark result for the in-flight Kaggle kernel vokaigharibo/gharibo-eval-001-fec22ca2 (ONE execution, BASE then CANDIDATE over the same 80 TEST records). Wait for it to leave RUNNING, then download predictions-base.jsonl, predictions-candidate.jsonl and run-record.json; verify the adapter sha256 and base revision against the accepted values; score BOTH arms locally with scripts/eval/score-arm.mjs against held-out gold; register the REAL M1-M13 values for both arms with their factual deltas and evidence hashes. If the kernel fails, record a FAILED EXECUTION truthfully - do NOT re-run, because a further attempt now requires a NEW human decision. Do NOT promote on the result: promotion is a separate governance act and GHARIBO-V0.1 must stay NOT_CREATED in this task. | DEC-0032 | docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md, docs/EVALUATION_BENCHMARK_LAUNCH.md, governance/DEC-0032-evaluation-authorization.json, governance/DEC-0034-evaluation-benchmark-launch.json, governance/DEC-0035-evaluation-kernel-relaunch.json, scripts/eval/score-arm.mjs |
+| ACT-0001 | P0 | Execute the single DEC-0037 no-inference loading diagnostic, record its factual outcome, then await a new human decision. Evaluation retries remain halted under DEC-0036. Never attach or open TEST or evaluation prompts. | DEC-0037 | governance/DEC-0037-diagnostic-authorization.json, governance/DEC-0036-evaluation-escalation.json |
 | ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
 
 ## History
@@ -449,6 +450,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.11.0 | 2026-09-15 | Post-execution acceptance: DEC-0030 accepted the completed GHARIBO-exp-001 execution on the DEC-0029 artifact (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and recorded the fp16→float32 runtime deviation instead of hiding it. Training state moved to COMPLETED, artifacts were registered, TEST isolation was re-proven, and evaluation stayed NOT_RUN with no model promotion. | — | PENDING_CHECKPOINT |
 | 1.12.0 | 2026-09-15 | Documentation and validator reconciliation: ADR-0020 accepted (DEC-0031). The obsolete "TRAINING HAS NOT STARTED" validator invariant was replaced with post-execution invariants; docs/MODEL_REGISTRY.md and docs/TRAINING_STRATEGY.md gained additive v1.4.0 notes (fp16-only T4 assumption corrected to float32); docs/ROADMAP.md STAGE-1 moved NOT_STARTED -> IN_PROGRESS; docs/ARCHITECTURE.md moved to v1.2.1 for the adrs fact 19 -> 20. No evaluation, no promotion. | — | PENDING_CHECKPOINT |
 | 1.13.0 | 2026-09-15 | Evaluation authorization recorded. DEC-0032 captures the CEO decision AUTHORIZED WITH LIMITS for exactly one governed held-out TEST benchmark, closes BLK-0003 through that decision, and moves evaluation to EVALUATION_AUTHORIZED_AWAITING_EXECUTION. The RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED before any TEST parse. No score is claimed: evaluation has not executed, the adapter stays EXPERIMENTAL and GHARIBO-V0.1 stays NOT_CREATED. | — | PENDING_CHECKPOINT |
+| 1.17.0 | 2026-09-16 | DEC-0037 authorizes one isolated diagnostic; evaluation remains NOT_RUN and attempt #4 remains unauthorized. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -596,4 +598,10 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - completed the docs/EVALUATION_AUTHORIZATION_REQUEST.md decision block truthfully
 - kept evaluationStatus NOT_RUN, evaluationResults 0, GHARIBO-V0.1 NOT_CREATED
 - This checkpoint authorizes measurement. It records no score and does not constitute an evaluation result.
+- Training executed: true
+
+**1.17.0 — changes**
+- Add isolated loading probe without data attachments or inference
+- Preserve DEC-0036 evaluation halt
+- Diagnostic authorization only.
 - Training executed: true

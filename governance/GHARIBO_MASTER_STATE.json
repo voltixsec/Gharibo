@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.16.0",
-  "updatedAt": "2026-09-15",
+  "masterStateVersion": "1.17.0",
+  "updatedAt": "2026-09-16",
   "project": {
     "id": "GHARIBO",
     "name": "GHARIBO AI LAB",
@@ -842,6 +842,29 @@
         "governance/DEC-0035-evaluation-kernel-relaunch.json",
         "governance/DEC-0032-evaluation-authorization.json",
         "scripts/eval/verify-eval-failure-evidence.py"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0037",
+      "date": "2026-09-16",
+      "title": "Authorize one isolated no-inference Kaggle model loading diagnostic",
+      "status": "ACCEPTED",
+      "decision": "ONE private Kaggle base/tokenizer load probe; stop before inference. No evaluation attempt #4, TEST access, generation, metrics or promotion is authorized. DEC-0036 remains binding for evaluation.",
+      "rationale": "Explicit human selection of the diagnostic option in DEC-0036; determine the loading failure without accessing any benchmark data.",
+      "scope": [
+        "training",
+        "models",
+        "integrations"
+      ],
+      "references": [
+        "governance/DEC-0037-diagnostic-authorization.json",
+        "governance/DEC-0036-evaluation-escalation.json",
+        "scripts/diagnostic/build-probe.mjs",
+        "scripts/diagnostic/probe.py",
+        "scripts/diagnostic/kernel-metadata.json"
       ],
       "supersedes": null,
       "supersededBy": null,
@@ -1905,6 +1928,14 @@
       "harnessRepairLoopHalted": true,
       "predictionsDownloaded": false,
       "scoringPerformed": false
+    },
+    "diagnosticAuthorization": {
+      "decisionId": "DEC-0037",
+      "record": "governance/DEC-0037-diagnostic-authorization.json",
+      "status": "AUTHORIZED_SINGLE_PROBE",
+      "kernelId": "vokaigharibo/gharibo-diagnostic-dec0037",
+      "maximumKernelPushes": 1,
+      "evaluationAttempt4Authorized": false
     }
   },
   "datasets": {
@@ -2552,16 +2583,11 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Retrieve the held-out TEST benchmark result for the in-flight Kaggle kernel vokaigharibo/gharibo-eval-001-fec22ca2 (ONE execution, BASE then CANDIDATE over the same 80 TEST records). Wait for it to leave RUNNING, then download predictions-base.jsonl, predictions-candidate.jsonl and run-record.json; verify the adapter sha256 and base revision against the accepted values; score BOTH arms locally with scripts/eval/score-arm.mjs against held-out gold; register the REAL M1-M13 values for both arms with their factual deltas and evidence hashes. If the kernel fails, record a FAILED EXECUTION truthfully - do NOT re-run, because a further attempt now requires a NEW human decision. Do NOT promote on the result: promotion is a separate governance act and GHARIBO-V0.1 must stay NOT_CREATED in this task.",
-      "requires": "DEC-0032",
+      "action": "Execute the single DEC-0037 no-inference loading diagnostic, record its factual outcome, then await a new human decision. Evaluation retries remain halted under DEC-0036. Never attach or open TEST or evaluation prompts.",
+      "requires": "DEC-0037",
       "references": [
-        "docs/EVALUATION.md",
-        "docs/RESEARCH_BENCHMARK.md",
-        "docs/EVALUATION_BENCHMARK_LAUNCH.md",
-        "governance/DEC-0032-evaluation-authorization.json",
-        "governance/DEC-0034-evaluation-benchmark-launch.json",
-        "governance/DEC-0035-evaluation-kernel-relaunch.json",
-        "scripts/eval/score-arm.mjs"
+        "governance/DEC-0037-diagnostic-authorization.json",
+        "governance/DEC-0036-evaluation-escalation.json"
       ]
     },
     {
@@ -2805,6 +2831,19 @@
         "evaluation EVALUATION_READY_AWAITING_AUTHORIZATION -> EVALUATION_AUTHORIZED_AWAITING_EXECUTION",
         "completed the docs/EVALUATION_AUTHORIZATION_REQUEST.md decision block truthfully",
         "kept evaluationStatus NOT_RUN, evaluationResults 0, GHARIBO-V0.1 NOT_CREATED"
+      ],
+      "trainingExecuted": true
+    },
+    {
+      "revision": "1.17.0",
+      "date": "2026-09-16",
+      "summary": "DEC-0037 authorizes one isolated diagnostic; evaluation remains NOT_RUN and attempt #4 remains unauthorized.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "Diagnostic authorization only.",
+      "changes": [
+        "Add isolated loading probe without data attachments or inference",
+        "Preserve DEC-0036 evaluation halt"
       ],
       "trainingExecuted": true
     }

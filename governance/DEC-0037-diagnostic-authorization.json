@@ -1,0 +1,29 @@
+{
+  "decisionId": "DEC-0037",
+  "recordKind": "DIAGNOSTIC_ONLY_AUTHORIZATION",
+  "date": "2026-09-16",
+  "authority": "Explicit human instruction in current task",
+  "authorizes": "ONE private Kaggle base/tokenizer load probe; stop before inference",
+  "baselineCommit": "c428a98cb25833adfaeae4f7be566584b4479a4c",
+  "kernelId": "vokaigharibo/gharibo-diagnostic-dec0037",
+  "maximumKernelPushes": 1,
+  "evaluationAttempt4Authorized": false,
+  "evaluationStatus": "NOT_RUN",
+  "trainingStatus": "COMPLETED",
+  "testDataAttached": false,
+  "testDataAccessAuthorized": false,
+  "inferenceAuthorized": false,
+  "generationAuthorized": false,
+  "promotionAuthorized": false,
+  "metricsAuthorized": false,
+  "dependencyPolicy": "Reuse governed three-stage install unchanged; no dependency upgrade or loader repair",
+  "baseRevisionVerification": "Resolve live upstream openai base revision against governed pin. Separately verify loaded distribution commit. This does not prove quantized weights are identical to upstream weights.",
+  "onFailure": "Capture traceback, classify, stop. No automatic additional probe.",
+  "notebookSha256": "b52c42b7aa99f5bfc049acf235f4d0ab0c98ffed56292c0987123f5717ef72b2",
+  "references": [
+    "governance/DEC-0036-evaluation-escalation.json",
+    "scripts/diagnostic/build-probe.mjs",
+    "scripts/diagnostic/probe.py",
+    "scripts/diagnostic/kernel-metadata.json"
+  ]
+}

@@ -761,6 +761,7 @@ const COMPLETED_MASTER_STATE_VERSIONS = [
   "1.14.0",
   "1.15.0",
   "1.16.0",
+  "1.17.0", // DEC-0037 diagnostic only; accepted training facts are unchanged.
 ];
 
 /**
@@ -967,7 +968,7 @@ export function isKaggleExecutionCompletedGoldState(state) {
   // own predicates, which each re-run this core underneath. Listing them here keeps the
   // "current tip is an accepted completed execution" contract true without weakening it:
   // every post-1.12.0 revision still has to pass `acceptsCompletedExecutionCore` verbatim.
-  const ADVANCED_READINESS_VERSIONS = ["1.13.0", "1.14.0", "1.15.0", "1.16.0"];
+  const ADVANCED_READINESS_VERSIONS = ["1.13.0", "1.14.0", "1.15.0", "1.16.0", "1.17.0"];
   if (!ADVANCED_READINESS_VERSIONS.includes(state?.masterStateVersion) &&
       (state?.training?.authorization?.status !== COMPLETED_READINESS ||
         state?.experiments?.["GHARIBO-exp-001"]?.readinessStatus !== COMPLETED_READINESS)) {
