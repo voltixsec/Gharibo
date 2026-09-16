@@ -5,7 +5,7 @@
 | **Document Owner** | Delivery (GHARIBO AI LAB) |
 | **Type** | Delivery note |
 | **Status** | Living |
-| **Version** | 1.5.0 |
+| **Version** | 1.6.0 |
 | **Last Updated** | 2026-09-16 |
 
 All notable changes to GHARIBO AI LAB are recorded here.
@@ -384,11 +384,12 @@ downloaded.
 
 ---
 
-## [Unreleased] — Held-out TEST benchmark launched (two pre-inference failures, repaired)
+## [Unreleased] — Held-out TEST benchmark launched three times, escalated after three pre-inference failures
 
-**Status: the authorized benchmark has been LAUNCHED TWICE. Both attempts FAILED pre-inference and
-are recorded as failures. No result exists — every M1–M13 value remains `null`, and two launches
-plus four repaired defect classes have produced ZERO metric values.**
+**Status: the authorized benchmark has been LAUNCHED THREE TIMES. All three attempts FAILED
+pre-inference and are recorded as failures. The harness-repair loop is HALTED and ESCALATED to the
+CEO (`DEC-0036`); NO fourth attempt is authorized. No result exists — every M1–M13 value remains
+`null`, and three launches plus five defect classes have produced ZERO metric values.**
 
 #### Added
 
@@ -419,6 +420,13 @@ plus four repaired defect classes have produced ZERO metric values.**
 - `scripts/eval/prepare-eval-launch.mjs` — the governed launch-bundle builder (prompts-only
   projection, `--check` mode, stray answer-file removal).
 
+- `governance/DEC-0036-evaluation-escalation.json` + `scripts/eval/build-dec0036-escalation.mjs` +
+  `scripts/eval/apply-dec0036-escalation.mjs` — the **escalation**. Records the third pre-inference
+  failure (defect `DEF-0036-E`), a 3-row attempt history, `harnessRepairLoopHalted = true`,
+  `fourthAttemptAuthorized = false`, the distinction between *consumed* (true) and *spent* (false),
+  and four options presented to the CEO **with no recommendation** — choosing between them is the
+  decision the escalation exists to obtain.
+
 #### Fixed
 
 - **`NameError` in cell 1 (the observed launch failure).** The generator emitted the governed pins
@@ -443,6 +451,13 @@ plus four repaired defect classes have produced ZERO metric values.**
   equality before any model loads. This defect was found because a deliberately weakened check was
   caught satisfying itself on an unrelated line of source.
 
+- **`RuntimeError` in cell 6 (the observed third-launch failure).** Unsloth could not load the
+  tokenizer/processor: a `404` on the distribution repo's `additional_chat_templates` path
+  surfaced as `RemoteEntryNotFoundError`, then the loader's own `RuntimeError`. A transient Xet
+  transport warning precedes the 404, so whether the folder is genuinely absent hub-side or the
+  download was partial is **not established and is deliberately not asserted**. No repair is
+  attempted: a third pre-inference failure is escalated (`DEC-0036`), not repaired again.
+
 #### Changed
 
 - `scripts/eval/check-eval-kernel.mjs` — **41 → 53 checks**. Twelve new checks cover the pin-encoding
@@ -465,9 +480,25 @@ plus four repaired defect classes have produced ZERO metric values.**
   requires `evaluationStatusAfterLaunch === "EVALUATION_BENCHMARK_IN_FLIGHT"`,
   `metricValuesProduced === 0`, `testRecordsParsedLocally === 0`, `executionSucceeded === false`, and
   the recorded pre-inference failure.
-- `docs/EVALUATION_BENCHMARK_LAUNCH.md` — v1.2.0. New §0 records **both** failures, all four
-  defects, the missing gate layer, the relaunch, the six pre-flight controls, and the escalation
-  rule. `docs/EVALUATION_EXECUTION_BLOCKER.md` — v1.3.0; `BLK-0004` is CLOSED, with the original
+- `scripts/eval/verify-eval-failure-evidence.py` — the signature table gained
+  `TOKENIZER_PROCESSOR_LOAD_FAILURE`, so a *fifth* failure class is classified rather than reported
+  as "unclassifiable". The verifier was run against all three failure logs.
+- `apps/web/lib/training/gold-authorization.mjs` — master-state allow-lists extended to `1.16.0`,
+  and a new layered predicate `isEvaluationEscalatedGoldState()` added. It sits on the launch
+  predicate, requires the halt and the honest counts, and blocks **both** directions of the
+  consumed/spent confusion: flipping `authorizationSpent` to `true` without inference would silently
+  forbid the repair a human might authorize; flipping it to `false` *with* inference would silently
+  permit test-set fitting.
+- `scripts/eval/verify-evaluation-state.mjs` — **31 → 33 checks**. A fourth branch handles the
+  escalated state, requiring `harnessRepairLoopHalted === true`, `furtherAttemptAuthorized === false`,
+  the recorded third failure, and zero metrics.
+- `governance/GHARIBO_MASTER_STATE.json` — master state `1.15.0 → 1.16.0`. 36 decisions.
+  `training.evaluationAuthorization` now carries the third-launch fields, `launchAttempts: 3`,
+  `defectClassesFound: 5`, `harnessRepairLoopHalted: true`, and
+  `authorizationSpent: false`.
+- `docs/EVALUATION_BENCHMARK_LAUNCH.md` — v1.3.0. §0 now records **all three** failures, all
+  five defects, the missing gate layer, the six pre-flight controls, the escalation, and a 10-row
+  honesty table. `docs/EVALUATION_EXECUTION_BLOCKER.md` — v1.4.0; `BLK-0004` is CLOSED, with the original
   classification retained as history rather than overwritten.
 - `package.json` — `eval:audit:launch`, `eval:audit:relaunch`, `eval:kernel:runtime`,
   `eval:launch:evidence`; `verify:eval` composes all of them.
@@ -486,6 +517,13 @@ plus four repaired defect classes have produced ZERO metric values.**
 - **Escalation rule.** A **third** pre-inference failure must be escalated to the CEO rather than
   repaired again. Repairs are bounded by the pre-inference test, not by a count — but repeated
   harness failure is itself evidence about the plan.
+- **Escalated, not repaired.** Three pushes and five defect classes produced zero measurements, and
+  the failure classes converged on the model-loading path rather than spreading randomly. That
+  convergence is a finding about the plan, not a bug in a cell — so the harness stopped
+  re-authorizing itself and asked a human.
+- **"Technically unspent" is not "clear to retry".** The single authorized execution remains unspent
+  because no TEST inference occurred, and a fourth attempt is nonetheless **not authorized**. The
+  gap between those two statements is exactly what `DEC-0036` refuses to close unilaterally.
 - **Every new gate was adversarially verified** by re-injecting the defect and observing a failure
   before being trusted. A gate that has never been seen to fail has not been shown to be a gate.
 - **Repository safety.** No raw TEST record, inference transcript, weight, adapter binary, Kaggle

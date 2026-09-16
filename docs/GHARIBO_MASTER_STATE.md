@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.15.0 |
+| **Version** | 1.16.0 |
 | **Last Updated** | 2026-09-15 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | COMPLETED |
 | Training invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | DEC-0032 authorized exactly one governed held-out TEST benchmark (AUTHORIZED WITH LIMITS, CEO, 2026-09-15), closing BLK-0003; the RESEARCH_BENCHMARK.md 3.5 leakage audit PASSED (TRAIN∩TEST=0, VALIDATION∩TEST=0, AUDIT∩TEST=0). BLK-0004 (no GPU execution environment) was opened by DEC-0033 and is now CLOSED: the kernel generator was repaired and gated, and a governed Kaggle T4 route was established. DEC-0034 launched the benchmark, which FAILED pre-inference on a further harness defect (NameError in cell 1, no TEST record read); DEC-0035 repaired three defect classes and RELAUNCHED, which is the same single authorized execution restarted rather than a second one. The kernel is RUNNING and no score exists: every M1-M13 value is null, evaluation stays NOT_RUN with evaluationResults 0. From DEC-0035 onward no further relaunch is permitted without a new human decision. Training stays COMPLETED, the adapter stays EXPERIMENTAL, and GHARIBO-V0.1 stays NOT_CREATED. |
+| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=None at the governance level. BLK-0004 (no GPU execution environment) is CLOSED - the execution environment was obtained and the kernel pushed three times. The active constraint is no longer a blocker but an ESCALATION: the harness has failed pre-inference three times, and DEC-0036 halts automated repair pending a CEO decision., note=A closed blocker is not a satisfied objective. BLK-0004 was closed by obtaining a runtime, not by obtaining a result; three launches have produced zero measurements. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -373,6 +373,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0033 | 2026-09-16 | Record the infrastructure blocker that prevented the DEC-0032 governed held-out TEST benchmark from executing | ACCEPTED | — |
 | DEC-0034 | 2026-09-16 | Launch the DEC-0032 governed held-out TEST benchmark on the Kaggle T4 route, and record its pre-inference harness failure | ACCEPTED | — |
 | DEC-0035 | 2026-09-16 | Repair the evaluation-harness defect classes and relaunch the kernel within the existing DEC-0032 authorization | ACCEPTED | — |
+| DEC-0036 | 2026-09-16 | Halt the evaluation-harness repair loop after a third pre-inference failure and escalate to the CEO | ACCEPTED | — |
 
 ## Validation
 

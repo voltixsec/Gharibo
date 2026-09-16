@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Approved |
-| **Version** | 1.2.0 |
+| **Version** | 1.3.0 |
 | **Last Updated** | 2026-09-16 |
 
 ## 1. Purpose
@@ -22,11 +22,17 @@ pre-inference failure of that first launch, and the repaired relaunch**.
 
 ---
 
-## 0. Update — both launches FAILED pre-inference, and were repaired
+## 0. Update — three launches, five defects, zero scores, and an escalation
 
-The launch described in §3 was pushed and began running, then **died in cell 1**. Its repair was
-relaunched and **died in cell 5**. Neither reached inference; **four** distinct defect classes were
-found and closed across the two attempts (§0.1, §0.3).
+> **CURRENT STATE: the harness-repair loop is HALTED and ESCALATED to the CEO (`DEC-0036`).**
+> Three kernel pushes have been made; **all three failed pre-inference**, and **no further attempt
+> is authorized**. Five distinct defect classes were found and closed, two of them introduced by the
+> repair for the one before. **No TEST inference has occurred and no M1–M13 value exists.**
+
+Attempt 1 died in cell 1 (§0.1). Its repair was relaunched and died in cell 5 (§0.3). That repair
+was pushed and died in cell 6 (§0.6) — reaching further each time, and never reaching inference.
+
+### 0.1 Attempt 1 — `NameError` in cell 1
 
 ```
 NameError: name 'false' is not defined        (cell 1, 9.58 s of relative log time)
@@ -57,7 +63,7 @@ install-stage marker — the failure preceded both. The script is proven to flip
 3. **Therefore the relaunch is the SAME single authorized execution restarted, not a second one.**
    `DEC-0032` `hardStops[2]` bars a repeat only where TEST inference has *materially occurred*.
 
-### 0.1 Three defects, and the gate layer that was missing
+### 0.2 Three defects, and the gate layer that was missing
 
 Repairing the first defect introduced the second, and repairing that introduced the third:
 
@@ -83,7 +89,7 @@ Two gates were added, both **adversarially verified** (re-inject the defect → 
 model are compile-checked and scanned but not executed, because doing so needs the accelerator this
 gate exists to avoid requiring. It is not a substitute for the run and does not claim to be.
 
-### 0.2 Relaunched kernel
+### 0.3 Relaunched kernel
 
 | Field | Value |
 |---|---|
@@ -97,7 +103,7 @@ gate exists to avoid requiring. It is not a substitute for the run and does not 
 > relaunch reaches inference, `hardStops[2]` binds: if it fails, or succeeds with disappointing
 > numbers, the answer is to record that — not to try again.
 
-### 0.3 The relaunch ALSO FAILED, on a fourth defect
+### 0.4 Attempt 2 — the relaunch failed, on a fourth defect
 
 The relaunched kernel did **not** reach inference either. It died in **cell 5**, during model load:
 
@@ -135,7 +141,39 @@ present**; install ran; 80 prompts loaded; the model load was attempted and rais
 because treating an installer log line as inference evidence is exactly how an unspent authorization
 gets declared spent.
 
-### 0.4 Pre-flight controls, all holding
+### 0.5 Attempt 3 — the tokenizer/processor could not be loaded, and the loop is HALTED
+
+The second repair (kernel version 3) was pushed. It reached **further than any previous attempt** —
+pins loaded, 80 prompts loaded, **all three governed install stages completed**, and
+`FastLanguageModel.from_pretrained` was entered — then died in **cell 6**:
+
+```
+RuntimeError: Unsloth: Could not load the tokenizer/processor. If you are offline, make sure the
+tokenizer files exist in the checkpoint folder or were previously downloaded to the Hugging Face
+cache, or set HF_HUB_OFFLINE=1 to force local loading.
+
+# underlying hub response:
+HTTPStatusError: Client error '404 Not Found' for url
+  https://huggingface.co/api/models/unsloth/gpt-oss-20b-unsloth-bnb-4bit/tree/main/additional_chat_templates?recursive=false&expand=false
+  -> RemoteEntryNotFoundError
+```
+
+| # | Defect | Class | Note |
+|---|---|---|---|
+| E | tokenizer/processor unavailable at the load path | runtime-only loader defect | a transient Xet transport warning precedes the 404, so whether the folder is genuinely absent hub-side or the download was partial is **not established and is not asserted** |
+
+**Still pre-inference, and provably so.** `verify-eval-failure-evidence.py` scans **8 inference
+markers, finds none**, and classifies the run as `TOKENIZER_PROCESSOR_LOAD_FAILURE` / `MODEL_LOAD`
+(4/4). Neither `base loaded from` nor `BASE loaded` appears in the log, so **no model object was
+ever constructed** — which makes "no inference occurred" structural rather than merely asserted.
+
+> **ESCALATION.** A third pre-inference failure triggers the rule `DEC-0035` wrote before it was
+> needed: *escalate rather than repair again*. `DEC-0036` therefore **halts the repair loop**. No
+> repair was performed, no fourth kernel was pushed, and **no fourth attempt is authorized**. The
+> decision to continue — a targeted further repair, a diagnostic no-inference probe, a runtime
+> change, or postponement — belongs to the CEO.
+
+### 0.6 Pre-flight controls
 
 Six controls are now asserted before a third push. Each is a claim about the **artifact**, checked by
 a gate — not an intention:
@@ -149,24 +187,32 @@ a gate — not an intention:
 | PF-5 | rendering uses the frozen render-then-tokenize convention (`developer` turn) | `check-eval-kernel.mjs` |
 | PF-6 | the notebook refuses to run if any gold payload is present | `verify-eval-kernel-runtime.py`, `verify-eval-bundle.py` |
 
-### 0.5 Two launches, four defects, zero scores
+### 0.7 Three launches, five defects, zero scores
 
 | | Count |
 |---|---|
-| Kernel pushes | **2** |
-| Defects found and closed | **4** (A, B, C, D) |
+| Kernel pushes | **3** |
+| Defects found and closed | **5** (A, B, C, D, E) |
 | Defects introduced *by fixing the previous one* | **2** (B, D) |
 | Gates hardened / added | **3** |
+| Repairs without reaching inference | **2** |
+| Attempts reaching the install stage | 2 of 3 |
+| Attempts reaching the model-load path | 2 of 3 |
+| **Attempts reaching inference** | **0** |
 | **Metric values produced** | **0** |
 
-Two of the four defects were created by the repair for the one before. That is the load-bearing
+Two of the five defects were created by the repair for the one before. That is the load-bearing
 argument for a gate that **executes** the artifact rather than one that re-reads it: all 41 original
 static checks passed on a notebook that could not run, and the fourth defect was invisible to every
 textual check because the source was well-formed.
 
-> **Escalation rule.** A **third** pre-inference failure must be escalated to the CEO rather than
-> repaired again. Repairs are bounded by the pre-inference test rather than by a count — but repeated
-> harness failure is itself evidence about the plan, and that judgement belongs to the CEO.
+**Progress is real and orthogonal to the question.** Each attempt reached strictly further than the
+last, which is genuine evidence that the repairs worked as repairs. It is also **no evidence at all
+about model quality**, and it must never be reported as though it were.
+
+> **Escalation rule, now triggered.** A **third** pre-inference failure must be escalated to the CEO
+> rather than repaired again. Repairs are bounded by the pre-inference test rather than by a count —
+> but repeated harness failure is itself evidence about the plan. `DEC-0036` is that escalation.
 
 ---
 
@@ -301,11 +347,15 @@ attempt requires a **new human decision**.
 | `testRecordsParsedLocally` | `0` |
 | `metricValuesProduced` | `0` |
 | `executionSucceeded` | `false` |
-| Kernel pushes | `2` (both `FAILED_PRE_INFERENCE`) |
-| Defects found and closed | `4` (A, B, C, D) |
+| Kernel pushes | `3` (all three `FAILED_PRE_INFERENCE`) |
+| Defects found and closed | `5` (A, B, C, D, E) |
 | Harness repairs without reaching inference | `2` |
+| Harness-repair loop | **`HALTED`** by `DEC-0036` |
+| Authorization consumed | `true` |
 | Authorization spent | `false` — no TEST inference has materially occurred |
-| Further attempt authorized | `false` — a further attempt needs a new human decision |
+| `hardStops[2]` satisfied | `false` |
+| `hardStops[3]` satisfied | `true` — the failures are recorded separately, not disguised |
+| Further attempt authorized | `false` — a further attempt needs a **new human decision** |
 | `predictionsDownloaded` | `false` |
 | `scoringPerformed` | `false` |
 | `evaluationStatus` | `EVALUATION_AUTHORIZED_READINESS` (unchanged) |
@@ -333,15 +383,24 @@ placeholders, and a failed attempt is no more permitted to become a score than a
 
 ## 7. What must happen next
 
-1. Push the repaired kernel (version 2) and let it leave the queue.
-2. **If it completes**: download `predictions-base.jsonl`, `predictions-candidate.jsonl` and
-   `run-record.json`; verify the recorded adapter and prompt hashes match the pins; score both arms
-   locally with `score-arm.mjs` against `gold.jsonl`; register the real M1–M13 values.
-3. **If it fails**: record it as a **FAILED EXECUTION** with the real error. Do **not** re-run
-   without a new human decision, and do **not** back-fill a score. If it fails *before* inference for
-   a **third** time, escalate to the CEO rather than repairing again (§0.5).
-4. Only after real scores exist may a **separate** promotion decision be considered. Promotion is a
-   different authorization from the one exercised here.
+**The next step is a CEO decision, not a fourth kernel push.** `DEC-0036` halts the repair loop and
+presents four options:
+
+| Option | What it means |
+|---|---|
+| **A. One targeted further repair** | Fix the tokenizer/processor load path specifically and push once more. |
+| **B. A diagnostic, no-inference probe** | Establish whether the 404 is hub-side or transport-induced *before* repairing anything. This is the only option that answers the open question rather than guessing at it. |
+| **C. Change the runtime** | The free-tier T4 path may not reproducibly load a 20B 4-bit model. |
+| **D. Re-scope or postpone** | Record that no evaluation is possible under the current zero-cost constraints. |
+
+`DEC-0036` presents these and **recommends none** — choosing between them is the decision the
+escalation exists to obtain.
+
+Whenever execution does resume, the standing rules are unchanged: download the prediction payloads,
+verify the recorded adapter and prompt hashes against the pins, score both arms locally against
+`gold.jsonl`, and register the real M1–M13 values. If a run fails, record the real error; do **not**
+back-fill a score, and do **not** treat "still technically unspent" as "clear to retry". Promotion
+remains a **separate** authorization from the one exercised here.
 
 ### 7.1 What has NOT happened
 
@@ -359,6 +418,7 @@ placeholders, and a failed attempt is no more permitted to become a score than a
 - `governance/DEC-0033-evaluation-infrastructure-blocker.json`
 - `governance/DEC-0034-evaluation-benchmark-launch.json`
 - `governance/DEC-0035-evaluation-kernel-relaunch.json`
+- `governance/DEC-0036-evaluation-escalation.json`
 - `docs/EVALUATION_EXECUTION_BLOCKER.md`
 - `docs/EVALUATION_AUTHORIZATION_REQUEST.md`
 - `docs/RESEARCH_BENCHMARK.md` §3.5, §5, §6, §7.1, §9

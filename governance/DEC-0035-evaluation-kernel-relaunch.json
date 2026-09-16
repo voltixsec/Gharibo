@@ -160,6 +160,11 @@
   "kernelUrl": "https://www.kaggle.com/code/vokaigharibo/gharibo-eval-001-fec22ca2",
   "repairedKernelVersion": 2,
   "repairedKernelStatus": "REPUSHED_AFTER_SECOND_REPAIR",
+  "supersededByEscalationId": "DEC-0036",
+  "outcomeOfThisRepair": "FAILED_PRE_INFERENCE_ON_A_FIFTH_DEFECT_CLASS",
+  "outcomeOfThisRepairDetail": "Kernel version 3 died in cell 6 inside Unsloth vision.py::from_pretrained with 'RuntimeError: Unsloth: Could not load the tokenizer/processor' after a 404 on the distribution repo's additional_chat_templates path. Still pre-inference: no model object was constructed. It reached further than any previous attempt — all three install stages completed — and it did NOT reach inference.",
+  "escalationTriggeredByThisRepair": true,
+  "escalationTriggerReason": "A THIRD pre-inference failure triggers the rule stated in this very record's afterThisPoint section: escalate to the CEO rather than repair again.",
   "kernelIdChangeReason": "Kaggle rejects a kernel push whose title does not slugify to the declared id (409 Conflict), and the repaired notebook was pushed under an id whose title resolves to it.",
   "kernelStatusAtRecordTime": "RUNNING",
   "kernelStatusSource": "kaggle kernels status (observed at recordedAt; a launch-time fact)",
@@ -226,5 +231,5 @@
     "scripts/eval/verify-eval-kernel-runtime.py",
     "scripts/eval/verify-eval-failure-evidence.py"
   ],
-  "relaunchHash": "3326564bfce2dae041df364c38e2d28b339e73c40ab0bc0e71124f870505ff2e"
+  "relaunchHash": "105ceddf653da56c2d8f0e44c5361b8c28346df5fb6b8ba2ebf4190a71e8483c"
 }

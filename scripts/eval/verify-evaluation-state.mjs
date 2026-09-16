@@ -229,6 +229,88 @@ if (infraBlocker && infraBlocker.status === "OPEN") {
     infraBlocker?.status === "CLOSED",
     `BLK-0004 status=${JSON.stringify(infraBlocker?.status)}`,
   );
+} else if (infraBlocker && infraBlocker.status === "CLOSED" && evalAuth.escalationDecisionId) {
+  // The fourth legitimate case, and the one this project actually reached: the blocker is CLOSED
+  // by a launch, no result exists, and the run is NOT in flight because it has failed a THIRD time
+  // pre-inference and the repair loop has been HALTED pending a CEO decision.
+  //
+  // This state invites a specific fraud: reading "still technically unspent" as "clear to retry".
+  // The branch therefore requires the halt to be recorded, the counts to be honest, and — the
+  // load-bearing check — `furtherAttemptAuthorized === false`. A harness that re-authorizes itself
+  // after three failures is exactly what this layer exists to make impossible.
+  check(
+    "third pre-inference failure is recorded as a failure",
+    evalAuth.thirdLaunchOutcome === "FAILED_PRE_INFERENCE" &&
+      evalAuth.thirdLaunchFailureClass === "HARNESS_DEFECT_NO_EXECUTION" &&
+      evalAuth.thirdLaunchFailureDefectId === "DEF-0036-E",
+    `thirdLaunchOutcome=${JSON.stringify(evalAuth.thirdLaunchOutcome)} defect=${JSON.stringify(evalAuth.thirdLaunchFailureDefectId)}`,
+  );
+  check(
+    "the third failure occurred before any model object existed",
+    evalAuth.thirdLaunchTestInferenceOccurred === false &&
+      evalAuth.thirdLaunchModelObjectConstructed === false,
+    `inference=${JSON.stringify(evalAuth.thirdLaunchTestInferenceOccurred)} model=${JSON.stringify(evalAuth.thirdLaunchModelObjectConstructed)}`,
+  );
+  check(
+    "the harness-repair loop is recorded as HALTED",
+    evalAuth.harnessRepairLoopHalted === true,
+    `harnessRepairLoopHalted=${JSON.stringify(evalAuth.harnessRepairLoopHalted)}`,
+  );
+  check(
+    "NO fourth attempt is authorized",
+    evalAuth.furtherAttemptAuthorized === false &&
+      evalAuth.furtherAttemptRequiresNewDecision === true,
+    `furtherAttemptAuthorized=${JSON.stringify(evalAuth.furtherAttemptAuthorized)}`,
+  );
+  check(
+    "consumed but NOT spent: no TEST inference occurred, so hardStops[2] is unsatisfied",
+    evalAuth.authorizationConsumed === true &&
+      evalAuth.authorizationSpent === false &&
+      evalAuth.hardStops2Satisfied === false &&
+      evalAuth.hardStops3Satisfied === true,
+    `consumed=${JSON.stringify(evalAuth.authorizationConsumed)} spent=${JSON.stringify(evalAuth.authorizationSpent)}`,
+  );
+  check(
+    "three launches, five defect classes, and zero metric values",
+    evalAuth.launchAttempts === 3 &&
+      evalAuth.defectClassesFound === 5 &&
+      evalAuth.metricValuesProducedAfterThreeLaunches === 0 &&
+      evalAuth.metricValuesProduced === 0,
+    `attempts=${JSON.stringify(evalAuth.launchAttempts)} defects=${JSON.stringify(evalAuth.defectClassesFound)} metrics=${JSON.stringify(evalAuth.metricValuesProduced)}`,
+  );
+  check(
+    "nothing was downloaded, scored, or parsed locally",
+    evalAuth.testRecordsParsedLocally === 0 &&
+      evalAuth.predictionsDownloaded === false &&
+      evalAuth.scoringPerformed === false &&
+      evalAuth.executionSucceeded === false,
+    `parsed=${JSON.stringify(evalAuth.testRecordsParsedLocally)} downloaded=${JSON.stringify(evalAuth.predictionsDownloaded)} scored=${JSON.stringify(evalAuth.scoringPerformed)}`,
+  );
+  check(
+    "BLK-0004 CLOSED by the launch decisions, not annotatively",
+    Array.isArray(infraBlocker.closedBy) && infraBlocker.closedBy.includes("DEC-0035"),
+    `closedBy=${JSON.stringify(infraBlocker.closedBy)}`,
+  );
+  check(
+    "DEC-0034, DEC-0035 and DEC-0036 are all ACCEPTED and unsuperseded",
+    ["DEC-0034", "DEC-0035", "DEC-0036"].every((id) => {
+      const d = decisions.filter((x) => x?.id === id);
+      return (
+        d.length === 1 &&
+        d[0].status === "ACCEPTED" &&
+        d[0].supersedes === null &&
+        d[0].supersededBy === null
+      );
+    }),
+    "DEC-0034/DEC-0035/DEC-0036 status/supersession",
+  );
+  check(
+    "DEC-0036 escalation record path is declared",
+    evalAuth.escalationRecord === "governance/DEC-0036-evaluation-escalation.json" &&
+      typeof evalAuth.escalationHash === "string" &&
+      /^[0-9a-f]{64}$/.test(evalAuth.escalationHash),
+    `escalationRecord=${JSON.stringify(evalAuth.escalationRecord)}`,
+  );
 } else if (infraBlocker && infraBlocker.status === "CLOSED") {
   // The third legitimate case: the blocker is CLOSED by a LAUNCH, but no result exists yet
   // because the run is still in flight. This is the state the DEC-0034/DEC-0035 checkpoint

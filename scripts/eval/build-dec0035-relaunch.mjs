@@ -352,6 +352,24 @@ export function evaluationRelaunchBody() {
     kernelUrl: "https://www.kaggle.com/code/vokaigharibo/gharibo-eval-001-fec22ca2",
     repairedKernelVersion: 2,
     repairedKernelStatus: "REPUSHED_AFTER_SECOND_REPAIR",
+    /**
+     * The second repair was pushed and ALSO failed pre-inference — a fifth defect class, at the
+     * model-load path. That is recorded in DEC-0036 as an ESCALATION rather than repaired here.
+     * Stated in this record too, so a reader of DEC-0035 alone cannot mistake this repair for a
+     * success.
+     */
+    supersededByEscalationId: "DEC-0036",
+    outcomeOfThisRepair: "FAILED_PRE_INFERENCE_ON_A_FIFTH_DEFECT_CLASS",
+    outcomeOfThisRepairDetail:
+      "Kernel version 3 died in cell 6 inside Unsloth vision.py::from_pretrained with " +
+      "'RuntimeError: Unsloth: Could not load the tokenizer/processor' after a 404 on the " +
+      "distribution repo's additional_chat_templates path. Still pre-inference: no model object " +
+      "was constructed. It reached further than any previous attempt — all three install stages " +
+      "completed — and it did NOT reach inference.",
+    escalationTriggeredByThisRepair: true,
+    escalationTriggerReason:
+      "A THIRD pre-inference failure triggers the rule stated in this very record's " +
+      "afterThisPoint section: escalate to the CEO rather than repair again.",
     kernelIdChangeReason:
       "Kaggle rejects a kernel push whose title does not slugify to the declared id (409 Conflict), " +
       "and the repaired notebook was pushed under an id whose title resolves to it.",

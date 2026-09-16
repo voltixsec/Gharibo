@@ -69,6 +69,16 @@ FATAL_SIGNATURES = {
         "phase": "MODEL_LOAD",
         "preceded_model_load": False,
     },
+    # Fifth distinct failure (kernel version 2). The base model loaded far enough to resolve the
+    # distribution repo, then Unsloth could not obtain a tokenizer/processor: the processor folder
+    # is probed at .../additional_chat_templates and the hub answers 404. Still pre-inference — it
+    # dies inside vision.py::from_pretrained, before any model object exists.
+    "TOKENIZER_PROCESSOR_LOAD_FAILURE": {
+        "exception": "RuntimeError",
+        "message": "Could not load the tokenizer/processor",
+        "phase": "MODEL_LOAD",
+        "preceded_model_load": False,
+    },
 }
 
 

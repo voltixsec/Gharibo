@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Approved |
-| **Version** | 1.3.0 |
+| **Version** | 1.4.0 |
 | **Last Updated** | 2026-09-16 |
 
 ## 0. Update — 2026-09-16 (v1.2.0): BLK-0004 is now CLOSED
@@ -20,13 +20,15 @@ launched on the governed Kaggle T4 route.
 | 3. Add the static safety gate | **DONE** | `scripts/eval/check-eval-kernel.mjs` — **53** checks |
 | 3b. Add a **runtime** gate | **DONE** | `scripts/eval/verify-eval-kernel-runtime.py` — **22** checks, executes the pins cell |
 | 4. Build the prompts-only bundle | **DONE** | 80 prompts, 19/19 privacy checks, no gold |
-| 5. Push dataset + kernel | **DONE ×2** | private dataset; kernel pushed twice, both attempts failed pre-inference |
-| 6–8 (download, score, register) | **PENDING** | neither push reached inference; no score exists |
+| 5. Push dataset + kernel | **DONE ×3** | private dataset; kernel pushed three times, **all three attempts failed pre-inference** |
+| 6–8 (download, score, register) | **BLOCKED** | no attempt reached inference; no score exists. `DEC-0036` halts the repair loop pending a CEO decision |
 
 **The blocker was closed by a launch, not by a result — and that distinction is load-bearing.**
 The first launch failed pre-inference with a `NameError` in cell 1; it was diagnosed, repaired and
-relaunched; the relaunch failed pre-inference with a loader contract error in cell 5. Because no TEST
-inference occurred at any point, the single authorized execution survives intact. Full detail is in
+relaunched; the relaunch failed pre-inference with a loader contract error in cell 5; its repair was
+pushed and failed pre-inference with a tokenizer/processor load error in cell 6. Because no TEST
+inference occurred at any point, the single authorized execution survives intact — but the third
+failure triggered the escalation rule, so the repair loop is now **HALTED**. Full detail is in
 `docs/EVALUATION_BENCHMARK_LAUNCH.md` §0.
 
 > **The classification in §2 below remains historically accurate for the period it describes.** It
@@ -36,9 +38,9 @@ inference occurred at any point, the single authorized execution survives intact
 The 41- and 49-check figures quoted below were accurate when written; the static gate has since grown
 to **53** checks, and a runtime gate plus a failure-evidence verifier now exist that did not then.
 
-> **A third pre-inference failure must be escalated to the CEO rather than repaired again.** Repairs
-> are bounded by the pre-inference test, not by a count — but two repairs and four defect classes
-> without a single inference step is itself evidence about the plan.
+> **A third pre-inference failure was escalated to the CEO rather than repaired again.** That rule was
+> written in `DEC-0035` before it was needed and is now invoked by `DEC-0036`: two repairs and **five**
+> defect classes without a single inference step is itself evidence about the plan.
 
 ---
 

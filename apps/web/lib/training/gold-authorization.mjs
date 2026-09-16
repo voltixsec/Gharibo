@@ -754,7 +754,14 @@ const COMPLETED_ACCEPTANCE_HASH =
  *   run, same package, same artifacts, same hashes, same dtype deviation, evaluation still
  *   NOT_RUN and still unpromoted — so the 1.11.0 acceptance holds verbatim inside it too.
  */
-const COMPLETED_MASTER_STATE_VERSIONS = ["1.11.0", "1.12.0", "1.13.0", "1.14.0", "1.15.0"];
+const COMPLETED_MASTER_STATE_VERSIONS = [
+  "1.11.0",
+  "1.12.0",
+  "1.13.0",
+  "1.14.0",
+  "1.15.0",
+  "1.16.0",
+];
 
 /**
  * The DEC-0030 acceptance core, independent of the master-state revision.
@@ -960,7 +967,7 @@ export function isKaggleExecutionCompletedGoldState(state) {
   // own predicates, which each re-run this core underneath. Listing them here keeps the
   // "current tip is an accepted completed execution" contract true without weakening it:
   // every post-1.12.0 revision still has to pass `acceptsCompletedExecutionCore` verbatim.
-  const ADVANCED_READINESS_VERSIONS = ["1.13.0", "1.14.0", "1.15.0"];
+  const ADVANCED_READINESS_VERSIONS = ["1.13.0", "1.14.0", "1.15.0", "1.16.0"];
   if (!ADVANCED_READINESS_VERSIONS.includes(state?.masterStateVersion) &&
       (state?.training?.authorization?.status !== COMPLETED_READINESS ||
         state?.experiments?.["GHARIBO-exp-001"]?.readinessStatus !== COMPLETED_READINESS)) {
@@ -1370,6 +1377,154 @@ export function preExecutionState(state) {
   return before;
 }
 
+/**
+ * The DEC-0036 escalation tip: the harness-repair loop was HALTED after a THIRD pre-inference
+ * failure, and the next step is a CEO decision rather than another automated push.
+ *
+ * WHAT THIS PREDICATE IS FOR
+ * -------------------------
+ * The tempting reading of a third pre-inference failure is "still unspent, so push again". The
+ * predicate exists to make that reading unavailable in code: at this tip the repair loop must be
+ * recorded as halted, the attempt and defect counts must be honest, and NO fourth attempt may be
+ * authorized. It is the machine-checkable form of "the harness does not re-authorize itself".
+ *
+ * LAYERING NOTE. This sits on `isEvaluationBenchmarkLaunchedGoldState`, which asserts the launch
+ * layer's values — correct for the DEC-0035 tip, and false at this tip, where the third failure has
+ * legitimately advanced several of them. As with the layer below, expected values are passed
+ * through explicitly rather than by deleting the assertions.
+ */
+export function isEvaluationEscalatedGoldState(state) {
+  const training = state?.training;
+  const evalAuthorization = training?.evaluationAuthorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  if (!evalAuthorization) return false;
+
+  // The launch layer must still hold underneath, with the fields the third failure advanced
+  // passed through explicitly. NOTE the deliberate omission of `activeKernelStatusAtRecordTime`
+  // and `activeKernelVersion` overrides — the layer below does NOT assert those, so nothing needs
+  // relaxing there; the third failure only advanced fields it genuinely owns.
+  const launchLayerAccepted = isEvaluationBenchmarkLaunchedGoldState(state);
+  if (!launchLayerAccepted) return false;
+
+  // ------------------------------------------------ the escalation (DEC-0036)
+  if (evalAuthorization.escalationDecisionId !== "DEC-0036" ||
+      evalAuthorization.escalationRecord !== "governance/DEC-0036-evaluation-escalation.json") {
+    return false;
+  }
+  if (typeof evalAuthorization.escalationHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(evalAuthorization.escalationHash)) {
+    return false;
+  }
+
+  // (b) ROUNDING DOWN: the third failure must still be stated, and stated as pre-inference.
+  if (evalAuthorization.thirdLaunchOutcome !== "FAILED_PRE_INFERENCE") return false;
+  if (evalAuthorization.thirdLaunchFailureClass !== "HARNESS_DEFECT_NO_EXECUTION") return false;
+  if (evalAuthorization.thirdLaunchFailureDefectId !== "DEF-0036-E") return false;
+  if (evalAuthorization.thirdLaunchFailurePhase !== "MODEL_LOAD") return false;
+  if (evalAuthorization.thirdLaunchTestInferenceOccurred !== false) return false;
+  // The model must not have been constructed — that is what makes "no inference" structural
+  // rather than merely asserted.
+  if (evalAuthorization.thirdLaunchModelObjectConstructed !== false) return false;
+
+  // The counts must be honest. Three launches and five defect classes produced ZERO metrics;
+  // a predicate that let those numbers round down would hide the whole point of the escalation.
+  if (evalAuthorization.launchAttempts !== 3) return false;
+  if (evalAuthorization.defectClassesFound !== 5) return false;
+  if (evalAuthorization.harnessRepairs !== 2) return false;
+  if (evalAuthorization.metricValuesProducedAfterThreeLaunches !== 0) return false;
+
+  // ------------------------------------------------ the halt itself
+  if (evalAuthorization.harnessRepairLoopHalted !== true) return false;
+  if (evalAuthorization.furtherAttemptAuthorized !== false) return false;
+  if (evalAuthorization.furtherAttemptRequiresNewDecision !== true) return false;
+  // `consumed` stays true; `spent` must stay FALSE, because no TEST inference occurred. If a
+  // future edit flipped `spent` to true without inference, the state would silently forbid the
+  // very repair the escalation is asking a human to consider — and if it flipped to false with
+  // inference, it would silently permit test-set fitting. Both directions are blocked here.
+  if (evalAuthorization.authorizationConsumed !== true) return false;
+  if (evalAuthorization.authorizationSpent !== false) return false;
+  if (evalAuthorization.hardStops2Satisfied !== false) return false;
+  if (evalAuthorization.hardStops3Satisfied !== true) return false;
+
+  // (a) ROUNDING UP: nothing may have been scored.
+  if (evalAuthorization.testRecordsParsedLocally !== 0) return false;
+  if (evalAuthorization.metricValuesProduced !== 0) return false;
+  if (evalAuthorization.executionSucceeded !== false) return false;
+  if (evalAuthorization.predictionsDownloaded !== false) return false;
+  if (evalAuthorization.scoringPerformed !== false) return false;
+
+  // Evaluation must still not have moved.
+  if (training?.evaluationResults !== 0) return false;
+  if (experiment?.evaluationStatus !== "NOT_RUN") return false;
+  if (experiment?.promotable !== false) return false;
+
+  // GHARIBO-V0.1 must still not exist.
+  const v01 = (state?.models?.derivedModels || []).find((m) => m?.id === "GHARIBO-V0.1");
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  // All three decisions must be present exactly once and none may have been superseded.
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  for (const id of ["DEC-0034", "DEC-0035", "DEC-0036"]) {
+    const found = decisions.filter((d) => d?.id === id);
+    if (found.length !== 1 ||
+        found[0].status !== "ACCEPTED" ||
+        found[0].supersedes !== null ||
+        found[0].supersededBy !== null) {
+      return false;
+    }
+  }
+
+  // BLK-0004 must be CLOSED, and closed through these decisions.
+  const blocker = (state?.blockers || []).find((b) => b?.id === "BLK-0004");
+  if (!blocker || blocker.status !== "CLOSED") return false;
+  if (!Array.isArray(blocker.closedBy) || !blocker.closedBy.includes("DEC-0035")) return false;
+
+  // Rebuild the DEC-0035 tip and require the previous predicate to still accept it with its own
+  // expectations intact, so this layer cannot be satisfied by tampering with the record beneath.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.15.0";
+  const ea = before.training.evaluationAuthorization;
+  for (const key of [
+    "escalationDecisionId",
+    "escalationHash",
+    "escalationRecord",
+    "escalationReason",
+    "thirdLaunchKernelId",
+    "thirdLaunchKernelVersion",
+    "thirdLaunchStatus",
+    "thirdLaunchOutcome",
+    "thirdLaunchFailureDefectId",
+    "thirdLaunchFailureClass",
+    "thirdLaunchFailurePhase",
+    "thirdLaunchFailureCell",
+    "thirdLaunchFailureException",
+    "thirdLaunchTestInferenceOccurred",
+    "thirdLaunchReachedInstallStage",
+    "thirdLaunchReachedModelLoad",
+    "thirdLaunchModelObjectConstructed",
+    "launchAttempts",
+    "defectClassesFound",
+    "harnessRepairs",
+    "metricValuesProducedAfterThreeLaunches",
+    "authorizationSpent",
+    "authorizationStateIsFragile",
+    "hardStops2Satisfied",
+    "hardStops3Satisfied",
+    "harnessRepairLoopHalted",
+    "activeKernelVersion",
+    "activeKernelStatusAtRecordTime",
+    "predictionsDownloaded",
+    "scoringPerformed",
+  ]) {
+    delete ea[key];
+  }
+  // Restore the DEC-0035 shape of the fields that advanced.
+  ea.activeKernelVersion = 2;
+  ea.activeKernelStatusAtRecordTime = "REPUSHED_AFTER_SECOND_REPAIR";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0036");
+  return isEvaluationBenchmarkLaunchedGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -1381,6 +1536,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isEvaluationAuthorizedGoldState(state) ||
     isEvaluationInfrastructureBlockedGoldState(state) ||
     isEvaluationBenchmarkLaunchedGoldState(state) ||
+    isEvaluationEscalatedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }
