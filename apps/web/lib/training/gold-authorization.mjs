@@ -2508,6 +2508,210 @@ export function isEvaluationAttempt5FailedGoldState(state) {
 }
 
 
+/**
+ * DEC-0046 authorizes exactly ONE Evaluation Attempt #6.
+ *
+ * This is additive over the terminal DEC-0045 failure state.
+ * Attempt #5 history remains immutable; no result or promotion is created here.
+ */
+export function isEvaluationAttempt6AuthorizedGoldState(state) {
+  const training = state?.training;
+  const attempt6 = training?.attempt6Authorization;
+  const experiment =
+    state?.experiments?.["GHARIBO-exp-001"];
+  const evalAuthorization =
+    training?.evaluationAuthorization;
+
+  if (state?.masterStateVersion !== "1.25.0") {
+    return false;
+  }
+
+  if (!attempt6 || !experiment || !evalAuthorization) {
+    return false;
+  }
+
+  if (
+    attempt6.decisionId !== "DEC-0046" ||
+    attempt6.status !== "AUTHORIZED_NOT_LAUNCHED" ||
+    attempt6.attemptNumber !== 6 ||
+    attempt6.maximumKernelPushes !== 1 ||
+    attempt6.kernelPushesPerformed !== 0 ||
+    attempt6.kernelPushesRemaining !== 1 ||
+    attempt6.automaticRetryAuthorized !== false ||
+    attempt6.launchAttempted !== false ||
+    attempt6.testInferenceOccurred !== false ||
+    attempt6.metricValuesProduced !== 0 ||
+    attempt6.authorizationSpent !== false ||
+    attempt6.authorizationConsumed !== false ||
+    attempt6.repairLocallyProven !== true ||
+    attempt6.repairRuntimeProvenOnKaggle !== false ||
+    attempt6.repairRegressionChecksPassed !== 9 ||
+    attempt6.staticKernelChecksPassed !== 64 ||
+    attempt6.notebookSha256 !==
+      "eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e" ||
+    attempt6.launchBundleHash !==
+      "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275" ||
+    attempt6.promptsSha256 !==
+      "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333" ||
+    attempt6.repairSourceCommit !==
+      "05d923f4ed3cada9093263839ba4f3c25717614b"
+  ) {
+    return false;
+  }
+
+  if (
+    evalAuthorization.attempt6AuthorizationDecisionId !==
+      "DEC-0046" ||
+    evalAuthorization.attempt6AuthorizationHash !==
+      "3afac20d638e033c13d875381b97005891d3946f3ba2ac336b04093b287bca93" ||
+    evalAuthorization.attempt6Status !==
+      "AUTHORIZED_NOT_LAUNCHED" ||
+    evalAuthorization.attempt6Number !== 6 ||
+    evalAuthorization.attempt6MaximumKernelPushes !== 1 ||
+    evalAuthorization.attempt6KernelPushesPerformed !== 0 ||
+    evalAuthorization.attempt6KernelPushesRemaining !== 1 ||
+    evalAuthorization.attempt6AutomaticRetryAuthorized !== false ||
+    evalAuthorization.attempt6ExecutionAuthorized !== true ||
+    evalAuthorization.attempt6LaunchAttempted !== false ||
+    evalAuthorization.attempt6TestInferenceOccurred !== false ||
+    evalAuthorization.attempt6MetricValuesProduced !== 0
+  ) {
+    return false;
+  }
+
+  if (
+    training?.evaluationResults !== 0 ||
+    experiment.evaluationStatus !== "NOT_RUN" ||
+    experiment.evaluationScore !== null ||
+    experiment.promotable !== false ||
+    experiment.readinessStatus !==
+      "ATTEMPT_6_AUTHORIZED_AWAITING_EXECUTION" ||
+    experiment.evaluationAuthorizationDecisionId !==
+      "DEC-0046" ||
+    experiment.evaluationAuthorizationStatus !==
+      "AUTHORIZED_WITH_LIMITS_ONE_PUSH_AVAILABLE" ||
+    experiment.evaluationOutcomeDecisionId !==
+      "DEC-0045" ||
+    experiment.evaluationAttemptNumber !== 6 ||
+    experiment.evaluationKernelPushesRemaining !== 1
+  ) {
+    return false;
+  }
+
+  const v01 =
+    (state?.models?.derivedModels || [])
+      .find((m) => m?.id === "GHARIBO-V0.1");
+
+  if (!v01 || v01.status !== "NOT_CREATED") {
+    return false;
+  }
+
+  const decisions =
+    Array.isArray(state?.decisions)
+      ? state.decisions
+      : [];
+
+  const dec46 =
+    decisions.filter(
+      (d) => d?.id === "DEC-0046"
+    );
+
+  if (
+    dec46.length !== 1 ||
+    dec46[0].status !== "ACCEPTED" ||
+    dec46[0].supersedes !== null ||
+    dec46[0].supersededBy !== null
+  ) {
+    return false;
+  }
+
+  // Strip ONLY the DEC-0046 layer and prove DEC-0045 still holds exactly beneath it.
+  const before =
+    structuredClone(state);
+
+  before.masterStateVersion =
+    "1.24.0";
+
+  before.decisions =
+    before.decisions.filter(
+      (d) => d?.id !== "DEC-0046"
+    );
+
+  delete before.training.attempt6Authorization;
+
+  const ea =
+    before.training.evaluationAuthorization;
+
+  for (const key of Object.keys(ea)) {
+    if (key.startsWith("attempt6")) {
+      delete ea[key];
+    }
+  }
+
+  const e =
+    before.experiments?.["GHARIBO-exp-001"];
+
+  e.readinessStatus =
+    "ATTEMPT_5_FAILED_PRE_INFERENCE_AWAITING_HUMAN_DECISION";
+
+  e.evaluationAuthorizationDecisionId =
+    "DEC-0044";
+
+  e.evaluationAuthorizationStatus =
+    "EXHAUSTED_ONE_PUSH_CONSUMED";
+
+  e.evaluationOutcomeDecisionId =
+    "DEC-0045";
+
+  delete e.evaluationAttemptNumber;
+  delete e.evaluationKernelPushesRemaining;
+
+  if (before.currentState?.blockerSummary) {
+    before.currentState.blockerSummary.blockingNow =
+      "Evaluation Attempt #5 failed PRE-INFERENCE on Kaggle kernel Version 4 during immutable snapshot_download. Its single authorized push is exhausted. No retry or Attempt #6 is authorized.";
+
+    before.currentState.blockerSummary.note =
+      "No BASE or CANDIDATE inference occurred, M1-M13 remain null, and the candidate remains EXPERIMENTAL_UNPROMOTED. A Hugging Face Hub post-install refresh repair exists on branch fix/attempt5-v4-hfhub-refresh at commit 05d923f4ed3cada9093263839ba4f3c25717614b; it is locally regression-proven only, not merged to main, not Kaggle-runtime-proven, and not authorized for execution.";
+  }
+
+  if (Array.isArray(before.nextActions)) {
+    const action =
+      before.nextActions.find(
+        (x) => x?.id === "ACT-0001"
+      );
+
+    if (action) {
+      action.priority = "P0";
+
+      action.action =
+        "Human decision required: decide whether any future evaluation execution should be authorized. A locally regression-proven repair candidate exists at 05d923f4ed3cada9093263839ba4f3c25717614b, but it is not merged or execution-authorized.";
+
+      action.requires =
+        "NEW_EXPLICIT_HUMAN_DECISION_AFTER_DEC-0045";
+
+      action.references = [
+        "governance/DEC-0045-evaluation-attempt-5-failure.json",
+        "governance/DEC-0044-evaluation-attempt-5-authorization.json",
+        "fix/attempt5-v4-hfhub-refresh@05d923f4ed3cada9093263839ba4f3c25717614b"
+      ];
+
+      action.status =
+        "BLOCKED_AWAITING_HUMAN_DECISION";
+
+      action.note =
+        "Attempt #5 exhausted its single push and failed before inference. No automatic retry and no Attempt #6 are authorized.";
+    }
+  }
+
+  before.history =
+    (before.history || [])
+      .filter(
+        (h) => h?.revision !== "1.25.0"
+      );
+
+  return isEvaluationAttempt5FailedGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -2525,6 +2729,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isEvaluationAttempt4FailedGoldState(state) ||
     isEvaluationAttempt5AuthorizedGoldState(state) ||
     isEvaluationAttempt5FailedGoldState(state) ||
+    isEvaluationAttempt6AuthorizedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

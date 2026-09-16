@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.24.0",
+  "masterStateVersion": "1.25.0",
   "updatedAt": "2026-09-16",
   "project": {
     "id": "GHARIBO",
@@ -22,8 +22,8 @@
     "blockerSummary": {
       "openBlockers": 0,
       "closedBlockers": 4,
-      "blockingNow": "Evaluation Attempt #5 failed PRE-INFERENCE on Kaggle kernel Version 4 during immutable snapshot_download. Its single authorized push is exhausted. No retry or Attempt #6 is authorized.",
-      "note": "No BASE or CANDIDATE inference occurred, M1-M13 remain null, and the candidate remains EXPERIMENTAL_UNPROMOTED. A Hugging Face Hub post-install refresh repair exists on branch fix/attempt5-v4-hfhub-refresh at commit 05d923f4ed3cada9093263839ba4f3c25717614b; it is locally regression-proven only, not merged to main, not Kaggle-runtime-proven, and not authorized for execution."
+      "blockingNow": "Evaluation Attempt #6 is AUTHORIZED WITH LIMITS by DEC-0046 and locally prepared. Exactly ONE Kaggle kernel push is available. No push has occurred yet and TEST inference has not begun.",
+      "note": "Attempt #5 remains a preserved FAILED_PRE_INFERENCE historical fact under DEC-0045. The HF Hub post-install refresh repair passed 9/9 local regression checks and the Attempt #6 kernel passed 64/64 safety checks. Evaluation remains NOT_RUN, M1-M13 remain null, the candidate remains EXPERIMENTAL_UNPROMOTED, and GHARIBO-V0.1 remains NOT_CREATED."
     },
     "dataset": {
       "id": "GHARIBO-Research-Gold-v0.1",
@@ -1055,6 +1055,34 @@
         "governance/DEC-0045-evaluation-attempt-5-failure.json",
         "governance/DEC-0044-evaluation-attempt-5-authorization.json",
         "fix/attempt5-v4-hfhub-refresh@05d923f4ed3cada9093263839ba4f3c25717614b"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0046",
+      "date": "2026-09-16",
+      "title": "Authorize exactly one governed Evaluation Attempt #6 using the locally proven HF Hub post-install refresh repair",
+      "status": "ACCEPTED",
+      "decision": "Authorize exactly ONE governed Evaluation Attempt #6: ONE Kaggle kernel push maximum, BASE first then CANDIDATE over the SAME 80 held-out TEST prompts, using the frozen evaluation contract and the Attempt #6 artifact bound to notebook SHA256 eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e and launch-bundle hash 598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275. TEST access, inference and scoring are authorized for that one execution only. Automatic retry, retraining, tuning, model selection, TEST-driven optimisation, promotion and GHARIBO-V0.1 creation remain forbidden.",
+      "rationale": "DEC-0045 truthfully closed Attempt #5 as a pre-inference failure caused during snapshot_download after a mixed in-memory huggingface_hub package state. The repair candidate from commit 05d923f4ed3cada9093263839ba4f3c25717614b was adopted only into a distinct Attempt #6 artifact, leaving Attempt #5 byte-identical. The repair passed 9/9 local regression checks, the generated Attempt #6 kernel passed 64/64 safety checks, the bundle is deterministic and prompts-only, and the CEO explicitly approved one further bounded execution.",
+      "scope": [
+        "training",
+        "experiments",
+        "models",
+        "integrations"
+      ],
+      "references": [
+        "governance/DEC-0046-evaluation-attempt-6-authorization.json",
+        "governance/DEC-0045-evaluation-attempt-5-failure.json",
+        "scripts/eval/build-dec0046-authorization.mjs",
+        "scripts/eval/build-eval-kernel-attempt6.mjs",
+        "scripts/eval/check-eval-kernel-attempt6.mjs",
+        "scripts/eval/check-hfhub-refresh-barrier-attempt6.mjs",
+        "scripts/eval/kaggle/gharibo-eval-002.ipynb",
+        "scripts/eval/prepare-eval-launch-attempt6.mjs",
+        "docs/RESEARCH_BENCHMARK.md"
       ],
       "supersedes": null,
       "supersededBy": null,
@@ -2191,7 +2219,27 @@
       "attempt4FailureEvidenceResult": "PASSED_4_OF_4_PRE_INFERENCE",
       "attempt4AuthorizationState": "EXHAUSTED_ONE_PUSH_CONSUMED_ZERO_REMAINING",
       "attempt4RetriesPerformed": 0,
-      "attempt4RepairPerformed": false
+      "attempt4RepairPerformed": false,
+      "attempt6AuthorizationDecisionId": "DEC-0046",
+      "attempt6AuthorizationHash": "3afac20d638e033c13d875381b97005891d3946f3ba2ac336b04093b287bca93",
+      "attempt6AuthorizationRecord": "governance/DEC-0046-evaluation-attempt-6-authorization.json",
+      "attempt6Status": "AUTHORIZED_NOT_LAUNCHED",
+      "attempt6Number": 6,
+      "attempt6MaximumKernelPushes": 1,
+      "attempt6KernelPushesPerformed": 0,
+      "attempt6KernelPushesRemaining": 1,
+      "attempt6AutomaticRetryAuthorized": false,
+      "attempt6NotebookSha256": "eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e",
+      "attempt6LaunchBundleHash": "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275",
+      "attempt6PromptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
+      "attempt6KernelId": "vokaigharibo/gharibo-eval-002-fec22ca2",
+      "attempt6RepairSourceCommit": "05d923f4ed3cada9093263839ba4f3c25717614b",
+      "attempt6RepairLocallyProven": true,
+      "attempt6RepairRuntimeProvenOnKaggle": false,
+      "attempt6ExecutionAuthorized": true,
+      "attempt6LaunchAttempted": false,
+      "attempt6TestInferenceOccurred": false,
+      "attempt6MetricValuesProduced": 0
     },
     "diagnosticAuthorization": {
       "decisionId": "DEC-0037",
@@ -2480,6 +2528,59 @@
         "repairMechanism": "After governed installation, purge previously loaded huggingface_hub modules from sys.modules, invalidate import caches, then import one coherent on-disk package version before snapshot_download.",
         "historicalAttempt5NotebookRegenerated": false
       }
+    },
+    "attempt6Authorization": {
+      "decisionId": "DEC-0046",
+      "record": "governance/DEC-0046-evaluation-attempt-6-authorization.json",
+      "authorizationHash": "3afac20d638e033c13d875381b97005891d3946f3ba2ac336b04093b287bca93",
+      "status": "AUTHORIZED_NOT_LAUNCHED",
+      "attemptNumber": 6,
+      "maximumKernelPushes": 1,
+      "kernelPushesPerformed": 0,
+      "kernelPushesRemaining": 1,
+      "automaticRetryAuthorized": false,
+      "testAccessAuthorized": true,
+      "inferenceAuthorized": true,
+      "scoringAuthorized": true,
+      "retrainingAuthorized": false,
+      "tuningAuthorized": false,
+      "modelSelectionAuthorized": false,
+      "promotionAuthorized": false,
+      "ghariboV01CreationAuthorized": false,
+      "authorizationSpentOnInferenceStart": true,
+      "authorizationSpent": false,
+      "authorizationConsumed": false,
+      "arms": [
+        "base",
+        "candidate"
+      ],
+      "armOrder": "BASE_THEN_CANDIDATE",
+      "sameTestRecordsForBothArms": true,
+      "testRecordCount": 80,
+      "testSplitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+      "candidateArmId": "GHARIBO-exp-001",
+      "candidateAdapterSha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+      "baseModel": "openai/gpt-oss-20b",
+      "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+      "loaderArchitecture": "IMMUTABLE_LOCAL_SNAPSHOT_WITH_POST_INSTALL_HFHUB_REFRESH",
+      "distributionRepo": "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+      "immutableDistributionRevision": "093fba6992ef5a7152481afec0bdfca1ac486998",
+      "repairSourceCommit": "05d923f4ed3cada9093263839ba4f3c25717614b",
+      "repairRegressionChecksPassed": 9,
+      "staticKernelChecksPassed": 64,
+      "repairLocallyProven": true,
+      "repairRuntimeProvenOnKaggle": false,
+      "notebookSha256": "eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e",
+      "launchBundleHash": "598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275",
+      "promptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
+      "kernelId": "vokaigharibo/gharibo-eval-002-fec22ca2",
+      "datasetId": "vokaigharibo/gharibo-eval-prompts-fec22ca2",
+      "launchAttempted": false,
+      "testInferenceOccurred": false,
+      "metricValuesProduced": 0,
+      "priorAttemptFailureDecisionId": "DEC-0045",
+      "furtherAttemptRequiresNewHumanDecision": true,
+      "next": "ONE_GOVERNED_KAGGLE_PUSH_FOR_ATTEMPT_6"
     }
   },
   "datasets": {
@@ -2543,7 +2644,7 @@
       "packageId": "78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2",
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "ATTEMPT_5_FAILED_PRE_INFERENCE_AWAITING_HUMAN_DECISION",
+      "readinessStatus": "ATTEMPT_6_AUTHORIZED_AWAITING_EXECUTION",
       "engineDependencyCount": 12,
       "resolvedEngineDependencies": 9,
       "promotionTarget": "GHARIBO-V0.1",
@@ -2570,9 +2671,11 @@
       "effectiveDtype": "float32",
       "runtimeDeviationClassification": "MATERIAL_RUNTIME_DEVIATION_ACCEPTED_POST_EXECUTION",
       "artifactRollupHash": "788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885",
-      "evaluationAuthorizationDecisionId": "DEC-0044",
-      "evaluationAuthorizationStatus": "EXHAUSTED_ONE_PUSH_CONSUMED",
-      "evaluationOutcomeDecisionId": "DEC-0045"
+      "evaluationAuthorizationDecisionId": "DEC-0046",
+      "evaluationAuthorizationStatus": "AUTHORIZED_WITH_LIMITS_ONE_PUSH_AVAILABLE",
+      "evaluationOutcomeDecisionId": "DEC-0045",
+      "evaluationAttemptNumber": 6,
+      "evaluationKernelPushesRemaining": 1
     }
   },
   "models": {
@@ -3128,15 +3231,15 @@
     {
       "id": "ACT-0001",
       "priority": "P0",
-      "action": "Human decision required: decide whether any future evaluation execution should be authorized. A locally regression-proven repair candidate exists at 05d923f4ed3cada9093263839ba4f3c25717614b, but it is not merged or execution-authorized.",
-      "requires": "NEW_EXPLICIT_HUMAN_DECISION_AFTER_DEC-0045",
+      "action": "Execute the single DEC-0046-authorized Evaluation Attempt #6 Kaggle benchmark: BASE then CANDIDATE over the same 80 held-out TEST prompts using the frozen Attempt #6 artifact.",
+      "requires": "DEC-0046",
       "references": [
-        "governance/DEC-0045-evaluation-attempt-5-failure.json",
-        "governance/DEC-0044-evaluation-attempt-5-authorization.json",
-        "fix/attempt5-v4-hfhub-refresh@05d923f4ed3cada9093263839ba4f3c25717614b"
+        "governance/DEC-0046-evaluation-attempt-6-authorization.json",
+        "scripts/eval/build-eval-kernel-attempt6.mjs",
+        "scripts/eval/check-hfhub-refresh-barrier-attempt6.mjs"
       ],
-      "status": "BLOCKED_AWAITING_HUMAN_DECISION",
-      "note": "Attempt #5 exhausted its single push and failed before inference. No automatic retry and no Attempt #6 are authorized."
+      "status": "READY_FOR_EXECUTION",
+      "note": "Exactly one Kaggle push is authorized. No automatic retry. If the run fails pre-inference, record the exact failure and STOP. Once TEST inference materially begins, the authorization is spent."
     },
     {
       "id": "ACT-0002",
@@ -3445,6 +3548,26 @@
         "Recorded repair commit 05d923f as LOCAL_REGRESSION_PROVEN_ONLY",
         "Preserved M1-M13 null, candidate unpromoted and GHARIBO-V0.1 NOT_CREATED"
       ]
+    },
+    {
+      "revision": "1.25.0",
+      "date": "2026-09-16",
+      "summary": "Accepted DEC-0046: one bounded Evaluation Attempt #6 using a distinct repaired artifact. Attempt #5 remains immutable historical evidence; no Kaggle push or TEST inference has occurred at this checkpoint.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "This revision authorizes and binds the exact Attempt #6 artifact before execution. The containing Git commit is recorded externally after checkpointing.",
+      "changes": [
+        "added DEC-0046 Attempt #6 authorization",
+        "bound notebook SHA256 eebd832d771467b8e468b8dbba946b7b7ff3e202f31ae52b6d76c2f1a7b0f48e",
+        "bound launch-bundle hash 598ec55dff3bbffb33beb9e6c1672ca1797abb80a74cc5f34e7300b592853275",
+        "bound prompts SHA256 dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
+        "recorded HF Hub post-install refresh repair as locally proven 9/9",
+        "recorded Attempt #6 kernel safety gate as 64/64 PASS",
+        "preserved Attempt #5 notebook and launch-bundle identities unchanged",
+        "authorized exactly one Kaggle push with zero automatic retries",
+        "kept evaluation NOT_RUN and GHARIBO-V0.1 NOT_CREATED"
+      ],
+      "trainingExecuted": true
     }
   ]
 }

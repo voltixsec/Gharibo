@@ -215,7 +215,7 @@ check(
 );
 
 check(
-  "current state requires a new human decision",
+  "DEC-0045 historical layer required a new human decision before Attempt #6",
   attempt5?.attempt6Authorized === false &&
   attempt5?.furtherAttemptRequiresNewHumanDecision === true
 );
@@ -235,5 +235,5 @@ if (failures.length) {
 
 console.log("");
 console.log("ATTEMPT #5 FAILURE GATE: PASSED");
-console.log("ATTEMPT #6 AUTHORIZED: NO");
+console.log("ATTEMPT #6 AUTHORIZED BY DEC-0045: NO (HISTORICAL)");
 console.log("KAGGLE PUSH EXECUTED BY THIS GATE: NO");
