@@ -146,11 +146,24 @@ def main() -> int:
     source_prompts = ITEMS / "prompts.jsonl"
 
     # ---------------------------------------------------------------- A. structure
+    #
+    # The bundle DIRECTORY is also where Kaggle output is downloaded after a run
+    # (`attempt4-output/` and friends). Those directories are gitignored local scratch, are never
+    # uploaded, and are not part of the payload — so the structural comparison is scoped to the
+    # PAYLOAD ROOTS the upload actually contains. Enumerating the whole tree instead would make
+    # this gate fail on the presence of a downloaded log, which is not a privacy defect and would
+    # train the reader to ignore it.
+    #
+    # The answer-bearing scans BELOW are deliberately NOT scoped this way: they still sweep the
+    # entire tree, because a gold file sitting anywhere under the bundle root is a real violation.
+    PAYLOAD_ROOTS = ("dataset", "kernel")
     on_disk = {
         str(p.relative_to(BUNDLE)).replace("\\", "/")
-        for p in BUNDLE.rglob("*")
+        for root in PAYLOAD_ROOTS
+        for p in (BUNDLE / root).rglob("*")
         if p.is_file()
     }
+    on_disk.add("launch-plan.json")
     check(
         "bundle contains exactly the expected payload files",
         on_disk == EXPECTED_PAYLOAD,

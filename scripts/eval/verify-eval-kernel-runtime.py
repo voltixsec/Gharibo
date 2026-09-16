@@ -104,11 +104,31 @@ def main():
 
     pins_src = pins_cells[0]["source"]
 
-    # Execute verbatim, including every assert. Only the trailing print() calls are dropped so
-    # the gate's own output stays parseable — dropping more than that would weaken the gate.
-    exec_src = "\n".join(
-        ln for ln in pins_src.split("\n") if not ln.strip().startswith("print(")
-    )
+    # Execute verbatim, including every assert. The gate's own diagnostic print() calls are
+    # dropped so its output stays parseable — but a print() STATEMENT may span several physical
+    # lines (open paren, continuation lines, close paren), and dropping only the first line
+    # leaves the continuations behind as orphaned, indented source. That is not a weaker gate,
+    # it is a BROKEN one: it reports an IndentationError in a perfectly valid notebook.
+    #
+    # So the print statements are removed structurally, by paren depth, not line by line:
+    #   'print(' opens a statement; following lines are continuations while depth > 0 (or while
+    #   the line ends in a backslash); the statement ends when depth returns to 0.
+    # A print( that is itself the whole statement on one line ends immediately.
+    kept, skipping, depth = [], False, 0
+    for ln in pins_src.split("\n"):
+        if skipping:
+            depth += ln.count("(") - ln.count(")")
+            if depth <= 0 and not ln.rstrip().endswith("\\"):
+                skipping = False
+            continue
+        stripped = ln.strip()
+        if stripped.startswith("print("):
+            depth = ln.count("(") - ln.count(")")
+            if depth > 0 or ln.rstrip().endswith("\\"):
+                skipping = True
+            continue
+        kept.append(ln)
+    exec_src = "\n".join(kept)
     ns = {}
     try:
         exec(compile(exec_src, "<pins cell>", "exec"), ns)
@@ -151,8 +171,20 @@ def main():
           PINS.get("candidateAdapterSha256") == ADAPTER_SHA256)
     check("base revision pin is the accepted value",
           PINS.get("baseModelRevision") == BASE_REVISION)
-    check("authorization decision pin is DEC-0032",
-          PINS.get("authorizationDecisionId") == "DEC-0032")
+    # The kernel now runs under the ATTEMPT #4 authorization (DEC-0038), which amended — and did not
+    # replace — DEC-0032. Both facts are pinned: the live authorization must be DEC-0038, and the
+    # prior one must still be recorded as DEC-0032, so the delegation chain stays traceable.
+    check("authorization decision pin is DEC-0038 (attempt #4)",
+          PINS.get("authorizationDecisionId") == "DEC-0038",
+          f"got {PINS.get('authorizationDecisionId')!r}")
+    check("prior authorization pin is DEC-0032 (amended, not replaced)",
+          PINS.get("priorAuthorizationDecisionId") == "DEC-0032",
+          f"got {PINS.get('priorAuthorizationDecisionId')!r}")
+    check("attempt number pin is 4", PINS.get("attemptNumber") == 4,
+          f"got {PINS.get('attemptNumber')!r}")
+    check("the ONE-push bound is pinned",
+          PINS.get("maximumKernelPushes") == 1,
+          f"got {PINS.get('maximumKernelPushes')!r}")
     check("decision scope pin is AUTHORIZED WITH LIMITS",
           PINS.get("decision") == "AUTHORIZED WITH LIMITS")
     check("held-out TEST record count pin is 80", PINS.get("testRecordCount") == 80)

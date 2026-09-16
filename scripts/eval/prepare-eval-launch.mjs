@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * prepare-eval-launch.mjs — build (or verify) the governed Kaggle launch bundle for the ONE
- * authorized held-out TEST benchmark (DEC-0032).
+ * authorized held-out TEST benchmark (attempt #4, DEC-0038).
  *
  * Mirrors scripts/training/prepare-kaggle-start.ts exactly, with one deliberate INVERSION:
  *

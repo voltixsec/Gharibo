@@ -5,8 +5,12 @@
  * WHAT THIS PRODUCES
  * ------------------
  * `scripts/eval/kaggle/gharibo-eval-001.ipynb`, the notebook that runs the ONE authorized
- * held-out TEST benchmark (DEC-0032) on a free Kaggle T4: BASE then CANDIDATE over the same
- * 80 TEST prompts, greedy, identical settings for both arms.
+ * held-out TEST benchmark (attempt #4, DEC-0038) on a free Kaggle T4: BASE then CANDIDATE over the
+ * same 80 TEST prompts, greedy, identical settings for both arms.
+ *
+ * DEC-0038 authorizes exactly ONE kernel push. The pins carry that bound so the notebook asserts it
+ * at runtime, and the prior authorization (DEC-0032) is carried alongside rather than overwritten —
+ * this attempt supersedes DEC-0032 for execution without erasing it.
  *
  * WHY A GENERATOR (mirrors scripts/qualify/qualify-kaggle-env.mjs)
  * ---------------------------------------------------------------
@@ -55,8 +59,17 @@ export const EVAL_PINS = Object.freeze({
   testSplitHash: "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
   testRecordCount: 80,
   datasetHash: "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
-  authorizationDecisionId: "DEC-0032",
+  authorizationDecisionId: "DEC-0038",
   decision: "AUTHORIZED WITH LIMITS",
+  /**
+   * The authorization DEC-0038 REPLACES for execution purposes. DEC-0032 remains the standing
+   * measure-only authorization; DEC-0038 is the bounded attempt-#4 decision that follows the
+   * DEC-0036 halt and the DEC-0037 diagnostic PASS. Both are pinned so the notebook records which
+   * decision it ran under AND what came before it, rather than silently re-labelling history.
+   */
+  priorAuthorizationDecisionId: "DEC-0032",
+  attemptNumber: 4,
+  maximumKernelPushes: 1,
   // decoding 7.1
   temperature: 0.0,
   doSample: false,
@@ -287,10 +300,16 @@ export function pinsCell(p) {
     "    'engineDependencies must carry name+spec; an empty entry means the pin set was shredded'",
     "assert len(PINS['engineDependencies']) == 9, 'engineDependencies must carry all 9 frozen specs'",
     "",
-    "assert PINS['authorizationDecisionId'] == 'DEC-0032', 'unexpected authorization'",
+    "assert PINS['authorizationDecisionId'] == 'DEC-0038', 'unexpected authorization'",
     "assert PINS['decision'] == 'AUTHORIZED WITH LIMITS', 'unexpected decision scope'",
+    "assert PINS['attemptNumber'] == 4, 'unexpected attempt number'",
+    "assert PINS['maximumKernelPushes'] == 1, 'attempt #4 is bounded to ONE kernel push'",
+    "assert PINS['priorAuthorizationDecisionId'] == 'DEC-0032', 'unexpected prior authorization'",
     "",
     "print('authorization :', PINS['authorizationDecisionId'], '-', PINS['decision'])",
+    "print('attempt       :', PINS['attemptNumber'], '(max pushes',",
+    "      str(PINS['maximumKernelPushes']) + ')')",
+    "print('prior auth    :', PINS['priorAuthorizationDecisionId'])",
     "print('TEST split    :', PINS['testSplitHash'])",
     "print('records       :', PINS['testRecordCount'])",
   ]);
@@ -320,11 +339,13 @@ function cells() {
       cell_type: "markdown",
       metadata: {},
       source: md([
-        "# GHARIBO — governed held-out TEST evaluation (`DEC-0032`)",
+        "# GHARIBO — governed held-out TEST evaluation (attempt #4, `DEC-0038`)",
         "",
         "| Field | Value |",
         "|-------|-------|",
         `| Authorization | \`${p.authorizationDecisionId}\` — ${p.decision} |`,
+        `| Attempt | #${p.attemptNumber} — maximum ${p.maximumKernelPushes} kernel push |`,
+        `| Prior authorization | \`${p.priorAuthorizationDecisionId}\` (superseded for execution by this attempt) |`,
         `| Base arm | \`${p.baseModel}\` @ \`${p.baseModelRevision}\` (unadapted) |`,
         `| Candidate arm | \`${p.candidateArmId}\` adapter \`${p.candidateAdapterSha256}\` |`,
         `| Held-out TEST | \`${p.testSplitHash}\` — ${p.testRecordCount} records |`,
@@ -811,6 +832,9 @@ function cells() {
         "run_record = {",
         "    'authorizationDecisionId': PINS['authorizationDecisionId'],",
         "    'decision': PINS['decision'],",
+        "    'attemptNumber': PINS['attemptNumber'],",
+        "    'maximumKernelPushes': PINS['maximumKernelPushes'],",
+        "    'priorAuthorizationDecisionId': PINS['priorAuthorizationDecisionId'],",
         "    'harnessVersion': PINS['harnessVersion'],",
         "    'baseModel': PINS['baseModel'],",
         "    'baseModelRevision': PINS['baseModelRevision'],",
@@ -864,6 +888,9 @@ export function buildNotebook() {
         artifact: "gharibo-eval-001",
         harness_version: EVAL_PINS.harnessVersion,
         authorization_decision: EVAL_PINS.authorizationDecisionId,
+        attempt_number: EVAL_PINS.attemptNumber,
+        maximum_kernel_pushes: EVAL_PINS.maximumKernelPushes,
+        prior_authorization_decision: EVAL_PINS.priorAuthorizationDecisionId,
         test_split_hash: EVAL_PINS.testSplitHash,
       },
     },

@@ -762,6 +762,9 @@ const COMPLETED_MASTER_STATE_VERSIONS = [
   "1.15.0",
   "1.16.0",
   "1.17.0", // DEC-0037 diagnostic only; accepted training facts are unchanged.
+  "1.18.0", // DEC-0038 attempt-#4 authorization only; accepted training facts are unchanged.
+  "1.19.0", // DEC-0039 attempt-#4 launch only; no result claimed, evaluation still NOT_RUN.
+  "1.20.0", // DEC-0040 attempt-#4 pre-inference FAILURE; zero metrics, evaluation still NOT_RUN.
 ];
 
 /**
@@ -968,7 +971,16 @@ export function isKaggleExecutionCompletedGoldState(state) {
   // own predicates, which each re-run this core underneath. Listing them here keeps the
   // "current tip is an accepted completed execution" contract true without weakening it:
   // every post-1.12.0 revision still has to pass `acceptsCompletedExecutionCore` verbatim.
-  const ADVANCED_READINESS_VERSIONS = ["1.13.0", "1.14.0", "1.15.0", "1.16.0", "1.17.0"];
+  const ADVANCED_READINESS_VERSIONS = [
+    "1.13.0",
+    "1.14.0",
+    "1.15.0",
+    "1.16.0",
+    "1.17.0",
+    "1.18.0",
+    "1.19.0",
+    "1.20.0",
+  ];
   if (!ADVANCED_READINESS_VERSIONS.includes(state?.masterStateVersion) &&
       (state?.training?.authorization?.status !== COMPLETED_READINESS ||
         state?.experiments?.["GHARIBO-exp-001"]?.readinessStatus !== COMPLETED_READINESS)) {
@@ -1429,8 +1441,18 @@ export function isEvaluationEscalatedGoldState(state) {
 
   // The counts must be honest. Three launches and five defect classes produced ZERO metrics;
   // a predicate that let those numbers round down would hide the whole point of the escalation.
-  if (evalAuthorization.launchAttempts !== 3) return false;
-  if (evalAuthorization.defectClassesFound !== 5) return false;
+  //
+  // NOTE ON `launchAttempts` AND `defectClassesFound`. At THIS tip the escalation's own record is
+  // three launches and five defect classes, and the floors are asserted as "at least" rather than
+  // "exactly": attempt #4 (DEC-0038/DEC-0039/DEC-0040) is a LATER, separately-authorized execution
+  // whose push and failure legitimately raise both counters. The floors are what matter here — a
+  // count that fell BELOW the escalation's own record would mean the escalation had been doctored —
+  // and the exact values are pinned at the DEC-0036 tip by the strip-and-re-assert step at the
+  // bottom of this predicate, which restores 3 and 5 and re-runs the layer beneath.
+  if (!(evalAuthorization.launchAttempts >= 3)) return false;
+  if (!(evalAuthorization.defectClassesFound >= 5)) return false;
+  // `harnessRepairs` stays EXACT: no repair was performed after the escalation, and one that
+  // appeared would mean the halted loop had been quietly restarted.
   if (evalAuthorization.harnessRepairs !== 2) return false;
   if (evalAuthorization.metricValuesProducedAfterThreeLaunches !== 0) return false;
 
@@ -1526,6 +1548,525 @@ export function isEvaluationEscalatedGoldState(state) {
   return isEvaluationBenchmarkLaunchedGoldState(before);
 }
 
+/**
+ * The master-state status of the DEC-0037 diagnostic: the diagnostic was RUN, it PASSED, and the
+ * single authorization it consumed is SPENT. The load facts themselves live under `execution`.
+ */
+const DIAGNOSTIC_PASS_STATUS = "COMPLETED_PASS_AUTHORIZATION_CONSUMED";
+
+/**
+ * DEC-0038 records the CEO decision AUTHORIZED WITH LIMITS for evaluation attempt #4: exactly ONE
+ * governed held-out TEST benchmark execution, BASE then CANDIDATE, over the same 80 records, one
+ * kernel push, no retries, on the DEC-0037 proven loading path.
+ *
+ * WHY THIS PREDICATE EXISTS, AND WHAT IT REFUSES
+ * ----------------------------------------------
+ * The pending risk at this tip is not that the attempt is unauthorized — it is that authorizing an
+ * attempt gets confused with having a result, or that the authorization quietly becomes a licence
+ * to iterate. So this predicate does two separate jobs:
+ *
+ *   ROUNDING UP is blocked. `evaluationResults` must still be 0, `evaluationStatus` must still be
+ *   "NOT_RUN", and the model must still be unpromoted. Authorizing a measurement is not taking it.
+ *
+ *   ITERATION is blocked. The authorization must be recorded as ONE push with no automatic retry,
+ *   no fifth attempt, and — critically — the retry posture DEC-0036 established must still be
+ *   intact underneath: `harnessRepairLoopHalted` true and `furtherAttemptAuthorized` false. This
+ *   attempt is a HUMAN decision layered on top of the halt; it does not dissolve it.
+ *
+ * LAYERING NOTE. This sits on `isEvaluationEscalatedGoldState`. The escalation's own fields are the
+ * historical record of the third failure and must survive verbatim; only the NEW attempt-#4 fields
+ * are this layer's own. As required by the gate-hardening convention, the predicate strips its own
+ * layer and re-asserts the predicate beneath, so it can never be satisfied by weakening the
+ * escalation gate that it depends on.
+ */
+export function isEvaluationAttempt4AuthorizedGoldState(state) {
+  const training = state?.training;
+  const evalAuthorization = training?.evaluationAuthorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  if (!evalAuthorization) return false;
+
+  // The escalation layer must still hold, verbatim. If the DEC-0036 halt or its third-failure
+  // record were tampered with, this layer is not allowed to paper over it.
+  if (!isEvaluationEscalatedGoldState(state)) return false;
+
+  // ------------------------------------------------ the authorization itself (DEC-0038)
+  if (evalAuthorization.attempt4AuthorizationDecisionId !== "DEC-0038") return false;
+  if (evalAuthorization.attempt4AuthorizationRecord !==
+      "governance/DEC-0038-evaluation-attempt-4-authorization.json") {
+    return false;
+  }
+  if (evalAuthorization.attempt4AuthorizationStatus !== "AUTHORIZED_WITH_LIMITS") return false;
+  if (typeof evalAuthorization.attempt4AuthorizationHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(evalAuthorization.attempt4AuthorizationHash)) {
+    return false;
+  }
+
+  // (a) ROUNDING UP: the attempt must be bounded to ONE push, and it must not have produced
+  // anything yet.
+  //
+  // NOTE ON THE PUSH FIELDS. This layer deliberately asserts the AUTHORIZATION, not the execution
+  // state: the upper bound (`attempt4MaximumKernelPushes === 1`) is permanent and stays pinned here,
+  // while `attempt4Pushed` / `attempt4KernelId` / `attempt4KernelVersion` / `attempt4Status` are
+  // advanced legitimately by the launch that follows (DEC-0039). Pinning the execution fields at
+  // their pre-launch values would make this predicate false at every later tip — and the upper
+  // bound is the field that actually constrains behaviour, so it is the one kept here.
+  if (evalAuthorization.attempt4Number !== 4) return false;
+  if (evalAuthorization.attempt4MaximumKernelPushes !== 1) return false;
+  // The DEC-0037 diagnostic must still be recorded as having authorized this attempt and no more.
+  if (evalAuthorization.attempt4AuthorizationSpentOnInferenceStart !== true) return false;
+
+  // Both arms on the SAME held-out TEST set, BASE first. A predicate that let the arm order float
+  // would let a later edit put CANDIDATE first and invite exactly the cross-arm adjustment the
+  // authorization forbids.
+  if (!Array.isArray(evalAuthorization.attempt4Arms) ||
+      evalAuthorization.attempt4Arms.length !== 2 ||
+      evalAuthorization.attempt4Arms[0] !== "base" ||
+      evalAuthorization.attempt4Arms[1] !== "candidate") {
+    return false;
+  }
+  if (evalAuthorization.attempt4ArmOrder !== "BASE_THEN_CANDIDATE") return false;
+  if (evalAuthorization.attempt4SameTestRecordsForBothArms !== true) return false;
+  if (evalAuthorization.attempt4TestRecordCount !== 80) return false;
+  if (evalAuthorization.attempt4TestSplitHash !==
+      "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b") {
+    return false;
+  }
+  if (evalAuthorization.attempt4HarnessVersion !== "gharibo-eval-harness-1.0.0") return false;
+
+  // The decoding contract must be identical across arms, and CANDIDATE settings must be recorded as
+  // not alterable after BASE output. This is the machine-checkable form of "do not tune against
+  // BASE, and do not tune against TEST".
+  if (evalAuthorization.attempt4DecodingIdenticalAcrossArms !== true) return false;
+  if (evalAuthorization.attempt4CandidateSettingsNotAlteredAfterBaseOutput !== true) return false;
+
+  // ------------------------------------------------ the two hard rules
+  if (evalAuthorization.attempt4AuthorizationSpentOnInferenceStart !== true) return false;
+  if (evalAuthorization.attempt4AutomaticRetryAuthorized !== false) return false;
+  if (evalAuthorization.attempt4FifthAttemptAuthorized !== false) return false;
+  if (evalAuthorization.attempt4FurtherAttemptRequiresNewDecision !== true) return false;
+
+  // The DEC-0036 halt must survive this layer. An authorization that cleared
+  // `furtherAttemptAuthorized` or dropped `harnessRepairLoopHalted` would be re-opening the loop
+  // DEC-0036 closed, and it would ALSO fail the layer beneath — this is the round trip.
+  if (evalAuthorization.harnessRepairLoopHalted !== true) return false;
+  if (evalAuthorization.furtherAttemptAuthorized !== false) return false;
+  if (evalAuthorization.furtherAttemptRequiresNewDecision !== true) return false;
+  if (evalAuthorization.hardStops2Satisfied !== false) return false;
+  if (evalAuthorization.hardStops3Satisfied !== true) return false;
+
+  // The proven loader path is BINDING and must not be recorded as redesigned. Reusing it is the
+  // entire evidential basis of this attempt; if the record stopped saying so, the authorization
+  // would rest on nothing.
+  if (evalAuthorization.attempt4LoaderConventionProvenBy !== "DEC-0037") return false;
+  if (evalAuthorization.attempt4RedesignForbidden !== true) return false;
+  if (evalAuthorization.attempt4AdditionalChatTemplates404Status !==
+      "REPRODUCED_AND_NON_FATAL") {
+    return false;
+  }
+
+  // ------------------------------------------------ nothing forbidden may have happened
+  for (const key of [
+    "attempt4PromotionAuthorized",
+    "attempt4TuningAuthorized",
+    "attempt4ModelSelectionAuthorized",
+    "attempt4GhariboV01CreationAuthorized",
+    "attempt4DatasetMutationAuthorized",
+    "attempt4TestDrivenCodeOptimisationAuthorized",
+  ]) {
+    if (evalAuthorization[key] !== false) return false;
+  }
+
+  // ------------------------------------------------ evaluation must still not have moved
+  if (evalAuthorization.authorizationSpent !== false) return false;
+  if (evalAuthorization.metricValuesProduced !== 0) return false;
+  if (evalAuthorization.predictionsDownloaded !== false) return false;
+  if (evalAuthorization.scoringPerformed !== false) return false;
+
+  if (training?.evaluationResults !== 0) return false;
+  if (experiment?.evaluationStatus !== "NOT_RUN") return false;
+  if (experiment?.promotable !== false) return false;
+
+  // GHARIBO-V0.1 must still not exist.
+  const v01 = (state?.models?.derivedModels || []).find((m) => m?.id === "GHARIBO-V0.1");
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  // The diagnostic that grounds this authorization must still be recorded as PASS, and must still
+  // be recorded as having refused both TEST access and inference. An authorization resting on a
+  // diagnostic cannot outlive the diagnostic's own claims.
+  //
+  // NOTE the split of duties. Master state carries the diagnostic's LIFECYCLE (it ran, it passed,
+  // its single authorization is consumed) plus the record path and hash; the LOAD FACTS themselves
+  // (install / tokenizer / model load / testAccessed / inferenceExecuted) live in the record file.
+  // Master state therefore pins the status and the hash here, and the record file is what makes the
+  // PASS verifiable — the hash pins the bytes, so the pass cannot be re-worded in place.
+  const diagnostic = training?.diagnosticAuthorization;
+  if (!diagnostic) return false;
+  if (diagnostic.decisionId !== "DEC-0037") return false;
+  if (diagnostic.status !== DIAGNOSTIC_PASS_STATUS) return false;
+  if (diagnostic.record !== "governance/DEC-0037-diagnostic-authorization.json") return false;
+  if (diagnostic.resultRecord !== "governance/DEC-0037-diagnostic-authorization.json") return false;
+  if (diagnostic.kernelPushes !== 1 || diagnostic.maximumKernelPushes !== 1) return false;
+  if (diagnostic.kernelId !== "vokaigharibo/gharibo-diagnostic-dec0037") return false;
+  if (diagnostic.evaluationAttempt4Authorized !== true) return false;
+  if (diagnostic.evaluationAttempt4AuthorizationDecisionId !== "DEC-0038") return false;
+
+  // DEC-0037 AND DEC-0038 must each be present exactly once, ACCEPTED, and unsuperseded. DEC-0036
+  // is already checked by the layer beneath.
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  for (const id of ["DEC-0037", "DEC-0038"]) {
+    const found = decisions.filter((d) => d?.id === id);
+    if (found.length !== 1 ||
+        found[0].status !== "ACCEPTED" ||
+        found[0].supersedes !== null ||
+        found[0].supersededBy !== null) {
+      return false;
+    }
+  }
+
+  // Rebuild the DEC-0037 tip by STRIPPING this layer, and require the predicate beneath to still
+  // accept it. This is what makes the layer sound: it cannot be satisfied by loosening the
+  // escalation gate underneath, because the gate underneath is re-run on the stripped state.
+  //
+  // The `attempt4Launch*` keys are stripped too: they are DEC-0039's layer, and leaving them in
+  // would let a launch-only field satisfy the authorization gate rather than the launch gate.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.17.0";
+  const eaBefore = before.training.evaluationAuthorization;
+  for (const key of Object.keys(eaBefore)) {
+    if (key.startsWith("attempt4")) delete eaBefore[key];
+  }
+  // Restore the DEC-0036 escalation-tip shape of the counters this layer's successors advance.
+  // The escalation layer asserts these as FLOORS (>= 3 and >= 5); leaving them undefined after the
+  // `attempt4*` sweep would make its floor comparison fail on a state that is factually correct at
+  // the 1.17.0 tip, which is a bug in the strip, not a finding about the state.
+  eaBefore.launchAttempts = 3;
+  eaBefore.defectClassesFound = 5;
+  if (before.training.diagnosticAuthorization) {
+    const d = before.training.diagnosticAuthorization;
+    d.evaluationAttempt4Authorized = false;
+    delete d.evaluationAttempt4AuthorizationDecisionId;
+    delete d.evaluationAttempt4AuthorizationHash;
+    delete d.evaluationAttempt4AuthorizedAt;
+    delete d.evaluationAttempt4AuthorizationBasis;
+    d.next = "READY_FOR_HUMAN_DECISION_ON_EVALUATION_RETRY";
+    delete d.note;
+  }
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0038");
+  return isEvaluationEscalatedGoldState(before);
+}
+
+/**
+ * DEC-0039 records that attempt #4 was actually LAUNCHED: one kernel push under DEC-0038's ONE-push
+ * bound, zero pushes remaining, run IN FLIGHT.
+ *
+ * WHY THIS PREDICATE EXISTS
+ * -------------------------
+ * The dangerous misreading at this tip is "we launched, so we measured". This predicate makes that
+ * reading unavailable in code. `evaluationResults` must still be 0, `evaluationStatus` must still be
+ * "NOT_RUN", the model must still be unpromoted, and every "did we score anything yet" field must
+ * still say no. A launch is the beginning of an experiment, not its report.
+ *
+ * IT ALSO PINS THE PUSH COUNT TO ZERO REMAINING. That is the field that makes repair-and-retry
+ * impossible without a further human decision: if an edit silently restored a push, this predicate
+ * fails. It is the machine-checkable form of "one attempt means one attempt".
+ *
+ * LAYERING NOTE. This sits on `isEvaluationAttempt4AuthorizedGoldState`. The authorization layer's
+ * own fields are the historical record of what was permitted and must survive verbatim; only the
+ * launch fields belong to this layer. As the gate-hardening convention requires, the predicate
+ * strips its own layer and re-asserts the predicate beneath, so it cannot be satisfied by weakening
+ * the authorization gate underneath — including by clearing the ONE-push bound it depends on.
+ */
+export function isEvaluationAttempt4LaunchedGoldState(state) {
+  const training = state?.training;
+  const evalAuthorization = training?.evaluationAuthorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  if (!evalAuthorization) return false;
+
+  // The authorization layer must still hold, verbatim — including its ONE-push bound.
+  if (!isEvaluationAttempt4AuthorizedGoldState(state)) return false;
+
+  // ------------------------------------------------ the launch itself (DEC-0039)
+  if (evalAuthorization.attempt4LaunchDecisionId !== "DEC-0039") return false;
+  if (evalAuthorization.attempt4LaunchRecord !==
+      "governance/DEC-0039-evaluation-attempt-4-launch.json") {
+    return false;
+  }
+  if (typeof evalAuthorization.attempt4LaunchHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(evalAuthorization.attempt4LaunchHash)) {
+    return false;
+  }
+
+  // ------------------------------------------------ ONE push, ZERO remaining
+  //
+  // NOTE ON `attempt4Status`. At the launch tip this is "IN_FLIGHT". A later record RESOLVES it to
+  // a terminal outcome, and this layer admits exactly two resolutions: the run concluded and was
+  // recorded as a pre-inference failure, or the run concluded successfully. It does NOT admit a
+  // value that would imply the attempt never launched. The push accounting below is what actually
+  // constrains behaviour, and it stays pinned exactly.
+  const launchStatus = evalAuthorization.attempt4Status;
+  if (launchStatus !== "IN_FLIGHT" &&
+      launchStatus !== "FAILED_PRE_INFERENCE" &&
+      launchStatus !== "COMPLETED") {
+    return false;
+  }
+  if (evalAuthorization.attempt4Pushed !== true) return false;
+  if (evalAuthorization.attempt4KernelPushesPerformed !== 1) return false;
+  if (evalAuthorization.attempt4KernelPushesRemaining !== 0) return false;
+  if (evalAuthorization.attempt4KernelId !== "vokaigharibo/gharibo-eval-001-fec22ca2") return false;
+  if (evalAuthorization.attempt4KernelVersion !== 3) return false;
+  if (evalAuthorization.attempt4RetryAuthorized !== false) return false;
+
+  // The authorization's own bound must not have been widened by this launch.
+  if (evalAuthorization.attempt4MaximumKernelPushes !== 1) return false;
+  if (evalAuthorization.attempt4AuthorizationSpentOnInferenceStart !== true) return false;
+  if (evalAuthorization.attempt4AutomaticRetryAuthorized !== false) return false;
+  if (evalAuthorization.attempt4FifthAttemptAuthorized !== false) return false;
+
+  // The pushed artifact must be pinned by hash, not by path.
+  if (!/^[0-9a-f]{64}$/.test(evalAuthorization.attempt4NotebookSha256AsPushed ?? "")) {
+    return false;
+  }
+  if (!/^[0-9a-f]{64}$/.test(evalAuthorization.attempt4LaunchBundleHashAsPushed ?? "")) {
+    return false;
+  }
+
+  // ------------------------------------------------ (a) ROUNDING UP: nothing may be claimed
+  //
+  // NOTE ON `attempt4TestInferenceOccurred`. At the launch tip this is the honest placeholder
+  // "IN_FLIGHT_NOT_YET_ESTABLISHED". A later record RESOLVES it, and the only resolution this
+  // predicate admits is `false` — the run concluded and established that no TEST inference took
+  // place. A value of `true` would mean inference DID occur, which this authorization never
+  // permitted this layer to assume, and is rejected here (and again in the failure layer above).
+  // Accepting the resolved `false` keeps the layer true at later tips without weakening it: the
+  // placeholder asserted "unknown", and `false` is strictly more information, not less.
+  const inferenceState = evalAuthorization.attempt4TestInferenceOccurred;
+  if (inferenceState !== "IN_FLIGHT_NOT_YET_ESTABLISHED" && inferenceState !== false) {
+    return false;
+  }
+  if (evalAuthorization.attempt4MetricValuesProduced !== 0) return false;
+  if (evalAuthorization.metricValuesProduced !== 0) return false;
+  if (evalAuthorization.predictionsDownloaded !== false) return false;
+  if (evalAuthorization.scoringPerformed !== false) return false;
+  if (evalAuthorization.authorizationSpent !== false) return false;
+
+  if (training?.evaluationResults !== 0) return false;
+  if (experiment?.evaluationStatus !== "NOT_RUN") return false;
+  if (experiment?.promotable !== false) return false;
+
+  const v01 = (state?.models?.derivedModels || []).find((m) => m?.id === "GHARIBO-V0.1");
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  // DEC-0039 must be present exactly once, ACCEPTED, and unsuperseded.
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  const found = decisions.filter((d) => d?.id === "DEC-0039");
+  if (found.length !== 1 ||
+      found[0].status !== "ACCEPTED" ||
+      found[0].supersedes !== null ||
+      found[0].supersededBy !== null) {
+    return false;
+  }
+
+  // Strip this layer and re-assert the authorization predicate beneath.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.18.0";
+  const eaBefore = before.training.evaluationAuthorization;
+  for (const key of Object.keys(eaBefore)) {
+    if (key.startsWith("attempt4Launch") ||
+        key === "attempt4Pushed" ||
+        key === "attempt4KernelPushesPerformed" ||
+        key === "attempt4KernelPushesRemaining" ||
+        key === "attempt4KernelId" ||
+        key === "attempt4KernelVersion" ||
+        key === "attempt4KernelStatusAtRecordTime" ||
+        key === "attempt4NotebookSha256AsPushed" ||
+        key === "attempt4LaunchBundleHashAsPushed" ||
+        key === "attempt4RetryAuthorized" ||
+        key === "attempt4MetricValuesProduced") {
+      delete eaBefore[key];
+    }
+  }
+  // Restore the pre-launch shape of the fields the launch advanced.
+  eaBefore.attempt4Status = "AUTHORIZED_NOT_YET_PUSHED";
+  eaBefore.attempt4Pushed = false;
+  eaBefore.attempt4KernelId = null;
+  eaBefore.attempt4KernelVersion = null;
+  eaBefore.attempt4TestInferenceOccurred = false;
+  eaBefore.launchAttempts = 3;
+  eaBefore.defectClassesFound = 5;
+  eaBefore.activeKernelVersion = 3;
+  eaBefore.activeKernelStatusAtRecordTime = "ERROR";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0039");
+  return isEvaluationAttempt4AuthorizedGoldState(before);
+}
+
+/**
+ * DEC-0040 records that evaluation attempt #4 FAILED PRE-INFERENCE, and that no repair was applied
+ * and no fifth attempt was authorized.
+ *
+ * WHY THIS PREDICATE EXISTS
+ * -------------------------
+ * This is the most dangerous tip in the whole ledger for one specific reason: the failure is KNOWN
+ * to be fixable, and a fixable failure invites a silent retry. So this predicate does three jobs:
+ *
+ *   NO MEASUREMENT. `evaluationResults` must still be 0, `evaluationStatus` must still be "NOT_RUN",
+ *   the model must still be unpromoted. Four attempts produced nothing; the state must say so.
+ *
+ *   NO RETRY. Zero pushes remaining, zero retries performed, no repair performed, no fifth attempt
+ *   authorized, and a new human decision required. This is what makes "we found the bug and fixed
+ *   it" insufficient to restart the loop on the harness's own authority.
+ *
+ *   THE FINDING MUST SURVIVE. The decisive observation — the same 404 is fatal at the mutable ref
+ *   "main" and non-fatal at the pinned commit SHA — must still be recorded, AND the unproven part
+ *   must still be recorded as unproven. A later edit that upgraded `transportCausationStatus` to a
+ *   proven value would be asserting something the logs do not support, so it fails here.
+ *
+ * LAYERING NOTE. This sits on `isEvaluationAttempt4LaunchedGoldState`. The launch layer's own fields
+ * are the historical record of what was pushed and must survive verbatim; only the post-run outcome
+ * fields belong to this layer. As the gate-hardening convention requires, the predicate strips its
+ * own layer and re-asserts the predicate beneath — including the ONE-push bound — so it cannot be
+ * satisfied by weakening the gate underneath it.
+ */
+export function isEvaluationAttempt4FailedGoldState(state) {
+  const training = state?.training;
+  const evalAuthorization = training?.evaluationAuthorization;
+  const experiment = state?.experiments?.["GHARIBO-exp-001"];
+  if (!evalAuthorization) return false;
+
+  // The launch layer must still hold, verbatim — including the ONE-push bound and zero remaining.
+  if (!isEvaluationAttempt4LaunchedGoldState(state)) return false;
+
+  // ------------------------------------------------ the failure record (DEC-0040)
+  if (evalAuthorization.attempt4FailureDecisionId !== "DEC-0040") return false;
+  if (evalAuthorization.attempt4FailureRecord !==
+      "governance/DEC-0040-evaluation-attempt-4-failure.json") {
+    return false;
+  }
+  if (typeof evalAuthorization.attempt4FailureHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(evalAuthorization.attempt4FailureHash)) {
+    return false;
+  }
+
+  // (b) ROUNDING DOWN: the failure must still be stated, and stated as pre-inference.
+  if (evalAuthorization.attempt4Status !== "FAILED_PRE_INFERENCE") return false;
+  if (evalAuthorization.attempt4Outcome !== "FAILED_PRE_INFERENCE") return false;
+  if (evalAuthorization.attempt4FailureClass !== "HARNESS_DEFECT_NO_EXECUTION") return false;
+  if (evalAuthorization.attempt4FailureDefectId !== "DEF-0040-A") return false;
+  if (evalAuthorization.attempt4FailurePhase !== "MODEL_LOAD") return false;
+  if (evalAuthorization.attempt4TestInferenceOccurred !== false) return false;
+  // The model object must never have been constructed — that is what makes "no inference"
+  // structural rather than merely asserted.
+  if (evalAuthorization.attempt4ModelObjectConstructed !== false) return false;
+  if (evalAuthorization.attempt4PredictionFilesProduced !== 0) return false;
+  if (evalAuthorization.attempt4FailureEvidenceResult !== "PASSED_4_OF_4_PRE_INFERENCE") {
+    return false;
+  }
+
+  // ------------------------------------------------ the decisive finding, with its limit
+  if (evalAuthorization.attempt4ResolvedRevisionObserved !== "main") return false;
+  if (evalAuthorization.attempt4ResolvedRevisionKind !== "MUTABLE_REF_NAME") return false;
+  if (evalAuthorization.attempt4ContrastResolvedRevision !==
+      "093fba6992ef5a7152481afec0bdfca1ac486998") {
+    return false;
+  }
+  if (evalAuthorization.attempt4ContrastResolvedRevisionKind !== "IMMUTABLE_COMMIT_SHA") {
+    return false;
+  }
+  if (evalAuthorization.attempt4ContrastOutcome !== "PASS") return false;
+  if (evalAuthorization.attempt4SameDefectIsNotInherentlyFatal !== true) return false;
+  // The unproven part must STAY unproven. Upgrading this to a proven value would assert transport
+  // causation the two logs do not establish.
+  if (evalAuthorization.attempt4TransportCausationStatus !== "UNPROVEN_NOT_ASSERTED") return false;
+
+  // ------------------------------------------------ no repair, no retry
+  if (evalAuthorization.attempt4AuthorizationState !==
+      "EXHAUSTED_ONE_PUSH_CONSUMED_ZERO_REMAINING") {
+    return false;
+  }
+  if (evalAuthorization.attempt4KernelPushesRemaining !== 0) return false;
+  if (evalAuthorization.attempt4RetriesPerformed !== 0) return false;
+  if (evalAuthorization.attempt4RepairPerformed !== false) return false;
+  if (evalAuthorization.attempt4RetryAuthorized !== false) return false;
+  if (evalAuthorization.attempt4FifthAttemptAuthorized !== false) return false;
+  if (evalAuthorization.attempt4FurtherAttemptRequiresNewDecision !== true) return false;
+  if (evalAuthorization.attempt4RemediesIdentifiedNotApplied !== true) return false;
+
+  // The halt must survive this layer. NOTE `launchAttempts` is deliberately NOT pinned to an exact
+  // value here: DEC-0040 raised the honest count to 4, and the floor lives in the escalation layer
+  // beneath. Pinning 4 exactly would make every later tip fail for no safety gain.
+  if (evalAuthorization.harnessRepairLoopHalted !== true) return false;
+  if (evalAuthorization.furtherAttemptAuthorized !== false) return false;
+  if (evalAuthorization.furtherAttemptRequiresNewDecision !== true) return false;
+  if (evalAuthorization.hardStops2Satisfied !== false) return false;
+  if (evalAuthorization.hardStops3Satisfied !== true) return false;
+
+  // ------------------------------------------------ (a) ROUNDING UP: nothing may be claimed
+  if (evalAuthorization.attempt4MetricValuesProduced !== 0) return false;
+  if (evalAuthorization.metricValuesProduced !== 0) return false;
+  if (evalAuthorization.predictionsDownloaded !== false) return false;
+  if (evalAuthorization.scoringPerformed !== false) return false;
+  if (evalAuthorization.authorizationSpent !== false) return false;
+
+  if (training?.evaluationResults !== 0) return false;
+  if (experiment?.evaluationStatus !== "NOT_RUN") return false;
+  if (experiment?.promotable !== false) return false;
+
+  const v01 = (state?.models?.derivedModels || []).find((m) => m?.id === "GHARIBO-V0.1");
+  if (!v01 || v01.status !== "NOT_CREATED") return false;
+
+  // DEC-0040 must be present exactly once, ACCEPTED, and unsuperseded.
+  const decisions = Array.isArray(state?.decisions) ? state.decisions : [];
+  const found = decisions.filter((d) => d?.id === "DEC-0040");
+  if (found.length !== 1 ||
+      found[0].status !== "ACCEPTED" ||
+      found[0].supersedes !== null ||
+      found[0].supersededBy !== null) {
+    return false;
+  }
+
+  // Strip this layer and re-assert the launch predicate beneath.
+  //
+  // NOTE the sweep uses EXPLICIT prefixes rather than a bare `attempt4Failure*` match, because
+  // `attempt4FurtherAttemptRequiresNewDecision` is the AUTHORIZATION layer's field (it happens to
+  // share the `attempt4F` prefix). Deleting it here would strip a field the layer beneath
+  // re-asserts, and the round trip would then fail on a state that is factually correct.
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.19.0";
+  const eaBefore = before.training.evaluationAuthorization;
+  for (const key of Object.keys(eaBefore)) {
+    if (key.startsWith("attempt4FailureRecord") ||
+        key.startsWith("attempt4FailureHash") ||
+        key.startsWith("attempt4FailureDecisionId") ||
+        key.startsWith("attempt4FailureClass") ||
+        key.startsWith("attempt4FailureDefectId") ||
+        key.startsWith("attempt4FailurePhase") ||
+        key.startsWith("attempt4FailureCell") ||
+        key.startsWith("attempt4FailureException") ||
+        key.startsWith("attempt4FailureLogSha256") ||
+        key.startsWith("attempt4FailureEvidence") ||
+        key.startsWith("attempt4Resolved") ||
+        key.startsWith("attempt4Contrast") ||
+        key === "attempt4Outcome" ||
+        key === "attempt4ModelObjectConstructed" ||
+        key === "attempt4PredictionFilesProduced" ||
+        key === "attempt4SameDefectIsNotInherentlyFatal" ||
+        key === "attempt4TransportCausationStatus" ||
+        key === "attempt4RemediesIdentifiedNotApplied" ||
+        key === "attempt4AuthorizationState" ||
+        key === "attempt4RetriesPerformed" ||
+        key === "attempt4RepairPerformed") {
+      delete eaBefore[key];
+    }
+  }
+  // Restore the in-flight shape of the fields the failure advanced.
+  eaBefore.attempt4Status = "IN_FLIGHT";
+  eaBefore.attempt4TestInferenceOccurred = "IN_FLIGHT_NOT_YET_ESTABLISHED";
+  eaBefore.attempt4KernelStatusAtRecordTime = "RUNNING";
+  eaBefore.launchAttempts = 3;
+  eaBefore.defectClassesFound = 5;
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0040");
+  return isEvaluationAttempt4LaunchedGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -1538,6 +2079,9 @@ export function isAcceptedGoldGovernanceState(state) {
     isEvaluationInfrastructureBlockedGoldState(state) ||
     isEvaluationBenchmarkLaunchedGoldState(state) ||
     isEvaluationEscalatedGoldState(state) ||
+    isEvaluationAttempt4AuthorizedGoldState(state) ||
+    isEvaluationAttempt4LaunchedGoldState(state) ||
+    isEvaluationAttempt4FailedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

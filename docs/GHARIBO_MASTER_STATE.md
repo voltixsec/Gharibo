@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.17.0 |
+| **Version** | 1.20.0 |
 | **Last Updated** | 2026-09-16 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -23,7 +23,7 @@
 | Training status | COMPLETED |
 | Training invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=None at the governance level. BLK-0004 (no GPU execution environment) is CLOSED - the execution environment was obtained and the kernel pushed three times. The active constraint is no longer a blocker but an ESCALATION: the harness has failed pre-inference three times, and DEC-0036 halts automated repair pending a CEO decision., note=A closed blocker is not a satisfied objective. BLK-0004 was closed by obtaining a runtime, not by obtaining a result; three launches have produced zero measurements. |
+| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=None at the governance level, and the constraint is not a blocker but an EXHAUSTED AUTHORIZATION plus a CEO decision. Attempt #4 failed pre-inference; its ONE permitted push was used and zero remain; the harness-repair loop is HALTED. Four attempts and six defect classes have produced zero measurements, and three of the four died at MODEL_LOAD., note=The question now on the table is not technical - the logs largely answer 'is it fixable' - but authorizational: whether to attempt a fifth time, change the runtime, or conclude the benchmark is not executable under the zero-cost mandate. M1-M13 remain null. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -375,6 +375,9 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0035 | 2026-09-16 | Repair the evaluation-harness defect classes and relaunch the kernel within the existing DEC-0032 authorization | ACCEPTED | — |
 | DEC-0036 | 2026-09-16 | Halt the evaluation-harness repair loop after a third pre-inference failure and escalate to the CEO | ACCEPTED | — |
 | DEC-0037 | 2026-09-16 | Authorize one isolated no-inference Kaggle model loading diagnostic | ACCEPTED | — |
+| DEC-0038 | 2026-09-16 | Authorize evaluation attempt #4: one governed BASE-then-CANDIDATE TEST benchmark on the DEC-0037 proven loading path | ACCEPTED | — |
+| DEC-0039 | 2026-09-16 | Launch evaluation attempt #4: one kernel push under DEC-0038, zero pushes remaining | ACCEPTED | — |
+| DEC-0040 | 2026-09-16 | Record evaluation attempt #4 as a pre-inference failure, apply no repair, and halt pending a CEO decision | ACCEPTED | — |
 
 ## Validation
 

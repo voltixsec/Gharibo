@@ -172,8 +172,8 @@
   "datasetVisibility": "PRIVATE",
   "payloadBasis": "PROMPTS_ONLY",
   "promptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
-  "notebookSha256": "43b407ef466c07421d85794a6754eb6238c610c248cd60d3ab5867f2cf068362",
-  "launchBundleHash": "a9276863f88109409cff20507c3f83e81c8486cc2e408c6edb10a6687895dd87",
+  "notebookSha256": "a494c7b40229a8b79698daf372834d6ac73cc9243ca92a251281c71c76c7536d",
+  "launchBundleHash": "5c09fbf6796364fa6610a49ff248fe926ade219e099328343e3a48dc74c43096",
   "bundleVerificationChecks": 19,
   "bundleVerificationResult": "PASSED",
   "goldPayloadIncluded": false,
@@ -231,5 +231,5 @@
     "scripts/eval/verify-eval-kernel-runtime.py",
     "scripts/eval/verify-eval-failure-evidence.py"
   ],
-  "relaunchHash": "105ceddf653da56c2d8f0e44c5361b8c28346df5fb6b8ba2ebf4190a71e8483c"
+  "relaunchHash": "67bf468b038135694e280d4bf61b58bcb1b3d139db9b224172c971da79854af7"
 }

@@ -245,6 +245,21 @@ if (infraBlocker && infraBlocker.status === "OPEN") {
       evalAuth.thirdLaunchFailureDefectId === "DEF-0036-E",
     `thirdLaunchOutcome=${JSON.stringify(evalAuth.thirdLaunchOutcome)} defect=${JSON.stringify(evalAuth.thirdLaunchFailureDefectId)}`,
   );
+  // The fourth legitimate case, and the one this project actually reached: the blocker is CLOSED
+  // by a launch, no result exists, and the run is NOT in flight because it has failed a THIRD time
+  // pre-inference and the repair loop has been HALTED pending a CEO decision.
+  //
+  // This state invites a specific fraud: reading "still technically unspent" as "clear to retry".
+  // The branch therefore requires the halt to be recorded, the counts to be honest, and — the
+  // load-bearing check — `furtherAttemptAuthorized === false`. A harness that re-authorizes itself
+  // after three failures is exactly what this layer exists to make impossible.
+  check(
+    "third pre-inference failure is recorded as a failure",
+    evalAuth.thirdLaunchOutcome === "FAILED_PRE_INFERENCE" &&
+      evalAuth.thirdLaunchFailureClass === "HARNESS_DEFECT_NO_EXECUTION" &&
+      evalAuth.thirdLaunchFailureDefectId === "DEF-0036-E",
+    `thirdLaunchOutcome=${JSON.stringify(evalAuth.thirdLaunchOutcome)} defect=${JSON.stringify(evalAuth.thirdLaunchFailureDefectId)}`,
+  );
   check(
     "the third failure occurred before any model object existed",
     evalAuth.thirdLaunchTestInferenceOccurred === false &&
@@ -271,12 +286,23 @@ if (infraBlocker && infraBlocker.status === "OPEN") {
     `consumed=${JSON.stringify(evalAuth.authorizationConsumed)} spent=${JSON.stringify(evalAuth.authorizationSpent)}`,
   );
   check(
-    "three launches, five defect classes, and zero metric values",
-    evalAuth.launchAttempts === 3 &&
-      evalAuth.defectClassesFound === 5 &&
+    "at least three launches, at least five defect classes, and zero metric values",
+    // The escalation's own record is three launches and five defect classes. A LATER, separately
+    // authorized attempt (#4, DEC-0038/0039/0040) legitimately raises both counters, so these are
+    // asserted as FLOORS here: the point is that neither count may round DOWN below the escalated
+    // record, and that the metric count may not round UP.
+    evalAuth.launchAttempts >= 3 &&
+      evalAuth.defectClassesFound >= 5 &&
       evalAuth.metricValuesProducedAfterThreeLaunches === 0 &&
       evalAuth.metricValuesProduced === 0,
     `attempts=${JSON.stringify(evalAuth.launchAttempts)} defects=${JSON.stringify(evalAuth.defectClassesFound)} metrics=${JSON.stringify(evalAuth.metricValuesProduced)}`,
+  );
+  check(
+    "the harness-repair loop is still HALTED and no further attempt is authorized",
+    evalAuth.harnessRepairLoopHalted === true &&
+      evalAuth.furtherAttemptAuthorized === false &&
+      evalAuth.furtherAttemptRequiresNewDecision === true,
+    `halted=${JSON.stringify(evalAuth.harnessRepairLoopHalted)} furtherAttemptAuthorized=${JSON.stringify(evalAuth.furtherAttemptAuthorized)}`,
   );
   check(
     "nothing was downloaded, scored, or parsed locally",
@@ -372,6 +398,337 @@ if (infraBlocker && infraBlocker.status === "OPEN") {
   );
 } else {
   check("BLK-0004 state is coherent", false, "BLK-0004 missing while evaluationResults is 0");
+}
+
+// --------------------------------------------------------------------------------------------
+// SECTION 4b — EVALUATION ATTEMPT #4 (DEC-0038 / DEC-0039 / DEC-0040)
+// --------------------------------------------------------------------------------------------
+// Attempt #4 is the first attempt in this project whose failure is NOT the same defect it was
+// launched to exercise. It was authorized exactly ONCE (DEC-0038, one kernel push), pushed once
+// (DEC-0039, zero remaining), failed PRE-INFERENCE at model load (DEC-0040), and was NOT repaired
+// or retried. This section exists to make four specific frauds impossible:
+//
+//   FRAUD 1 — "the kernel ran, so something was measured." The log is machine-scanned for the
+//     inference markers; the count must be zero, no prediction file may exist, and no run record
+//     may have been written. The evidence is DERIVED by a committed script, never asserted here.
+//   FRAUD 2 — "it failed, so go again." The authorization is EXHAUSTED: one push performed, zero
+//     remaining, retries 0, repair false, fifth attempt false, and a further attempt requires a
+//     NEW human decision. A harness that re-authorizes itself after four failures is the exact
+//     failure mode this section makes impossible.
+//   FRAUD 3 — "the 404 caused it, and it is fatal anyway." BOTH halves of the contrast are
+//     observed: attempt #4 hit the identical 404 at the mutable ref "main" and FAILED, while
+//     DEC-0037 hit it at the immutable commit SHA and PASSED. The defect is therefore recorded as
+//     NOT inherently fatal. What is NOT observed is that the preceding Xet transport error CAUSED
+//     the fallback — so transport causation must still read UNPROVEN_NOT_ASSERTED. Overclaiming
+//     the cause would be as dishonest as overclaiming a score.
+//   FRAUD 4 — "the number arrived late." This block runs BEFORE the results branch above and
+//     re-asserts the zero. If a result is ever registered while this attempt's evidence is
+//     missing, the checks below fail rather than silently reconciling.
+if (evalAuth.attempt4AuthorizationDecisionId) {
+  check(
+    "attempt #4 authorization is DEC-0038, ACCEPTED, unsuperseded, and pinned by sha256",
+    evalAuth.attempt4AuthorizationDecisionId === "DEC-0038" &&
+      evalAuth.attempt4AuthorizationRecord ===
+        "governance/DEC-0038-evaluation-attempt-4-authorization.json" &&
+      isSha256(evalAuth.attempt4AuthorizationHash) &&
+      decisions.filter((d) => d?.id === "DEC-0038").length === 1 &&
+      decisions.find((d) => d?.id === "DEC-0038")?.status === "ACCEPTED" &&
+      decisions.find((d) => d?.id === "DEC-0038")?.supersedes === null &&
+      decisions.find((d) => d?.id === "DEC-0038")?.supersededBy === null,
+    `id=${JSON.stringify(evalAuth.attempt4AuthorizationDecisionId)} hash=${JSON.stringify(evalAuth.attempt4AuthorizationHash)}`,
+  );
+  check(
+    "attempt #4 is the FOURTH attempt, authorized WITH LIMITS, amending — not replacing — DEC-0036",
+    evalAuth.attempt4Number === 4 &&
+      evalAuth.attempt4AuthorizationStatus === "AUTHORIZED_WITH_LIMITS" &&
+      evalAuth.attempt4Number > 3,
+    `number=${JSON.stringify(evalAuth.attempt4Number)} status=${JSON.stringify(evalAuth.attempt4AuthorizationStatus)}`,
+  );
+  check(
+    "attempt #4 is bounded to exactly ONE kernel push and BASE-then-CANDIDATE over the same 80 records",
+    evalAuth.attempt4MaximumKernelPushes === 1 &&
+      evalAuth.attempt4Arms?.length === 2 &&
+      evalAuth.attempt4Arms?.[0] === "base" &&
+      evalAuth.attempt4Arms?.[1] === "candidate" &&
+      evalAuth.attempt4ArmOrder === "BASE_THEN_CANDIDATE" &&
+      evalAuth.attempt4SameTestRecordsForBothArms === true &&
+      evalAuth.attempt4TestRecordCount === 80 &&
+      evalAuth.attempt4TestSplitHash ===
+        "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+    `maxPushes=${JSON.stringify(evalAuth.attempt4MaximumKernelPushes)} order=${JSON.stringify(evalAuth.attempt4ArmOrder)}`,
+  );
+  check(
+    "the decoding contract is IDENTICAL across both arms (no tuning, no model selection)",
+    evalAuth.attempt4DecodingIdenticalAcrossArms === true &&
+      evalAuth.attempt4CandidateSettingsNotAlteredAfterBaseOutput === true &&
+      evalAuth.attempt4TuningAuthorized === false &&
+      evalAuth.attempt4ModelSelectionAuthorized === false &&
+      evalAuth.attempt4PromotionAuthorized === false &&
+      evalAuth.attempt4GhariboV01CreationAuthorized === false &&
+      evalAuth.attempt4DatasetMutationAuthorized === false &&
+      evalAuth.attempt4TestDrivenCodeOptimisationAuthorized === false &&
+      evalAuth.attempt4AutomaticRetryAuthorized === false,
+    `identical=${JSON.stringify(evalAuth.attempt4DecodingIdenticalAcrossArms)} tuningAuthorized=${JSON.stringify(evalAuth.attempt4TuningAuthorized)}`,
+  );
+  check(
+    "attempt #4 reuses the DEC-0037 PROVEN loader path and forbids redesign",
+    evalAuth.attempt4LoaderConventionProvenBy === "DEC-0037" &&
+      typeof evalAuth.attempt4LoaderConvention === "string" &&
+      evalAuth.attempt4RedesignForbidden === true &&
+      evalAuth.attempt4AdditionalChatTemplates404Status === "REPRODUCED_AND_NON_FATAL",
+    `provenBy=${JSON.stringify(evalAuth.attempt4LoaderConventionProvenBy)} redesignForbidden=${JSON.stringify(evalAuth.attempt4RedesignForbidden)}`,
+  );
+  check(
+    "starting TEST inference spends the authorization; a pre-inference failure stops the run",
+    evalAuth.attempt4AuthorizationSpentOnInferenceStart === true &&
+      typeof evalAuth.attempt4OnPreInferenceFailure === "string" &&
+      /no repair-and-retry/i.test(evalAuth.attempt4OnPreInferenceFailure) &&
+      /no attempt #5/i.test(evalAuth.attempt4OnPreInferenceFailure),
+    `spentOnStart=${JSON.stringify(evalAuth.attempt4AuthorizationSpentOnInferenceStart)} onFailureIsPolicy=${typeof evalAuth.attempt4OnPreInferenceFailure === "string"}`,
+  );
+
+  // ---- the launch (DEC-0039) -----------------------------------------------------------------
+  check(
+    "the ONE push was performed, it is DEC-0039, and ZERO pushes remain",
+    evalAuth.attempt4LaunchDecisionId === "DEC-0039" &&
+      evalAuth.attempt4LaunchRecord ===
+        "governance/DEC-0039-evaluation-attempt-4-launch.json" &&
+      isSha256(evalAuth.attempt4LaunchHash) &&
+      evalAuth.attempt4Pushed === true &&
+      evalAuth.attempt4KernelPushesPerformed === 1 &&
+      evalAuth.attempt4KernelPushesRemaining === 0 &&
+      evalAuth.attempt4RetryAuthorized === false,
+    `pushed=${JSON.stringify(evalAuth.attempt4Pushed)} performed=${JSON.stringify(evalAuth.attempt4KernelPushesPerformed)} remaining=${JSON.stringify(evalAuth.attempt4KernelPushesRemaining)}`,
+  );
+  check(
+    "the launch is pinned to a concrete kernel version and artifact hashes",
+    evalAuth.attempt4KernelId === "vokaigharibo/gharibo-eval-001-fec22ca2" &&
+      evalAuth.attempt4KernelVersion === 3 &&
+      isSha256(evalAuth.attempt4NotebookSha256AsPushed) &&
+      isSha256(evalAuth.attempt4LaunchBundleHashAsPushed),
+    `kernel=${JSON.stringify(evalAuth.attempt4KernelId)} version=${JSON.stringify(evalAuth.attempt4KernelVersion)}`,
+  );
+  check(
+    "the launch record itself does not claim an outcome it could not yet know",
+    // At launch time the only honest observation was RUNNING. The value on disk now reads ERROR
+    // because it was RECONCILED BY THE FAILURE RECORD (DEC-0040) — not because the launch record
+    // foretold it. Either is acceptable HERE, but the metric count must be zero and the status must
+    // never be a SUCCESS-class value, which would mean a result was implied without one existing.
+    evalAuth.attempt4MetricValuesProduced === 0 &&
+      ["RUNNING", "ERROR"].includes(evalAuth.attempt4KernelStatusAtRecordTime),
+    `metricsAtLaunch=${JSON.stringify(evalAuth.attempt4MetricValuesProduced)} statusAtRecord=${JSON.stringify(evalAuth.attempt4KernelStatusAtRecordTime)}`,
+  );
+
+  // ---- the failure (DEC-0040) ----------------------------------------------------------------
+  check(
+    "attempt #4 failed PRE-INFERENCE and is recorded as a FAILURE, not as an outcome",
+    evalAuth.attempt4Status === "FAILED_PRE_INFERENCE" &&
+      evalAuth.attempt4Outcome === "FAILED_PRE_INFERENCE" &&
+      evalAuth.attempt4FailureDecisionId === "DEC-0040" &&
+      evalAuth.attempt4FailureRecord ===
+        "governance/DEC-0040-evaluation-attempt-4-failure.json" &&
+      isSha256(evalAuth.attempt4FailureHash) &&
+      evalAuth.attempt4FailureClass === "HARNESS_DEFECT_NO_EXECUTION",
+    `status=${JSON.stringify(evalAuth.attempt4Status)} failureDecision=${JSON.stringify(evalAuth.attempt4FailureDecisionId)}`,
+  );
+  check(
+    "the failure occurred at MODEL LOAD, before any model object existed",
+    evalAuth.attempt4FailurePhase === "MODEL_LOAD" &&
+      evalAuth.attempt4FailureDefectId === "DEF-0040-A" &&
+      evalAuth.attempt4ModelObjectConstructed === false &&
+      evalAuth.attempt4PredictionFilesProduced === 0,
+    `phase=${JSON.stringify(evalAuth.attempt4FailurePhase)} defect=${JSON.stringify(evalAuth.attempt4FailureDefectId)} modelObject=${JSON.stringify(evalAuth.attempt4ModelObjectConstructed)}`,
+  );
+  check(
+    "the failure evidence was DERIVED from the log by a committed script, never asserted",
+    evalAuth.attempt4FailureEvidenceScript ===
+      "scripts/eval/verify-eval-failure-evidence.py" &&
+      evalAuth.attempt4FailureEvidenceResult === "PASSED_4_OF_4_PRE_INFERENCE" &&
+      isSha256(evalAuth.attempt4FailureLogSha256),
+    `evidence=${JSON.stringify(evalAuth.attempt4FailureEvidenceResult)} logSha256=${JSON.stringify(evalAuth.attempt4FailureLogSha256)}`,
+  );
+  check(
+    "the decisive revision finding is recorded, and its unproven half stays UNPROVEN",
+    // The 404 is NOT inherently fatal: DEC-0037 survived the identical 404 at the pinned commit
+    // SHA. Attempt #4 hit it at the mutable ref "main". Both halves are OBSERVED. What is NOT
+    // observed is that the preceding Xet transport error CAUSED the fallback — so that half must
+    // still read UNPROVEN, and the contrast must be recorded as the decisive finding it is.
+    evalAuth.attempt4ResolvedRevisionObserved === "main" &&
+      evalAuth.attempt4ResolvedRevisionKind === "MUTABLE_REF_NAME" &&
+      evalAuth.attempt4ContrastResolvedRevision ===
+        "093fba6992ef5a7152481afec0bdfca1ac486998" &&
+      evalAuth.attempt4ContrastResolvedRevisionKind === "IMMUTABLE_COMMIT_SHA" &&
+      evalAuth.attempt4ContrastOutcome === "PASS" &&
+      evalAuth.attempt4SameDefectIsNotInherentlyFatal === true &&
+      evalAuth.attempt4TransportCausationStatus === "UNPROVEN_NOT_ASSERTED",
+    `observed=${JSON.stringify(evalAuth.attempt4ResolvedRevisionObserved)} causality=${JSON.stringify(evalAuth.attempt4TransportCausationStatus)}`,
+  );
+  check(
+    "remedies were IDENTIFIED but NOT APPLIED — evaluation, not harness development",
+    evalAuth.attempt4RemediesIdentifiedNotApplied === true,
+    `remediesIdentifiedNotApplied=${JSON.stringify(evalAuth.attempt4RemediesIdentifiedNotApplied)}`,
+  );
+  check(
+    "DEC-0038, DEC-0039 and DEC-0040 are each present exactly once, ACCEPTED, and unsuperseded",
+    // THE LEDGER, not just the filesystem. Removing DEC-0039 from the ledger would erase the record
+    // of the ONE push that was authorized and spent; superseding DEC-0040 would quietly set the
+    // failure aside. In both cases the three JSON record files would still sit on disk and every
+    // on-disk check below would keep passing — so the ledger entries themselves are asserted here.
+    ["DEC-0038", "DEC-0039", "DEC-0040"].every((id) => {
+      const d = decisions.filter((x) => x?.id === id);
+      return (
+        d.length === 1 &&
+        d[0].status === "ACCEPTED" &&
+        d[0].supersedes === null &&
+        d[0].supersededBy === null
+      );
+    }),
+    ["DEC-0038", "DEC-0039", "DEC-0040"]
+      .map((id) => {
+        const d = decisions.filter((x) => x?.id === id);
+        return `${id}:n=${d.length},status=${JSON.stringify(d[0]?.status)},supersededBy=${JSON.stringify(d[0]?.supersededBy)}`;
+      })
+      .join(" "),
+  );
+  check(
+    "the launch and failure records are pinned by sha256",
+    isSha256(evalAuth.attempt4LaunchHash) && isSha256(evalAuth.attempt4FailureHash),
+    `launchHash=${JSON.stringify(evalAuth.attempt4LaunchHash)} failureHash=${JSON.stringify(evalAuth.attempt4FailureHash)}`,
+  );
+
+  // ---- enforcement of the handoff's failure policy -------------------------------------------
+  check(
+    "NO retry, NO repair, NO fifth attempt: a further attempt requires a NEW human decision",
+    evalAuth.attempt4RetriesPerformed === 0 &&
+      evalAuth.attempt4RepairPerformed === false &&
+      evalAuth.attempt4RetryAuthorized === false &&
+      evalAuth.attempt4FifthAttemptAuthorized === false &&
+      evalAuth.attempt4AutomaticRetryAuthorized === false &&
+      evalAuth.attempt4FurtherAttemptRequiresNewDecision === true &&
+      evalAuth.harnessRepairLoopHalted === true &&
+      evalAuth.furtherAttemptAuthorized === false,
+    `retries=${JSON.stringify(evalAuth.attempt4RetriesPerformed)} repaired=${JSON.stringify(evalAuth.attempt4RepairPerformed)} fifthAuthorized=${JSON.stringify(evalAuth.attempt4FifthAttemptAuthorized)}`,
+  );
+  check(
+    "attempt #4 is recorded as an EXHAUSTED one-push authorization",
+    evalAuth.attempt4AuthorizationState ===
+      "EXHAUSTED_ONE_PUSH_CONSUMED_ZERO_REMAINING",
+    `state=${JSON.stringify(evalAuth.attempt4AuthorizationState)}`,
+  );
+  check(
+    "attempt #4 produced ZERO metric values, nothing was downloaded, nothing was scored",
+    evalAuth.attempt4MetricValuesProduced === 0 &&
+      evalAuth.metricValuesProduced === 0 &&
+      evalAuth.predictionsDownloaded === false &&
+      evalAuth.scoringPerformed === false &&
+      evalAuth.testRecordsParsedLocally === 0,
+    `metrics=${JSON.stringify(evalAuth.attempt4MetricValuesProduced)} scored=${JSON.stringify(evalAuth.scoringPerformed)} downloaded=${JSON.stringify(evalAuth.predictionsDownloaded)}`,
+  );
+  check(
+    "attempt #4 did not touch the model: still NOT_RUN, zero results, still unpromoted",
+    // `testInferenceOccurred` is a TRI-STATE, and attempt #4 is the reason it has a third value.
+    // The baseline field was written while the run was still in flight and reads "POSSIBLY_IN_FLIGHT".
+    // DEC-0040 then resolved it — for attempt #4 — to `false`, on evidence. The check therefore
+    // requires the RESOLVED per-attempt value to be false, and separately requires the baseline to be
+    // either the unresolved "POSSIBLY_IN_FLIGHT" or false: any other value (in particular `true`)
+    // would mean TEST inference occurred and every zero below would be a lie.
+    (evalAuth.attempt4TestInferenceOccurred === false) &&
+      (evalAuth.testInferenceOccurred === "POSSIBLY_IN_FLIGHT" ||
+        evalAuth.testInferenceOccurred === false) &&
+      evalAuth.testRecordsParsed === 0 &&
+      evalAuth.testRecordsParsedLocally === 0 &&
+      evalAuth.executionSucceeded === false &&
+      evalAuth.evaluationStatus === "NOT_RUN" &&
+      evalAuth.evaluationResults === 0 &&
+      results_count === 0 &&
+      experiment?.evaluationStatus === "NOT_RUN" &&
+      experiment?.promotable === false,
+    `attempt4Inference=${JSON.stringify(evalAuth.attempt4TestInferenceOccurred)} evaluationStatus=${JSON.stringify(evalAuth.evaluationStatus)} experimentStatus=${JSON.stringify(experiment?.evaluationStatus)} results=${JSON.stringify(results_count)} promotable=${JSON.stringify(experiment?.promotable)}`,
+  );
+
+  // ---- the records must exist, be parseable, and agree with the state ------------------------
+  for (const [label, rel, expectedId] of [
+    [
+      "authorization",
+      "governance/DEC-0038-evaluation-attempt-4-authorization.json",
+      "DEC-0038",
+    ],
+    [
+      "launch",
+      "governance/DEC-0039-evaluation-attempt-4-launch.json",
+      "DEC-0039",
+    ],
+    [
+      "failure",
+      "governance/DEC-0040-evaluation-attempt-4-failure.json",
+      "DEC-0040",
+    ],
+  ]) {
+    const rec = readJson(rel);
+    check(
+      `attempt-#4 ${label} record exists on disk and parses`,
+      rec !== null,
+      `missing or malformed: ${rel}`,
+    );
+    check(
+      `attempt-#4 ${label} record identifies itself as ${expectedId}`,
+      rec?.decisionId === expectedId,
+      `decisionId=${JSON.stringify(rec?.decisionId)}`,
+    );
+  }
+  const failureRec = readJson(
+    "governance/DEC-0040-evaluation-attempt-4-failure.json",
+  );
+  check(
+    "the failure record's own decisive comparison matches the state exactly",
+    // The whole finding rests on this pair of OBSERVED strings. If either side drifts — e.g. the
+    // failing side is quietly rewritten to the commit SHA, or the passing side loses its pin — the
+    // "the same defect is not inherently fatal" conclusion stops being supported by evidence.
+    failureRec?.decisiveComparison?.attempt4Fail?.resolvedRevision === "main" &&
+      failureRec?.decisiveComparison?.attempt4Fail?.resolvedRevisionKind ===
+        "MUTABLE_REF_NAME" &&
+      failureRec?.decisiveComparison?.attempt4Fail?.loadOutcome === "FAIL" &&
+      failureRec?.decisiveComparison?.dec0037Pass?.resolvedRevision ===
+        "093fba6992ef5a7152481afec0bdfca1ac486998" &&
+      failureRec?.decisiveComparison?.dec0037Pass?.resolvedRevisionKind ===
+        "IMMUTABLE_COMMIT_SHA" &&
+      failureRec?.decisiveComparison?.dec0037Pass?.loadOutcome === "PASS" &&
+      failureRec?.failureLogSha256 === evalAuth.attempt4FailureLogSha256,
+    `failRef=${JSON.stringify(failureRec?.decisiveComparison?.attempt4Fail?.resolvedRevision)} passRef=${JSON.stringify(failureRec?.decisiveComparison?.dec0037Pass?.resolvedRevision)}`,
+  );
+  check(
+    "the failure record refuses to assert the unproven transport causation",
+    typeof failureRec?.whatIsNotEstablished === "string" &&
+      /UNPROVEN/.test(failureRec.whatIsNotEstablished) &&
+      /CAUSED|fall back/i.test(failureRec.whatIsNotEstablished),
+    "the record must carry what is NOT established, and name the unproven link explicitly",
+  );
+  check(
+    "the failure record proves no inference from evidence and produced no predictions",
+    failureRec?.testInferenceOccurred === false &&
+      failureRec?.predictionsProduced?.predictionsBase === false &&
+      failureRec?.predictionsProduced?.predictionsCandidate === false &&
+      failureRec?.predictionsProduced?.runRecord === false &&
+      failureRec?.testRecordsParsedLocally === 0 &&
+      failureRec?.predictionsDownloaded === false &&
+      failureRec?.scoringPerformed === false &&
+      failureRec?.metricValuesProduced === 0 &&
+      failureRec?.repairsPerformedByThisRecord === 0 &&
+      failureRec?.kernelPushedByThisRecord === false &&
+      failureRec?.fifthAttemptAuthorized === false &&
+      failureRec?.furtherAttemptRequiresNewHumanDecision === true,
+    `inference=${JSON.stringify(failureRec?.testInferenceOccurred)} runRecord=${JSON.stringify(failureRec?.predictionsProduced?.runRecord)} repairs=${JSON.stringify(failureRec?.repairsPerformedByThisRecord)}`,
+  );
+  check(
+    "the failure record confirms nothing was promoted, tuned, selected, mutated, or created",
+    failureRec?.promotionPerformed === false &&
+      failureRec?.tuningPerformed === false &&
+      failureRec?.selectionPerformed === false &&
+      failureRec?.datasetMutated === false &&
+      failureRec?.testDrivenCodeOptimisationPerformed === false &&
+      failureRec?.ghariboV01Created === false,
+    "no forbidden side-effect may be recorded as performed",
+  );
 }
 
 // ------------------------------------------------------------ 5. TEST remains isolated

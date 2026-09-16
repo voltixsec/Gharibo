@@ -35,7 +35,7 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 | Roadmap | `docs/ROADMAP.md` | Product | Roadmap | Approved | 1.3.0 | 2026-09-15 |
 | Documentation Governance | `docs/DOCUMENTATION_GOVERNANCE.md` | Architecture | Governance | Frozen | 1.0.0 | 2026-09-14 |
 | Document Register | `docs/DOCUMENT_REGISTER.md` | Architecture | Governance | Living | 1.17.0 | 2026-09-16 |
-| Master State (generated) | `docs/GHARIBO_MASTER_STATE.md` | Architecture | Governance | Living | 1.17.0 | 2026-09-16 |
+| Master State (generated) | `docs/GHARIBO_MASTER_STATE.md` | Architecture | Governance | Living | 1.20.0 | 2026-09-16 |
 | Master State (canonical) | `governance/GHARIBO_MASTER_STATE.json` | Architecture | Governance | Living | 1.0.0 | 2026-09-15 |
 | ADR Index | `docs/adr/README.md` | Architecture | Governance | Living | 1.4.0 | 2026-09-15 |
 | ADR Template | `docs/adr/TEMPLATE.md` | Architecture | Governance | Living | 1.0.0 | 2026-09-14 |

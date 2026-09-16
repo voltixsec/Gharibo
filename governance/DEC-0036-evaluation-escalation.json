@@ -86,8 +86,8 @@
     "Re-scope or postpone the benchmark, recording that no evaluation is possible under the current zero-cost constraints."
   ],
   "optionsPresentedNote": "This record presents options; it does not recommend one. Choosing between them is the decision the escalation exists to obtain.",
-  "notebookSha256": "43b407ef466c07421d85794a6754eb6238c610c248cd60d3ab5867f2cf068362",
-  "launchBundleHash": "a9276863f88109409cff20507c3f83e81c8486cc2e408c6edb10a6687895dd87",
+  "notebookSha256": "a494c7b40229a8b79698daf372834d6ac73cc9243ca92a251281c71c76c7536d",
+  "launchBundleHash": "5c09fbf6796364fa6610a49ff248fe926ade219e099328343e3a48dc74c43096",
   "promptsSha256": "dcea32df3697921322afc33eae856bf6fd4e111785f63c4d399de7077e43f333",
   "candidateAdapterSha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
   "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
@@ -131,5 +131,5 @@
     "docs/RESEARCH_BENCHMARK.md",
     "scripts/eval/verify-eval-failure-evidence.py"
   ],
-  "escalationHash": "52484dbe21ee782f1012693037effdae03ddbd73addd743bfed3f0ef890a318b"
+  "escalationHash": "c5c770c16ada8c3a57b10f71946257cd366d6cfbed4f3fc11e1772c1d37d4654"
 }

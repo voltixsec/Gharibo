@@ -42,8 +42,12 @@
     "eval:launch:evidence": "python scripts/eval/verify-eval-failure-evidence.py --log gharibo-eval-001-fec22ca2.log",
     "eval:bundle": "node scripts/eval/prepare-eval-launch.mjs",
     "eval:bundle:verify": "python scripts/eval/verify-eval-bundle.py",
-    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:launch && npm run eval:audit:relaunch && npm run eval:audit:escalation && npm run eval:audit:leakage && npm run eval:verify && npm run eval:check && npm run eval:kernel:runtime && npm run eval:bundle:verify",
-    "eval:audit:escalation": "node scripts/eval/build-dec0036-escalation.mjs --check"
+    "verify:eval": "npm run eval:audit:auth && npm run eval:audit:blocker && npm run eval:audit:launch && npm run eval:audit:relaunch && npm run eval:audit:escalation && npm run eval:audit:attempt4:auth && npm run eval:audit:attempt4:launch && npm run eval:audit:attempt4:failure && npm run eval:audit:leakage && npm run eval:verify && npm run eval:gate:attempt4 && npm run eval:check && npm run eval:kernel:runtime && npm run eval:bundle:verify",
+    "eval:audit:escalation": "node scripts/eval/build-dec0036-escalation.mjs --check",
+    "eval:audit:attempt4:auth": "node scripts/eval/build-dec0038-authorization.mjs --check",
+    "eval:audit:attempt4:launch": "node scripts/eval/build-dec0039-launch.mjs --check",
+    "eval:audit:attempt4:failure": "node scripts/eval/build-dec0040-failure.mjs --check",
+    "eval:gate:attempt4": "node scripts/eval/check-attempt4-gate.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
