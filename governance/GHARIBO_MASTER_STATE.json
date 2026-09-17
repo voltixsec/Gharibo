@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.34.0",
+  "masterStateVersion": "1.35.0",
   "updatedAt": "2026-09-17",
   "project": {
     "id": "GHARIBO",
@@ -1326,6 +1326,29 @@
         "governance/DEC-0053-kaggle-authorized-compute-host.json",
         "data/derived/exp002/pilot-integrity.json",
         "data/derived/exp002/package-pilot/launch-summary.json"
+      ],
+      "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0056",
+      "date": "2026-09-17",
+      "title": "Prospective authorization for the verified pilot artifact to enter the V1 qualification gate",
+      "status": "ACCEPTED",
+      "decision": "PROSPECTIVELY authorize the exact integrity-verified EXP-002 pilot adapter to ENTER the V1 qualification gate. This decision is taken BEFORE the qualification run and does not depend on its outcome. It does NOT make the artifact promotable, does NOT declare GHARIBO V1, does NOT rewrite DEC-0052 or DEC-0053, and does NOT retroactively authorize anything: the pilot remains recorded as having been prepared as non-promotable pipeline validation. It only permits qualification of this exact immutable artifact. A SEPARATE evidence-based promotion decision is required afterwards, and only if every existing V1 gate genuinely passes.",
+      "rationale": "A trained artifact produced under a pilot that was declared non-promotable needs an explicit, prospective gate-entry authorization before it can be qualified. Recording it before the run keeps the authorization prospective rather than retroactive, and it neither promotes the artifact nor declares V1.",
+      "scope": [
+        "training",
+        "experiments",
+        "models"
+      ],
+      "references": [
+        "governance/DEC-0055-pilot-complete-integrity-verified.json",
+        "data/derived/exp002/pilot-integrity.json",
+        "data/derived/exp002/qualification/items-manifest.json",
+        "scripts/exp002/build_qualification_items.py",
+        "scripts/eval/local-eval-controller.mjs"
       ],
       "supersedes": null,
       "supersededBy": null,
@@ -2925,7 +2948,8 @@
         "integrityVerdict": "PASS",
         "adapterSha256": "8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e",
         "integrityArtifact": "data/derived/exp002/pilot-integrity.json",
-        "qualificationStatus": "SEALED_UNTOUCHED"
+        "qualificationStatus": "AUTHORIZED_NOT_YET_RUN",
+        "qualificationAuthorization": "DEC-0056"
       },
       "production": {
         "experimentId": "GHARIBO-exp-002",
@@ -2939,6 +2963,18 @@
         "gatedOnPilot": true,
         "trainingAuthorized": false,
         "kernelPushesPerformed": 0
+      },
+      "qualification": {
+        "status": "AUTHORIZED",
+        "decisionId": "DEC-0056",
+        "rows": 80,
+        "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1",
+        "promptsSha256": "3c0e0aa06b4d9e1d5f9bbe0a724f0d17c99fdd6401d907f0e3cf58b1e6ff8aee",
+        "goldSha256": "b8a6ecac92953cd1ac38c1730dc12ca5a24b4d24f118d5c2a96e79a184308421",
+        "goldLocal": true,
+        "scoringLocal": true,
+        "inferenceHost": "KAGGLE_INFERENCE_ONLY",
+        "evaluationStatus": "NOT_RUN"
       }
     }
   },
@@ -3083,7 +3119,7 @@
       "kernelPushesRemaining": 1,
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "PILOT_COMPLETE_AWAITING_QUALIFICATION_AUTHORIZATION",
+      "readinessStatus": "QUALIFICATION_AUTHORIZED_NOT_RUN",
       "promotable": false,
       "promotionBlockedReason": "No training has run and no evaluation result exists. A pilot adapter is non-promotable by construction. Additionally BLK-0005 records that no independent source corpus exists, so any V1 claim must state that it rests on the sealed EXP-002 qualification split.",
       "qualificationSplit": {
@@ -3648,6 +3684,14 @@
         "status": "PASS",
         "exitCode": 0,
         "evidence": "29/29 integrity checks PASS on 121 recovered files. Adapter sha256 8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e (31,876,192 bytes). 25/25 optimizer steps, 1 epoch, train_loss 0.19649010464549066, train_runtime 1419.1747 s. Sealed qualification split not present in the recovered output.",
+        "verifiedAt": "2026-09-17"
+      },
+      {
+        "gate": "exp002:qualification-seal-open",
+        "command": "python scripts/exp002/build_qualification_items.py",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "Sealed qualification split opened exactly once under DEC-0056. 80 rows, split hash 1c5648cb...a9b1 verified. prompts.jsonl (model-visible) and gold.jsonl (scorer-only, local) separated. Consumed EXP-001 TEST split never read.",
         "verifiedAt": "2026-09-17"
       }
     ],
@@ -4283,6 +4327,20 @@
         "confirmed adapter, outputs/final and outputs/checkpoint-25 are byte-identical (terminal checkpoint)",
         "preserved the historical non-promotable origin of the pilot without rewriting it",
         "did not open the sealed qualification split, did not evaluate, did not promote, did not run the 560-row job"
+      ]
+    },
+    {
+      "revision": "1.35.0",
+      "date": "2026-09-17",
+      "summary": "DEC-0056 prospective authorization for the integrity-verified EXP-002 pilot adapter to enter the V1 qualification gate. Not promoted; V1 not declared.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "Gate-entry authorization only. Promotion requires a separate evidence-based decision.",
+      "changes": [
+        "prospectively authorized qualification of adapter 8d80d7ca...733e",
+        "opened the sealed qualification split exactly once under this decision (80 rows, hash verified)",
+        "split prompts from gold: prompts are model-visible, gold remains scorer-only and local",
+        "did not make the artifact promotable, did not declare V1, did not rewrite DEC-0052/0053"
       ]
     }
   ]

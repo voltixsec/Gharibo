@@ -1,0 +1,59 @@
+{
+  "artifact": {
+    "adapterSha256": "8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e",
+    "form": "LoRA adapter over unsloth/gpt-oss-20b (NOT a merged model)",
+    "integrityChecks": 29,
+    "integrityVerdict": "PASS",
+    "packageId": "69477068f524892b0537167afe898cb026216e3bd802962f3d16126e4707f6b4",
+    "recipeHash": "d1851753a05a0d2b560ccd8d47b82318fd69261b66aa0e9274f259e67a0e93a3"
+  },
+  "authority": "Explicit human authorization to qualify this exact already-trained, integrity-verified artifact.",
+  "decision": "PROSPECTIVELY authorize the exact integrity-verified EXP-002 pilot adapter to ENTER the V1 qualification gate. This decision is taken BEFORE the qualification run and does not depend on its outcome. It does NOT make the artifact promotable, does NOT declare GHARIBO V1, does NOT rewrite DEC-0052 or DEC-0053, and does NOT retroactively authorize anything: the pilot remains recorded as having been prepared as non-promotable pipeline validation. It only permits qualification of this exact immutable artifact. A SEPARATE evidence-based promotion decision is required afterwards, and only if every existing V1 gate genuinely passes.",
+  "decisionHash": "335ec86e01ad5ffd5c81c106d4711a22f32e8449172f3371449101030b4d7806",
+  "decisionId": "DEC-0056",
+  "next": "RUN_QUALIFICATION_INFERENCE_AND_SCORE_LOCALLY",
+  "notAuthorizedByThisDecision": [
+    "promotion of the artifact",
+    "declaring GHARIBO V1",
+    "the 560-row production training run",
+    "reuse of the consumed EXP-001 TEST split",
+    "uploading qualification gold",
+    "any additional training job",
+    "rewriting DEC-0052 or DEC-0053"
+  ],
+  "qualificationExecutionPolicy": {
+    "additionalTrainingLaunches": 0,
+    "cherryPicking": false,
+    "consumedExp001TestForbidden": true,
+    "goldAnswersRemainLocal": true,
+    "inferenceHost": "KAGGLE_INFERENCE_ONLY",
+    "inventedMetrics": false,
+    "placeholderScores": false,
+    "promptsMayBeSent": true,
+    "retriesToImproveScore": false,
+    "scoringRemainsLocal": true,
+    "thresholdChangesAfterResults": false,
+    "trainingAuthorized": false,
+    "tuningOnQualification": false
+  },
+  "recordDate": "2026-09-17",
+  "recordKind": "EXP002_QUALIFICATION_GATE_ENTRY_AUTHORIZATION",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0055-pilot-complete-integrity-verified.json",
+    "data/derived/exp002/pilot-integrity.json",
+    "data/derived/exp002/qualification/items-manifest.json",
+    "scripts/exp002/build_qualification_items.py",
+    "scripts/eval/local-eval-controller.mjs"
+  ],
+  "sealOpening": {
+    "goldSha256": "b8a6ecac92953cd1ac38c1730dc12ca5a24b4d24f118d5c2a96e79a184308421",
+    "note": "Prompts are model-visible. Gold is scorer-only and never leaves this machine.",
+    "openedOnce": true,
+    "openedUnder": "DEC-0056",
+    "promptsSha256": "3c0e0aa06b4d9e1d5f9bbe0a724f0d17c99fdd6401d907f0e3cf58b1e6ff8aee",
+    "rows": 80,
+    "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1"
+  },
+  "status": "PROSPECTIVE_AUTHORIZATION_TO_ENTER_QUALIFICATION_GATE_NOT_PROMOTED"
+}

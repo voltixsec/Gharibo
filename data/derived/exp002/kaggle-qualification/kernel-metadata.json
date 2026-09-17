@@ -1,0 +1,17 @@
+{
+  "id": "vokaigharibo/gharibo-exp-002-qualification",
+  "title": "GHARIBO exp-002 qualification",
+  "code_file": "GHARIBO-exp-002-qualification.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [
+    "vokaigharibo/gharibo-exp-002-pilot"
+  ],
+  "model_sources": []
+}
