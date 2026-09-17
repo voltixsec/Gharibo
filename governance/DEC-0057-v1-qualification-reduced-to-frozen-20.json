@@ -1,0 +1,59 @@
+{
+  "authority": "Explicit user decision: the V1 qualification scope for this execution path is exactly 20 items, an intentional evidence-budget decision.",
+  "decision": "Supersede the 80-item qualification population (DEC-0056) for the V1 promotion decision on this execution path. The final V1 qualification is a FROZEN 20-item subset drawn deterministically from the original 80-item sealed population. The 20 items were selected and frozen BEFORE any scoring, using only item_id (a content address); gold was never read during selection. The remaining 60 items stay sealed and unused. Governance records truthfully that V1 qualification evidence was reduced from an 80-item population to a frozen 20-item set, and that 20 items are NOT evidentially equivalent to 80. DEC-0056 is preserved as history; it is superseded for scope, not rewritten.",
+  "decisionHash": "5100d96982d6085dff7c446aaf4c2d89fcdd2db0c1b10d802622855ffc8a62c9",
+  "decisionId": "DEC-0057",
+  "frozenSubset": {
+    "artifact": "data/derived/exp002/qualification/frozen-20.json",
+    "frozenBeforeScoring": true,
+    "goldReadDuringSelection": false,
+    "items": 20,
+    "mayNotBeReplacedAfterResults": true,
+    "selectionAlgorithm": "sha256(seed + ':' + item_id) ascending, first 20",
+    "selectionSeed": "20260917-exp002-v1qual",
+    "subsetHash": "c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45"
+  },
+  "inferenceIncident": {
+    "benchmark": {
+      "finalChannelPass": 3,
+      "items": 3,
+      "meanTokensPerSecond": 4.25,
+      "medianItemSeconds": 141.865,
+      "note": "3 benchmark prompts are part of the frozen 20; they were used for RUNTIME MEASUREMENT ONLY and were never scored.",
+      "terminationFailures": 0,
+      "verdict": "GREEN"
+    },
+    "classification": "NOT_A_TRAINING_OR_MODEL_FAILURE",
+    "fix": "runtime-only: single-GPU pin (CUDA_VISIBLE_DEVICES=0 -> device_map {'': 0}, lm_head cuda:0), Harmony stop-token stopping criteria, torch.inference_mode(). Model, adapter, tokenizer, template, Harmony contract and greedy generation semantics unchanged.",
+    "kind": "INFERENCE_RUNTIME_PERFORMANCE_INCIDENT",
+    "observed": "first item completed at ~1100.7 s; item 2 still incomplete at ~2010.2 s (>900 s stall)",
+    "obsoleteRunStopped": true,
+    "rootCause": "(1) no stopping criterion - generate() ran to the full max_new_tokens=3072 ceiling instead of stopping at the Harmony <|return|> terminator; (2) two-GPU sharding placed lm_head on cuda:1, forcing a cross-PCIe transfer per generated token although the model fits on one T4; (3) torch.no_grad() instead of torch.inference_mode()."
+  },
+  "next": "RUN_FROZEN_20_INFERENCE_THEN_SCORE_LOCALLY",
+  "notAuthorizedByThisDecision": [
+    "retraining",
+    "modifying the adapter",
+    "changing the base model",
+    "expanding back to 80",
+    "launching the 560-row production run",
+    "uploading gold",
+    "cherry-picking items after results"
+  ],
+  "recordDate": "2026-09-17",
+  "recordKind": "V1_QUALIFICATION_SCOPE_REDUCED_TO_FROZEN_20",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0056-qualification-gate-entry-authorization.json",
+    "data/derived/exp002/qualification/frozen-20.json",
+    "data/derived/exp002/pilot-integrity.json"
+  ],
+  "scopeReduction": {
+    "authorizedBy": "explicit user decision",
+    "evidenceStrengthWarning": "A 20-item qualification does NOT carry the statistical strength of an 80-item evaluation. No equivalence may be claimed.",
+    "from": 80,
+    "remainingSealed": 60,
+    "to": 20
+  },
+  "status": "AUTHORIZED_REDUCTION_80_TO_20_FROZEN_BEFORE_SCORING"
+}

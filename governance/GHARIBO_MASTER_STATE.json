@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "masterStateVersion": "1.35.0",
+  "masterStateVersion": "1.36.0",
   "updatedAt": "2026-09-17",
   "project": {
     "id": "GHARIBO",
@@ -1351,6 +1351,27 @@
         "scripts/eval/local-eval-controller.mjs"
       ],
       "supersedes": null,
+      "supersededBy": null,
+      "architectureChanging": false
+    },
+    {
+      "id": "DEC-0057",
+      "date": "2026-09-17",
+      "title": "V1 qualification scope reduced to a frozen 20-item subset (authorized)",
+      "status": "ACCEPTED",
+      "decision": "Supersede the 80-item qualification population (DEC-0056) for the V1 promotion decision on this execution path. The final V1 qualification is a FROZEN 20-item subset drawn deterministically from the original 80-item sealed population. The 20 items were selected and frozen BEFORE any scoring, using only item_id (a content address); gold was never read during selection. The remaining 60 items stay sealed and unused. Governance records truthfully that V1 qualification evidence was reduced from an 80-item population to a frozen 20-item set, and that 20 items are NOT evidentially equivalent to 80. DEC-0056 is preserved as history; it is superseded for scope, not rewritten.",
+      "rationale": "The user authorized an intentional evidence-budget reduction from 80 to 20 items. The subset was frozen before scoring using only item_id, so it cannot be cherry-picked. Governance states plainly that 20 items are not equivalent to 80.",
+      "scope": [
+        "training",
+        "experiments",
+        "models"
+      ],
+      "references": [
+        "governance/DEC-0056-qualification-gate-entry-authorization.json",
+        "data/derived/exp002/qualification/frozen-20.json",
+        "data/derived/exp002/pilot-integrity.json"
+      ],
+      "supersedes": "DEC-0056.scope",
       "supersededBy": null,
       "architectureChanging": false
     }
@@ -2965,8 +2986,8 @@
         "kernelPushesPerformed": 0
       },
       "qualification": {
-        "status": "AUTHORIZED",
-        "decisionId": "DEC-0056",
+        "status": "FROZEN_20_RUNNING",
+        "decisionId": "DEC-0057",
         "rows": 80,
         "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1",
         "promptsSha256": "3c0e0aa06b4d9e1d5f9bbe0a724f0d17c99fdd6401d907f0e3cf58b1e6ff8aee",
@@ -2974,7 +2995,13 @@
         "goldLocal": true,
         "scoringLocal": true,
         "inferenceHost": "KAGGLE_INFERENCE_ONLY",
-        "evaluationStatus": "NOT_RUN"
+        "evaluationStatus": "NOT_RUN",
+        "scope": 20,
+        "sourcePopulation": 80,
+        "subsetHash": "c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45",
+        "benchmarkVerdict": "GREEN",
+        "medianItemSeconds": 141.865,
+        "meanTokensPerSecond": 4.25
       }
     }
   },
@@ -3119,7 +3146,7 @@
       "kernelPushesRemaining": 1,
       "evaluationStatus": "NOT_RUN",
       "evaluationScore": null,
-      "readinessStatus": "QUALIFICATION_AUTHORIZED_NOT_RUN",
+      "readinessStatus": "QUALIFICATION_20_RUNNING",
       "promotable": false,
       "promotionBlockedReason": "No training has run and no evaluation result exists. A pilot adapter is non-promotable by construction. Additionally BLK-0005 records that no independent source corpus exists, so any V1 claim must state that it rests on the sealed EXP-002 qualification split.",
       "qualificationSplit": {
@@ -3692,6 +3719,14 @@
         "status": "PASS",
         "exitCode": 0,
         "evidence": "Sealed qualification split opened exactly once under DEC-0056. 80 rows, split hash 1c5648cb...a9b1 verified. prompts.jsonl (model-visible) and gold.jsonl (scorer-only, local) separated. Consumed EXP-001 TEST split never read.",
+        "verifiedAt": "2026-09-17"
+      },
+      {
+        "gate": "exp002:frozen-20-subset",
+        "command": "python - (deterministic seeded selection over item_id)",
+        "status": "PASS",
+        "exitCode": 0,
+        "evidence": "20 items frozen from the 80-item sealed population using sha256(seed:item_id) ascending. subsetHash c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45. Gold never read during selection. 60 items remain sealed.",
         "verifiedAt": "2026-09-17"
       }
     ],
@@ -4341,6 +4376,23 @@
         "opened the sealed qualification split exactly once under this decision (80 rows, hash verified)",
         "split prompts from gold: prompts are model-visible, gold remains scorer-only and local",
         "did not make the artifact promotable, did not declare V1, did not rewrite DEC-0052/0053"
+      ]
+    },
+    {
+      "revision": "1.36.0",
+      "date": "2026-09-17",
+      "summary": "DEC-0057 V1 qualification reduced to a frozen 20-item subset; inference performance incident diagnosed and fixed at runtime; obsolete slow run stopped.",
+      "commit": null,
+      "commitStatus": "PENDING_CHECKPOINT",
+      "commitNote": "Records an authorized scope reduction and a runtime-only inference fix. No retraining.",
+      "changes": [
+        "recorded the inference runtime performance incident and that it was NOT a training or model failure",
+        "stopped the obsolete slow qualification execution to protect GPU quota",
+        "diagnosed the root cause: no stopping criterion, two-GPU sharding with lm_head on cuda:1, and no_grad instead of inference_mode",
+        "fixed at runtime only: single-GPU pin, Harmony stop-token stopping criteria, torch.inference_mode()",
+        "recorded a GREEN 3-prompt benchmark (median 141.865 s/item, 4.25 tok/s, 0 termination failures)",
+        "froze a deterministic 20-item subset (hash c4bcad86...) before scoring, with gold unread",
+        "recorded truthfully that 20 items are NOT evidentially equivalent to 80"
       ]
     }
   ]
