@@ -114,3 +114,6 @@ data/derived/exp002/package/
 data/derived/exp002/package-pilot/
 data/derived/exp002/package-production/
 data/derived/exp002/splits/*.jsonl
+# Qualification items — the sealed holdout answers must NEVER be versioned.
+# This repository is PUBLIC. Only the prompts may travel; gold stays local-only.
+data/derived/exp002/qualification/

@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.34.0 |
+| **Version** | 1.35.0 |
 | **Last Updated** | 2026-09-17 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -162,7 +162,7 @@ Notes:
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL | CLOSED_NON_PROMOTABLE_TRAINING_OBJECTIVE_DEFECT | 9/12 | GHARIBO-V0.1 | false |
-| GHARIBO-exp-002 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | faaae06551acda24897c5b95c19d290ed591f3be2fff3c33376525a768415332 | NOT_RUN | PILOT_COMPLETE_AWAITING_QUALIFICATION_AUTHORIZATION | undefined/undefined | GHARIBO-V1 | false |
+| GHARIBO-exp-002 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | faaae06551acda24897c5b95c19d290ed591f3be2fff3c33376525a768415332 | NOT_RUN | QUALIFICATION_AUTHORIZED_NOT_RUN | undefined/undefined | GHARIBO-V1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** DEC-0048: the 512-token SFT window excluded the assistant Gold payload from 640/640 TRAIN examples. EXP-001 is historical experimental evidence only and cannot be promoted.
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -398,6 +398,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0053 | 2026-09-17 | Kaggle authorized as the EXP-002 training compute host | ACCEPTED | — |
 | DEC-0054 | 2026-09-17 | EXP-002 pilot V1 dtype failure corrected at source; V2 pushed and RUNNING | ACCEPTED | — |
 | DEC-0055 | 2026-09-17 | EXP-002 pilot COMPLETE and integrity-verified; not yet qualified or promoted | ACCEPTED | — |
+| DEC-0056 | 2026-09-17 | Prospective authorization for the verified pilot artifact to enter the V1 qualification gate | ACCEPTED | — |
 
 ## Validation
 
@@ -447,6 +448,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | exp002:pilot-package | npx vite-node scripts/exp002/build-exp002-package.ts --mode=pilot | PASS | 0 | Pilot package built: 100 rows, splitHash b8250d98..., packageId 067bec301c6af0a2a675e41ba17548a6fb2b8f56b4787010322451b2b6668066. The rendered notebook's representation cells were executed against the real pilot payload and passed: 100 examples, 54,317 supervised tokens, 90,696 masked, max assistant end 2689/3072, min 300 supervised per row, zero truncated spans, zero zero-supervision rows. TEST and qualification payloads absent. | 2026-09-17 | — |
 | exp002:pilot-kaggle-bundle | python scripts/exp002/build_kaggle_pilot_bundle.py | PASS | 0 | 37/37 pre-push gates green. Verified: 100 train rows, train sha256 0de7275c...6151 at 572915 bytes matching the remote dataset, delivered dtype float32 agreeing with the recipe and the manifest, context 3072 with no silent downgrade in executable code, explicit assistant-only mask with fail-closed zero supervision, checkpoint policy matching 25 steps, TEST and qualification absent, no credential-shaped strings, metadata UTF-8 without BOM with LF newlines, GPU on, TPU off, internet on, kernel private, dataset source governed. | 2026-09-17 | — |
 | exp002:pilot-integrity | recover + verify pilot artifact | PASS | 0 | 29/29 integrity checks PASS on 121 recovered files. Adapter sha256 8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e (31,876,192 bytes). 25/25 optimizer steps, 1 epoch, train_loss 0.19649010464549066, train_runtime 1419.1747 s. Sealed qualification split not present in the recovered output. | 2026-09-17 | — |
+| exp002:qualification-seal-open | python scripts/exp002/build_qualification_items.py | PASS | 0 | Sealed qualification split opened exactly once under DEC-0056. 80 rows, split hash 1c5648cb...a9b1 verified. prompts.jsonl (model-visible) and gold.jsonl (scorer-only, local) separated. Consumed EXP-001 TEST split never read. | 2026-09-17 | — |
 
 ## Blockers
 
@@ -499,6 +501,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.32.0 | 2026-09-17 | DEC-0053 Kaggle T4 authorized as the EXP-002 training compute host, superseding the DEC-0050 local-hardware restriction and re-scoping BLK-0006 so it no longer blocks training. Pilot (100 rows, 0.61 h) and production (560 rows, 3.07 h) packages prepared. Evaluation, scoring and the sealed holdout remain local. Nothing authorized to run. | — | PENDING_CHECKPOINT |
 | 1.33.0 | 2026-09-17 | DEC-0054 EXP-002 pilot V1 recorded as a pre-training dtype contract failure; the defect corrected at source in six places; a fail-closed artifact-agreement gate added; artifacts rebuilt; corrected Kaggle Version 2 pushed and observed RUNNING. | — | PENDING_CHECKPOINT |
 | 1.34.0 | 2026-09-17 | DEC-0055 EXP-002 pilot COMPLETE with integrity PASS (29/29). Artifact recorded, not promoted; sealed qualification untouched. | — | PENDING_CHECKPOINT |
+| 1.35.0 | 2026-09-17 | DEC-0056 prospective authorization for the integrity-verified EXP-002 pilot adapter to enter the V1 qualification gate. Not promoted; V1 not declared. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -799,4 +802,12 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - preserved the historical non-promotable origin of the pilot without rewriting it
 - did not open the sealed qualification split, did not evaluate, did not promote, did not run the 560-row job
 - Records artifact recovery and verification only. No evaluation, promotion or V1 creation.
+- Training executed: —
+
+**1.35.0 — changes**
+- prospectively authorized qualification of adapter 8d80d7ca...733e
+- opened the sealed qualification split exactly once under this decision (80 rows, hash verified)
+- split prompts from gold: prompts are model-visible, gold remains scorer-only and local
+- did not make the artifact promotable, did not declare V1, did not rewrite DEC-0052/0053
+- Gate-entry authorization only. Promotion requires a separate evidence-based decision.
 - Training executed: —

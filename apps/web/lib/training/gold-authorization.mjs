@@ -3561,6 +3561,74 @@ function isPilotCompleteIntegrityVerifiedGoldState(state) {
   return isPilotV2RelaunchedGoldState(before);
 }
 
+/**
+ * DEC-0056 prospective authorization for the verified pilot adapter to enter the
+ * V1 qualification gate.
+ *
+ * Records GATE ENTRY ONLY. It does not promote, does not declare V1, and requires
+ * the qualification gold to remain local and unscored at this revision. It
+ * recognizes the exact v1.35 state, then reconstructs v1.34 and delegates.
+ */
+function isQualificationGateEntryGoldState(state) {
+  if (state?.masterStateVersion !== "1.35.0" || state?.updatedAt !== "2026-09-17") {
+    return false;
+  }
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0056");
+  const t = state?.training?.exp002;
+  const q = t?.qualification;
+  const e = state?.experiments?.["GHARIBO-exp-002"];
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // Gate entry authorized; nothing promoted and nothing scored yet.
+    q?.status !== "AUTHORIZED" ||
+    q?.decisionId !== "DEC-0056" ||
+    q?.rows !== 80 ||
+    q?.goldLocal !== true ||
+    q?.scoringLocal !== true ||
+    q?.inferenceHost !== "KAGGLE_INFERENCE_ONLY" ||
+    q?.evaluationStatus !== "NOT_RUN" ||
+    t?.pilot?.qualificationStatus !== "AUTHORIZED_NOT_YET_RUN" ||
+    t?.pilot?.promotable !== false ||
+    t?.pilot?.trainingAuthorized !== false ||
+    t?.pilot?.integrityVerdict !== "PASS" ||
+
+    // No evaluation result, no promotion, no production run.
+    e?.evaluationStatus !== "NOT_RUN" ||
+    e?.evaluationScore !== null ||
+    e?.promotable !== false ||
+    e?.trainingAuthorized !== false ||
+    e?.qualificationSplit?.policy !== "SEALED_UNTIL_V1_PROMOTION_GATE" ||
+    state?.training?.evaluationResults !== 0 ||
+    t?.production?.kernelPushesPerformed !== 0 ||
+    t?.production?.trainingAuthorized !== false ||
+
+    // Open issues stay recorded.
+    (state?.blockers || []).find((b) => b?.id === "BLK-0005")?.status !== "OPEN" ||
+    (state?.blockers || []).find((b) => b?.id === "BLK-0006")?.status !== "RE_SCOPED_NOT_BLOCKING"
+  ) {
+    return false;
+  }
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.34.0";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0056");
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.35.0");
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:qualification-seal-open"
+  );
+  const bt = before.training.exp002;
+  bt.pilot.qualificationStatus = "SEALED_UNTOUCHED";
+  delete bt.pilot.qualificationAuthorization;
+  delete bt.qualification;
+  const be = before.experiments["GHARIBO-exp-002"];
+  be.readinessStatus = "PILOT_COMPLETE_AWAITING_QUALIFICATION_AUTHORIZATION";
+  return isPilotCompleteIntegrityVerifiedGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -3587,6 +3655,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isKaggleComputeAuthorizedGoldState(state) ||
     isPilotV2RelaunchedGoldState(state) ||
     isPilotCompleteIntegrityVerifiedGoldState(state) ||
+    isQualificationGateEntryGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }
