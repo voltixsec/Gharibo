@@ -118,3 +118,4 @@ data/derived/exp002/splits/*.jsonl
 # This repository is PUBLIC. Only the prompts may travel; gold stays local-only.
 data/derived/exp002/qualification/
 data/derived/exp002/qualification-recovered/
+data/derived/exp002/production-recovered/
