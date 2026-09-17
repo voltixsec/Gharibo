@@ -3629,6 +3629,67 @@ function isQualificationGateEntryGoldState(state) {
   return isPilotCompleteIntegrityVerifiedGoldState(before);
 }
 
+/**
+ * DEC-0057 V1 qualification scope reduced to a frozen 20-item subset.
+ *
+ * Records an AUTHORIZED EVIDENCE-BUDGET REDUCTION plus a runtime-only inference
+ * fix. Nothing is promoted and nothing is scored at this revision. Recognizes the
+ * exact v1.36 state, then reconstructs v1.35 and delegates.
+ */
+function isFrozen20QualificationGoldState(state) {
+  if (state?.masterStateVersion !== "1.36.0" || state?.updatedAt !== "2026-09-17") {
+    return false;
+  }
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0057");
+  const q = state?.training?.exp002?.qualification;
+  const e = state?.experiments?.["GHARIBO-exp-002"];
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // Scope is frozen at 20 and nothing is scored.
+    q?.scope !== 20 ||
+    q?.sourcePopulation !== 80 ||
+    q?.subsetHash !== "c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45" ||
+    q?.goldLocal !== true ||
+    q?.scoringLocal !== true ||
+    q?.inferenceHost !== "KAGGLE_INFERENCE_ONLY" ||
+    q?.evaluationStatus !== "NOT_RUN" ||
+    q?.decisionId !== "DEC-0057" ||
+
+    // Still not promotable, still no evaluation, still no production run.
+    state?.training?.exp002?.pilot?.promotable !== false ||
+    e?.evaluationStatus !== "NOT_RUN" ||
+    e?.evaluationScore !== null ||
+    e?.promotable !== false ||
+    e?.trainingAuthorized !== false ||
+    state?.training?.evaluationResults !== 0 ||
+    state?.training?.exp002?.production?.kernelPushesPerformed !== 0 ||
+
+    // Open issues stay recorded.
+    (state?.blockers || []).find((b) => b?.id === "BLK-0005")?.status !== "OPEN" ||
+    (state?.blockers || []).find((b) => b?.id === "BLK-0006")?.status !== "RE_SCOPED_NOT_BLOCKING"
+  ) {
+    return false;
+  }
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.35.0";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0057");
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.36.0");
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:frozen-20-subset"
+  );
+  const bq = before.training.exp002.qualification;
+  bq.status = "AUTHORIZED";
+  bq.decisionId = "DEC-0056";
+  delete bq.scope; delete bq.sourcePopulation; delete bq.subsetHash;
+  delete bq.benchmarkVerdict; delete bq.medianItemSeconds; delete bq.meanTokensPerSecond;
+  before.experiments["GHARIBO-exp-002"].readinessStatus = "QUALIFICATION_AUTHORIZED_NOT_RUN";
+  return isQualificationGateEntryGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -3656,6 +3717,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isPilotV2RelaunchedGoldState(state) ||
     isPilotCompleteIntegrityVerifiedGoldState(state) ||
     isQualificationGateEntryGoldState(state) ||
+    isFrozen20QualificationGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

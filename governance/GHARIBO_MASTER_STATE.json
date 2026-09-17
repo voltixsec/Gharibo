@@ -1371,9 +1371,10 @@
         "data/derived/exp002/qualification/frozen-20.json",
         "data/derived/exp002/pilot-integrity.json"
       ],
-      "supersedes": "DEC-0056.scope",
+      "supersedes": null,
       "supersededBy": null,
-      "architectureChanging": false
+      "architectureChanging": false,
+      "scopeNote": "Supersedes the SCOPE of DEC-0056 (80-item population) for this execution path. DEC-0056 itself remains ACCEPTED history and is not rewritten."
     }
   ],
   "roadmap": {

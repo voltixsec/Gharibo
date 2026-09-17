@@ -55,5 +55,7 @@
     "remainingSealed": 60,
     "to": 20
   },
-  "status": "AUTHORIZED_REDUCTION_80_TO_20_FROZEN_BEFORE_SCORING"
+  "status": "AUTHORIZED_REDUCTION_80_TO_20_FROZEN_BEFORE_SCORING",
+  "supersedes": null,
+  "supersedesScopeOf": "DEC-0056"
 }

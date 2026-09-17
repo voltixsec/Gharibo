@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.35.0 |
+| **Version** | 1.36.0 |
 | **Last Updated** | 2026-09-17 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -162,7 +162,7 @@ Notes:
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL | CLOSED_NON_PROMOTABLE_TRAINING_OBJECTIVE_DEFECT | 9/12 | GHARIBO-V0.1 | false |
-| GHARIBO-exp-002 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | faaae06551acda24897c5b95c19d290ed591f3be2fff3c33376525a768415332 | NOT_RUN | QUALIFICATION_AUTHORIZED_NOT_RUN | undefined/undefined | GHARIBO-V1 | false |
+| GHARIBO-exp-002 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | faaae06551acda24897c5b95c19d290ed591f3be2fff3c33376525a768415332 | NOT_RUN | QUALIFICATION_20_RUNNING | undefined/undefined | GHARIBO-V1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** DEC-0048: the 512-token SFT window excluded the assistant Gold payload from 640/640 TRAIN examples. EXP-001 is historical experimental evidence only and cannot be promoted.
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
@@ -399,6 +399,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0054 | 2026-09-17 | EXP-002 pilot V1 dtype failure corrected at source; V2 pushed and RUNNING | ACCEPTED | — |
 | DEC-0055 | 2026-09-17 | EXP-002 pilot COMPLETE and integrity-verified; not yet qualified or promoted | ACCEPTED | — |
 | DEC-0056 | 2026-09-17 | Prospective authorization for the verified pilot artifact to enter the V1 qualification gate | ACCEPTED | — |
+| DEC-0057 | 2026-09-17 | V1 qualification scope reduced to a frozen 20-item subset (authorized) | ACCEPTED | — |
 
 ## Validation
 
@@ -449,6 +450,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | exp002:pilot-kaggle-bundle | python scripts/exp002/build_kaggle_pilot_bundle.py | PASS | 0 | 37/37 pre-push gates green. Verified: 100 train rows, train sha256 0de7275c...6151 at 572915 bytes matching the remote dataset, delivered dtype float32 agreeing with the recipe and the manifest, context 3072 with no silent downgrade in executable code, explicit assistant-only mask with fail-closed zero supervision, checkpoint policy matching 25 steps, TEST and qualification absent, no credential-shaped strings, metadata UTF-8 without BOM with LF newlines, GPU on, TPU off, internet on, kernel private, dataset source governed. | 2026-09-17 | — |
 | exp002:pilot-integrity | recover + verify pilot artifact | PASS | 0 | 29/29 integrity checks PASS on 121 recovered files. Adapter sha256 8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e (31,876,192 bytes). 25/25 optimizer steps, 1 epoch, train_loss 0.19649010464549066, train_runtime 1419.1747 s. Sealed qualification split not present in the recovered output. | 2026-09-17 | — |
 | exp002:qualification-seal-open | python scripts/exp002/build_qualification_items.py | PASS | 0 | Sealed qualification split opened exactly once under DEC-0056. 80 rows, split hash 1c5648cb...a9b1 verified. prompts.jsonl (model-visible) and gold.jsonl (scorer-only, local) separated. Consumed EXP-001 TEST split never read. | 2026-09-17 | — |
+| exp002:frozen-20-subset | python - (deterministic seeded selection over item_id) | PASS | 0 | 20 items frozen from the 80-item sealed population using sha256(seed:item_id) ascending. subsetHash c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45. Gold never read during selection. 60 items remain sealed. | 2026-09-17 | — |
 
 ## Blockers
 
@@ -502,6 +504,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.33.0 | 2026-09-17 | DEC-0054 EXP-002 pilot V1 recorded as a pre-training dtype contract failure; the defect corrected at source in six places; a fail-closed artifact-agreement gate added; artifacts rebuilt; corrected Kaggle Version 2 pushed and observed RUNNING. | — | PENDING_CHECKPOINT |
 | 1.34.0 | 2026-09-17 | DEC-0055 EXP-002 pilot COMPLETE with integrity PASS (29/29). Artifact recorded, not promoted; sealed qualification untouched. | — | PENDING_CHECKPOINT |
 | 1.35.0 | 2026-09-17 | DEC-0056 prospective authorization for the integrity-verified EXP-002 pilot adapter to enter the V1 qualification gate. Not promoted; V1 not declared. | — | PENDING_CHECKPOINT |
+| 1.36.0 | 2026-09-17 | DEC-0057 V1 qualification reduced to a frozen 20-item subset; inference performance incident diagnosed and fixed at runtime; obsolete slow run stopped. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -810,4 +813,15 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - split prompts from gold: prompts are model-visible, gold remains scorer-only and local
 - did not make the artifact promotable, did not declare V1, did not rewrite DEC-0052/0053
 - Gate-entry authorization only. Promotion requires a separate evidence-based decision.
+- Training executed: —
+
+**1.36.0 — changes**
+- recorded the inference runtime performance incident and that it was NOT a training or model failure
+- stopped the obsolete slow qualification execution to protect GPU quota
+- diagnosed the root cause: no stopping criterion, two-GPU sharding with lm_head on cuda:1, and no_grad instead of inference_mode
+- fixed at runtime only: single-GPU pin, Harmony stop-token stopping criteria, torch.inference_mode()
+- recorded a GREEN 3-prompt benchmark (median 141.865 s/item, 4.25 tok/s, 0 termination failures)
+- froze a deterministic 20-item subset (hash c4bcad86...) before scoring, with gold unread
+- recorded truthfully that 20 items are NOT evidentially equivalent to 80
+- Records an authorized scope reduction and a runtime-only inference fix. No retraining.
 - Training executed: —
