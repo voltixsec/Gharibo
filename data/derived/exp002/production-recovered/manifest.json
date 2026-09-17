@@ -1,0 +1,276 @@
+{
+  "artifact_destination": null,
+  "base_model": "openai/gpt-oss-20b",
+  "base_model_revision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+  "batch": {
+    "gradient_accumulation_steps": 4,
+    "per_device_train_batch_size": 1
+  },
+  "checkpoint_policy": {
+    "resume_from_checkpoint": null,
+    "save_steps": 140,
+    "save_strategy": "steps",
+    "save_total_limit": 2
+  },
+  "created_at": "2026-09-17T00:00:00.000Z",
+  "dataset": {
+    "dataset_hash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+    "dataset_id": "GHARIBO-Research-Gold-v0.1",
+    "dataset_version": "exp002-production-split-v1",
+    "dataset_version_id": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+    "record_count": 560,
+    "record_format": "harmony-messages-v1",
+    "split_hashes": {
+      "test": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+      "train": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+      "validation": "77b8040e8a85d310a6e4ad1a81a013ad9b1b6c3775cc929202a9830f1e0d49ec"
+    },
+    "split_policy": {
+      "algorithm": "seeded-sha256-content-hash-with-audit-quarantine",
+      "audit_quarantine": {
+        "audit_cohort_size": 100,
+        "audit_seed": 3407,
+        "quarantined_into": [
+          "train",
+          "validation"
+        ],
+        "test_audited": 0
+      },
+      "line_hash_algorithm": "sha256(utf-8(raw line bytes, trailing CR stripped))",
+      "method": "EXP-002 production payload, seed 20260917. Re-split of Gold v0.1 TRAIN+VALIDATION (720 rows). qualification = last 80 of the hash-keyed ordering; dev = last 80 of the remainder.",
+      "minimum_records_per_split": null,
+      "ratios": {
+        "test": 0.1111,
+        "train": 0.7778,
+        "validation": 0.1111
+      },
+      "seed": 20260917,
+      "split_hash_algorithm": "sha256(utf-8('\\n'.join(sorted(lineHash(r) for r in S))))",
+      "test_held_out": true,
+      "test_policy": "The Gold v0.1 TEST split was consumed by Evaluation Attempt #6 (DEC-0048) and is never used again. The EXP-002 qualification split is sealed until the V1 promotion gate."
+    }
+  },
+  "dtype": "float32",
+  "engine": {
+    "dependencies": [
+      {
+        "name": "torch",
+        "resolved_version": null,
+        "source": "pip",
+        "spec": "torch>=2.8.0",
+        "url": null
+      },
+      {
+        "name": "triton",
+        "resolved_version": null,
+        "source": "pip",
+        "spec": "triton>=3.4.0",
+        "url": null
+      },
+      {
+        "name": "unsloth_zoo",
+        "resolved_version": "2026.9.3",
+        "source": "pip",
+        "spec": "unsloth_zoo==2026.9.3",
+        "url": null
+      },
+      {
+        "name": "unsloth",
+        "resolved_version": "2026.9.4",
+        "source": "pip",
+        "spec": "unsloth==2026.9.4",
+        "url": null
+      },
+      {
+        "name": "transformers",
+        "resolved_version": "4.56.2",
+        "source": "pip",
+        "spec": "transformers==4.56.2",
+        "url": null
+      },
+      {
+        "name": "triton_kernels",
+        "resolved_version": null,
+        "source": "git",
+        "spec": "@05b2c186c1b6c9a08375389d5efe9cb4c401c075#subdirectory=python/triton_kernels",
+        "url": "https://github.com/triton-lang/triton.git"
+      },
+      {
+        "name": "peft",
+        "resolved_version": "0.20.0",
+        "source": "pip",
+        "spec": "peft==0.20.0",
+        "url": null
+      },
+      {
+        "name": "trl",
+        "resolved_version": "0.22.2",
+        "source": "pip",
+        "spec": "trl==0.22.2",
+        "url": null
+      },
+      {
+        "name": "datasets",
+        "resolved_version": "5.0.1",
+        "source": "pip",
+        "spec": "datasets==5.0.1",
+        "url": null
+      },
+      {
+        "name": "accelerate",
+        "resolved_version": "1.15.0",
+        "source": "pip",
+        "spec": "accelerate==1.15.0",
+        "url": null
+      },
+      {
+        "name": "bitsandbytes",
+        "resolved_version": "0.50.2",
+        "source": "pip",
+        "spec": "bitsandbytes==0.50.2",
+        "url": null
+      },
+      {
+        "name": "openai-harmony",
+        "resolved_version": "0.0.8",
+        "source": "pip",
+        "spec": "openai-harmony==0.0.8",
+        "url": null
+      }
+    ],
+    "engine": "unsloth",
+    "engine_version": "unsloth-freeze-2026.09.15"
+  },
+  "environment_metadata": {
+    "cuda": "12.8",
+    "gpu": "Tesla T4",
+    "os": "posix",
+    "packages": {
+      "torch": "2.10.0+cu128",
+      "triton": "3.6.0"
+    },
+    "python_version": "3.12.13"
+  },
+  "epochs": 1,
+  "evaluation_config": {
+    "benchmark_categories": [
+      "Reasoning",
+      "Instruction Following",
+      "Structured Output",
+      "Research",
+      "Source Fidelity",
+      "Hallucination Resistance"
+    ],
+    "executed": false,
+    "research_metrics": [
+      "schema_correctness",
+      "record_precision",
+      "duplicate_rate",
+      "unsupported_claim_rate",
+      "source_coverage",
+      "taxonomy_accuracy"
+    ],
+    "status": "NOT_RUN"
+  },
+  "exp002": {
+    "consumed_test": {
+      "reusable_as_promotion_evidence": false,
+      "split_hash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b"
+    },
+    "context_policy": {
+      "chosen_context_length": 3072,
+      "measured_max_rendered_tokens": 2689,
+      "rule": "smallest candidate context with zero partial and zero zero-visibility assistant spans"
+    },
+    "declared_dtype": "float32",
+    "final_channel": "final",
+    "governed_chat_template_sha256": "a4c9919cbbd4acdd51ccffe22da049264b1b73e59055fa58811a99efbd7c8146",
+    "governed_reasoning_effort": "medium",
+    "governed_system_date": "2026-09-15",
+    "ignore_index": -100,
+    "loss_contract": {
+      "collator": "AssistantOnlyCollator",
+      "fail_closed_on_zero_supervised_row": true,
+      "kind": "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK",
+      "relies_on_trainer_default": false
+    },
+    "qualification_sealed": true,
+    "recipe_hash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee",
+    "role_sequence": "system -> user -> assistant",
+    "splits": {
+      "dev": {
+        "file": "dev.jsonl",
+        "rows": 80,
+        "split_hash": "77b8040e8a85d310a6e4ad1a81a013ad9b1b6c3775cc929202a9830f1e0d49ec"
+      },
+      "qualification": {
+        "file": "qualification.jsonl",
+        "read_policy": "SEALED_UNTIL_V1_PROMOTION_GATE",
+        "rows": 80,
+        "split_hash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1"
+      },
+      "split_seed": "20260917",
+      "train": {
+        "file": "train.jsonl",
+        "rows": 560,
+        "split_hash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8"
+      }
+    },
+    "terminator": "<|return|>"
+  },
+  "experiment_id": "GHARIBO-exp-002",
+  "git_commit_sha": "uncommitted",
+  "harmony": {
+    "developer_template_id": "research-structured-knowledge",
+    "hidden_channels": [
+      "analysis"
+    ],
+    "reasoning_effort": "medium"
+  },
+  "learning_rate": 0.0002,
+  "loader_model_id": "unsloth/gpt-oss-20b",
+  "loader_model_revision": "e220476dc09936adfed96d0451acfa3601c23bd7",
+  "lora": {
+    "alpha": 16,
+    "bias": "none",
+    "dropout": 0,
+    "r": 16,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj"
+    ]
+  },
+  "loss_contract_evidence": {
+    "context_length": 3072,
+    "dev_examples": 80,
+    "governed_chat_template_sha256": "a4c9919cbbd4acdd51ccffe22da049264b1b73e59055fa58811a99efbd7c8146",
+    "governed_terminator": "<|return|>",
+    "ignore_index": -100,
+    "kind": "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK",
+    "masked_tokens_total": 505415,
+    "max_assistant_end": 2689,
+    "min_supervised_tokens_per_row": 297,
+    "pinned_system_date": "2026-09-15",
+    "recipe_hash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee",
+    "role_contract": "system -> user -> assistant",
+    "supervised_tokens_total": 301698,
+    "train_examples": 560,
+    "train_inference_prompt_parity": "PROVEN_BY_TOKEN_PREFIX",
+    "truncated_assistant_spans": 0,
+    "zero_supervised_rows": 0
+  },
+  "lr_scheduler_type": "linear",
+  "max_steps": null,
+  "method": "QLoRA + SFT",
+  "optimizer": "adamw_8bit",
+  "package_id": "139a53c4111c58ce2dcc9e8d80ed2a40c791afd7f08196f90a1b3efd1e3e38bc",
+  "quantization": "4-bit",
+  "resume_from_checkpoint": null,
+  "schema_version": "1.1.0",
+  "seed": 20260917,
+  "sequence_length": 3072,
+  "warmup_steps": 5,
+  "weight_decay": 0.01
+}

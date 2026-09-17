@@ -1,0 +1,54 @@
+{
+  "artifact": {
+    "adapterBytes": 31876192,
+    "adapterSha256": "5d192d843af72298f5080f4ebe9fd77e3b47fa6c1abf46064706d091b80f7c22",
+    "baseModel": "openai/gpt-oss-20b",
+    "loader": "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+    "packageId": "139a53c4111c58ce2dcc9e8d80ed2a40c791afd7f08196f90a1b3efd1e3e38bc",
+    "recipeHash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee",
+    "type": "LoRA adapter over gpt-oss-20b (NOT merged)"
+  },
+  "artifactKind": "GHARIBO_EXP002_PRODUCTION_INTEGRITY",
+  "checks": {
+    "adapter/final/ckpt140 identical": true,
+    "completionMarkerMatchesPackageId": true,
+    "context3072": true,
+    "dtypeFloat32": true,
+    "experimentId": true,
+    "ignoreIndexMinus100": true,
+    "loraR16A16": true,
+    "lossContract": true,
+    "noGoldInArtifact": true,
+    "oneEpoch": true,
+    "optimizerSteps140": true,
+    "recipeHashGoverned": true,
+    "trainExamples560": true,
+    "zeroSupervisionRows": true,
+    "zeroTruncatedSpans": true
+  },
+  "experimentId": "GHARIBO-exp-002",
+  "failed": [],
+  "kernelRef": "vokaigharibo/gharibo-exp-002-production",
+  "pilotComparison": {
+    "note": "Production loss is ~5.5x lower than the pilot, consistent with 5.6x more training data.",
+    "pilotLoss": 0.19649010464549066,
+    "productionLoss": 0.036044296949902285
+  },
+  "schemaVersion": "1.0.0",
+  "source": "Kaggle kernel output (results attachment)",
+  "training": {
+    "context": 3072,
+    "dtype": "float32",
+    "epochs": 1.0,
+    "examples": 560,
+    "maskedTokens": 505415,
+    "maxAssistantEnd": 2689,
+    "optimizerSteps": 140,
+    "supervisedTokens": 301698,
+    "trainLoss": 0.036044296949902285,
+    "trainRuntimeSeconds": 8142.2594,
+    "truncatedAssistantSpans": 0,
+    "zeroSupervisionRows": 0
+  },
+  "verdict": "PASS"
+}
