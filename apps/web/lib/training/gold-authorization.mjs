@@ -2740,6 +2740,164 @@ export function isEvaluationAttempt6AuthorizedGoldState(state) {
   return isEvaluationAttempt5FailedGoldState(before);
 }
 
+
+/**
+ * DEC-0048 post-evaluation forensic closure.
+ *
+ * This does not rewrite or weaken any historical authorization.
+ * It recognizes only the exact v1.27 EXP-001 closure, then
+ * reconstructs the accepted v1.26 DEC-0047 checkpoint and
+ * delegates to the existing Attempt #6 validator.
+ */
+function isExp001ForensicClosureGoldState(state) {
+  if (
+    state?.masterStateVersion !== "1.27.0" ||
+    state?.updatedAt !== "2026-09-17"
+  ) {
+    return false;
+  }
+
+  const experiment =
+    state?.experiments?.["GHARIBO-exp-001"];
+
+  const closure = experiment?.forensicClosure;
+
+  const decision =
+    (state?.decisions || []).find(
+      (d) => d?.id === "DEC-0048"
+    );
+
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.date !== "2026-09-17" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    experiment?.evaluationStatus !==
+      "ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL" ||
+
+    experiment?.evaluationScore !== null ||
+    experiment?.promotable !== false ||
+
+    experiment?.readinessStatus !==
+      "CLOSED_NON_PROMOTABLE_TRAINING_OBJECTIVE_DEFECT" ||
+
+    closure?.decisionId !== "DEC-0048" ||
+    !/^[0-9a-f]{64}$/.test(
+      closure?.decisionHash ?? ""
+    ) ||
+
+    closure?.rootCause !==
+      "TRAINING_WINDOW_TRUNCATION_EXCLUDED_ASSISTANT_GOLD_PAYLOAD" ||
+
+    closure
+      ?.trainAssistantEntirelyOutsideEffectiveWindow
+      ?.count !== 640 ||
+
+    closure
+      ?.trainAssistantEntirelyOutsideEffectiveWindow
+      ?.total !== 640 ||
+
+    closure
+      ?.validationAssistantEntirelyOutsideEffectiveWindow
+      ?.count !== 80 ||
+
+    closure
+      ?.validationAssistantEntirelyOutsideEffectiveWindow
+      ?.total !== 80 ||
+
+    closure?.assistantOnlyLoss !== false ||
+    closure?.maxLength !== 512 ||
+    closure?.testConsumed !== true ||
+
+    closure?.testReusableForExp002Optimization !== false ||
+
+    closure?.candidateStatus !==
+      "EXPERIMENTAL_NON_PROMOTABLE" ||
+
+    closure?.ghariboV01Status !==
+      "NOT_CREATED"
+  ) {
+    return false;
+  }
+
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.26.0";
+  before.updatedAt = "2026-09-16";
+
+  before.currentState.trainingInvariant =
+    "TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM";
+
+  if (before.currentState?.blockerSummary) {
+    before.currentState.blockerSummary.blockingNow =
+      "Attempt #6 is ready for its single authorized Kaggle kernel push after DEC-0047 binds the missing accepted private adapter input. No kernel push or TEST inference has occurred.";
+
+    before.currentState.blockerSummary.note =
+      "DEC-0046 authorization remains unchanged. DEC-0047 reconciles only the launch artifact: notebook and evaluation semantics unchanged; one push remaining; no automatic retry or promotion.";
+  }
+
+  const e =
+    before.experiments["GHARIBO-exp-001"];
+
+  e.evaluationStatus = "NOT_RUN";
+  e.evaluationScore = null;
+
+  e.readinessStatus =
+    "ATTEMPT_6_AUTHORIZED_AWAITING_EXECUTION";
+
+  e.promotable = false;
+
+  e.promotionBlockedReason =
+    "Training completed, but promotion requires at least one real evaluation result and none exists. Training completion is not model promotion (ADR-0008).";
+
+  delete e.forensicClosure;
+
+  before.decisions =
+    before.decisions.filter(
+      (d) => d?.id !== "DEC-0048"
+    );
+
+  before.history =
+    (before.history || []).filter(
+      (h) => h?.revision !== "1.27.0"
+    );
+
+  const act1 =
+    (before.nextActions || []).find(
+      (a) => a?.id === "ACT-0001"
+    );
+
+  if (act1) {
+    act1.priority = "P0";
+
+    act1.action =
+      "READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH: use the DEC-0047 reconciled bundle under the existing DEC-0046 one-push authorization. This preparation task stops before execution.";
+
+    act1.requires = "DEC-0046 + DEC-0047";
+
+    act1.references = [
+      "governance/DEC-0047-attempt-6-artifact-reconciliation.json",
+      "governance/DEC-0046-evaluation-attempt-6-authorization.json",
+      "governance/DEC-0045-evaluation-attempt-5-failure.json",
+      "scripts/eval/prepare-eval-launch-attempt6.mjs",
+      "scripts/eval/check-attempt6-authorization-gate.mjs"
+    ];
+
+    act1.status =
+      "READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH";
+
+    act1.note =
+      "Zero pushes performed; one remaining. No TEST inference, scoring, tuning, training, selection, or promotion performed.";
+  }
+
+  return isEvaluationAttempt6AuthorizedGoldState(
+    before
+  );
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -2757,6 +2915,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isEvaluationAttempt4FailedGoldState(state) ||
     isEvaluationAttempt5AuthorizedGoldState(state) ||
     isEvaluationAttempt5FailedGoldState(state) ||
+    isExp001ForensicClosureGoldState(state) ||
     isEvaluationAttempt6AuthorizedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );

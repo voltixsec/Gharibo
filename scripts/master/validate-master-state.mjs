@@ -334,16 +334,64 @@ function runChecks(state, rawText) {
     if (!completion) fail('training-invariant', 'a COMPLETED training state requires an executionCompletion record');
 
     for (const [key, e] of Object.entries(state.experiments || {})) {
-      if (e.evaluationStatus !== 'NOT_RUN') {
-        fail('training-invariant', `${key}: evaluationStatus must be "NOT_RUN" until a real evaluation executes`);
+      const closure = e?.forensicClosure;
+
+      const evaluationIsNotRun =
+        e.evaluationStatus === 'NOT_RUN';
+
+      const evaluationIsDec0048ForensicClosure =
+        key === 'GHARIBO-exp-001' &&
+        e.evaluationStatus ===
+          'ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL' &&
+        e.evaluationScore === null &&
+        e.promotable === false &&
+        e.readinessStatus ===
+          'CLOSED_NON_PROMOTABLE_TRAINING_OBJECTIVE_DEFECT' &&
+        closure?.decisionId === 'DEC-0048' &&
+        /^[0-9a-f]{64}$/.test(closure?.decisionHash ?? '') &&
+        closure?.rootCause ===
+          'TRAINING_WINDOW_TRUNCATION_EXCLUDED_ASSISTANT_GOLD_PAYLOAD' &&
+        closure?.trainAssistantEntirelyOutsideEffectiveWindow?.count === 640 &&
+        closure?.trainAssistantEntirelyOutsideEffectiveWindow?.total === 640 &&
+        closure?.validationAssistantEntirelyOutsideEffectiveWindow?.count === 80 &&
+        closure?.validationAssistantEntirelyOutsideEffectiveWindow?.total === 80 &&
+        closure?.assistantOnlyLoss === false &&
+        closure?.maxLength === 512 &&
+        closure?.testConsumed === true &&
+        closure?.testReusableForExp002Optimization === false &&
+        closure?.candidateStatus === 'EXPERIMENTAL_NON_PROMOTABLE' &&
+        closure?.ghariboV01Status === 'NOT_CREATED';
+
+      if (!evaluationIsNotRun && !evaluationIsDec0048ForensicClosure) {
+        fail(
+          'training-invariant',
+          `${key}: evaluationStatus is neither NOT_RUN nor the exact accepted DEC-0048 forensic closure state`,
+        );
       }
-      if (e.promotable === true && e.evaluationStatus === 'NOT_RUN') {
-        fail('training-invariant', `${key}: promotable cannot be true while evaluationStatus is NOT_RUN`);
+
+      if (
+        e.promotable === true &&
+        (evaluationIsNotRun || evaluationIsDec0048ForensicClosure)
+      ) {
+        fail(
+          'training-invariant',
+          `${key}: promotable cannot be true in NOT_RUN or DEC-0048 non-promotable forensic state`,
+        );
       }
-      if (e.runStatus === 'COMPLETED' &&
-          !(completion && completion.decisionId === 'DEC-0030' &&
-            completion.runId === e.trainingRunId && completion.experimentId === key)) {
-        fail('training-invariant', `${key}: runStatus COMPLETED requires DEC-0030 completion evidence bound to this exact run`);
+
+      if (
+        e.runStatus === 'COMPLETED' &&
+        !(
+          completion &&
+          completion.decisionId === 'DEC-0030' &&
+          completion.runId === e.trainingRunId &&
+          completion.experimentId === key
+        )
+      ) {
+        fail(
+          'training-invariant',
+          `${key}: runStatus COMPLETED requires DEC-0030 completion evidence bound to this exact run`,
+        );
       }
     }
 
@@ -401,7 +449,7 @@ function runChecks(state, rawText) {
     }
 
     if (!failedUnder('training-invariant')) {
-      pass('training-invariant', 'post-training invariants hold: completion evidence is real and coherent, TEST stays isolated, the dtype deviation is recorded, both failed attempts survive, the roadmap agrees with the execution, and no evaluation or promotion is claimed');
+      pass('training-invariant', 'post-training invariants hold: completion evidence is coherent, historical training-time TEST isolation is preserved, the dtype deviation is recorded, failed training attempts survive, and evaluation is either NOT_RUN or the exact DEC-0048 non-promotable forensic closure');
     }
   }
 

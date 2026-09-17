@@ -1,0 +1,224 @@
+{
+  "decisionId": "DEC-0048",
+  "recordKind": "POST_EVALUATION_TRAINING_OBJECTIVE_DEFECT_AND_NON_PROMOTION",
+  "recordRevision": 1,
+  "recordDate": "2026-09-17",
+  "status": "EXP_001_CLOSED_NON_PROMOTABLE",
+  "authority": "Explicit human approval to document the EXP-001 defect, preserve all historical evidence, block promotion, and prepare a separate corrected experiment without using consumed TEST results for optimization.",
+  "decision": "GHARIBO-exp-001 is a real successfully executed training run whose produced adapter is preserved as historical experimental evidence, but the experiment is non-promotable for the intended structured-output task because its effective 512-token SFT window excluded the assistant Gold payload from every audited TRAIN example. GHARIBO-V0.1 is not created. EXP-002 may be prepared from TRAIN and VALIDATION only under a separately governed corrected training contract; training is not authorized by this decision.",
+  "baselineCommit": "c0c337deff59b122536d6ebcaa96c7edaf58bd91",
+  "experimentId": "GHARIBO-exp-001",
+  "candidateAdapterSha256": "794917f25c4aa9e77acb6a746b69a703412539e9939f6bfc1e8c602d64be678f",
+  "dataset": {
+    "id": "GHARIBO-Research-Gold-v0.1",
+    "hash": "84acad9b1ba0d693ece0c2b53112a9948b171d2ccf1f6d81e5c485c42c1d65a5",
+    "splitHashes": {
+      "train": "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2",
+      "validation": "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787",
+      "test": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b"
+    }
+  },
+  "trainingExecution": {
+    "acceptedBy": "DEC-0030",
+    "runId": "ea6e30f2-ce26-4323-b35a-3436ee867eaf",
+    "completed": true,
+    "examples": 640,
+    "epochs": 1,
+    "steps": 160,
+    "trainLoss": 0.6016419500112533,
+    "finalStepLoss": 0.2192,
+    "executionValidity": "REAL_EXECUTION_AND_VALID_ARTIFACTS",
+    "taskFitness": "MATERIALLY_DEFECTIVE_FOR_INTENDED_STRUCTURED_OUTPUT_OBJECTIVE"
+  },
+  "effectiveSftConfiguration": {
+    "datasetTextField": "text",
+    "maxLength": 512,
+    "maxSeqLength": 512,
+    "packing": false,
+    "completionOnlyLoss": null,
+    "assistantOnlyLoss": false,
+    "perDeviceTrainBatchSize": 1,
+    "gradientAccumulationSteps": 4,
+    "numTrainEpochs": 1,
+    "maxSteps": -1
+  },
+  "goldContractAudit": {
+    "trainRows": 640,
+    "trainAssistantJsonOk": 640,
+    "trainRequiredFieldsOk": 640,
+    "validationRows": 80,
+    "validationAssistantJsonOk": 80,
+    "validationRequiredFieldsOk": 80,
+    "requiredFields": [
+      "entityType",
+      "externalKey",
+      "classification",
+      "normalizedPayload",
+      "evidence",
+      "provenance"
+    ],
+    "payloadPresentInTrain": 0,
+    "normalizedPayloadPresentInTrain": 640,
+    "classificationPresentInTrain": 640,
+    "provenancePresentInTrain": 640,
+    "verdict": "GOLD_CONTRACT_VALID"
+  },
+  "tokenWindowForensicAudit": {
+    "limit": 512,
+    "tokenizerEnvironment": {
+      "transformers": "4.56.2",
+      "tokenizers": "0.22.2",
+      "huggingfaceHub": "0.36.2"
+    },
+    "train": {
+      "rows": 640,
+      "renderFailures": 0,
+      "renderedOver512": 640,
+      "renderedOver512Pct": 100,
+      "assistantFullyInside512": 0,
+      "assistantPartiallyCut": 0,
+      "assistantEntirelyOutside512": 640,
+      "assistantEntirelyOutside512Pct": 100,
+      "renderedTokensMin": 960,
+      "renderedTokensMax": 2700,
+      "renderedTokensAvg": 1458.08,
+      "assistantStartMin": 666,
+      "assistantStartMax": 1537,
+      "assistantStartAvg": 919.35,
+      "assistantContentTokensMin": 293,
+      "assistantContentTokensMax": 1162,
+      "assistantContentTokensAvg": 537.72
+    },
+    "validation": {
+      "rows": 80,
+      "renderFailures": 0,
+      "renderedOver512": 80,
+      "renderedOver512Pct": 100,
+      "assistantFullyInside512": 0,
+      "assistantPartiallyCut": 0,
+      "assistantEntirelyOutside512": 80,
+      "assistantEntirelyOutside512Pct": 100,
+      "renderedTokensMin": 967,
+      "renderedTokensMax": 2565,
+      "renderedTokensAvg": 1408.91,
+      "assistantStartMin": 670,
+      "assistantStartMax": 1472,
+      "assistantStartAvg": 894.95,
+      "assistantContentTokensMin": 296,
+      "assistantContentTokensMax": 1092,
+      "assistantContentTokensAvg": 512.96
+    },
+    "conclusion": "The assistant Gold payload began after the 512-token truncation boundary for every audited TRAIN and VALIDATION example. The intended supervised assistant answer was therefore absent from the effective token window in 640/640 TRAIN examples and 80/80 VALIDATION examples."
+  },
+  "evaluationAttempt6": {
+    "authorizationDecisionId": "DEC-0046",
+    "reconciliationDecisionId": "DEC-0047",
+    "kernelPushesAuthorized": 1,
+    "kernelPushesPerformed": 1,
+    "kernelPushesRemaining": 0,
+    "testRecordsPerArm": 80,
+    "basePredictionsSha256": "4ff8dc8dfcc9fa908be9fc2159b6b224bdd63889337ce37076fa83395c6ea955",
+    "candidatePredictionsSha256": "129ce75c56d18b5bac11ed5e7e2a54c35f161b6c35ad8e75d45a9edd35594258",
+    "rawOutputs": {
+      "baseNonEmpty": 80,
+      "candidateNonEmpty": 80
+    },
+    "firstScoringPass": "NON_DECISIONAL_DUE_TO_HARMONY_SERIALIZATION_DEFECT",
+    "harmonySerializationDefect": "The evaluation harness persisted decoded multi-channel Harmony output instead of isolating the final channel even though the benchmark contract scores only final.",
+    "trainEvalRoleContractMismatch": {
+      "train": "system -> user -> assistant",
+      "trainCount": 640,
+      "validation": "system -> user -> assistant",
+      "validationCount": 80,
+      "evaluation": "developer -> user",
+      "classification": "PROMPT_CONTRACT_MISMATCH"
+    },
+    "diagnosticFinalAudit": {
+      "base": {
+        "assistantFinalFound": 63,
+        "finalJsonParseOk": 29,
+        "finalHasRequiredFields": 0
+      },
+      "candidate": {
+        "assistantFinalFound": 61,
+        "finalJsonParseOk": 28,
+        "finalHasRequiredFields": 0
+      }
+    },
+    "candidateRequiredFieldCoverageAmongParseableFinals": {
+      "parseableFinals": 28,
+      "entityType": 28,
+      "externalKey": 28,
+      "classification": 0,
+      "normalizedPayload": 0,
+      "evidence": 26,
+      "provenance": 1
+    }
+  },
+  "rootCause": {
+    "primary": "TRAINING_WINDOW_TRUNCATION_EXCLUDED_ASSISTANT_GOLD_PAYLOAD",
+    "contributing": [
+      "FULL_TEXT_SFT_WITH_ASSISTANT_ONLY_LOSS_DISABLED",
+      "512_TOKEN_MAX_LENGTH_FOR_CONVERSATIONS_RENDERING_TO_960_2700_TOKENS",
+      "EVALUATION_ROLE_CONTRACT_MISMATCH_SYSTEM_VS_DEVELOPER",
+      "EVALUATION_HARMONY_FINAL_CHANNEL_NOT_ISOLATED"
+    ],
+    "excluded": [
+      "GOLD_SCHEMA_CORRUPTION",
+      "MISSING_TRAIN_ROWS",
+      "INVALID_ADAPTER_ARTIFACT",
+      "FAILED_KAGGLE_TRAINING_EXECUTION"
+    ]
+  },
+  "promotion": {
+    "promoted": false,
+    "candidateStatus": "EXPERIMENTAL_NON_PROMOTABLE",
+    "targetModel": "GHARIBO-V0.1",
+    "targetStatus": "NOT_CREATED"
+  },
+  "testPolicy": {
+    "existingTestConsumedByAttempt6": true,
+    "mayUseForExp002Training": false,
+    "mayUseForExp002PromptEngineering": false,
+    "mayUseForExp002HyperparameterSelection": false,
+    "mayUseForExp002CheckpointSelection": false,
+    "mayClaimAsFreshIndependentExp002Holdout": false,
+    "futureIndependentClaimRequirement": "A new untouched holdout must be governed separately and must not be shaped using Attempt #6 TEST outcomes."
+  },
+  "exp002": {
+    "status": "NOT_CREATED",
+    "trainingAuthorized": false,
+    "preparationPermitted": true,
+    "permittedPreparationData": [
+      "TRAIN",
+      "VALIDATION"
+    ],
+    "requiredPreTrainingGates": [
+      "TRAIN and future evaluation role contracts must be explicitly identical",
+      "assistant Gold payload must be inside the effective training token window under an audited truncation policy",
+      "assistant/completion-only loss behavior must be explicit and regression-tested",
+      "TRAIN and VALIDATION token-length distributions must be measured before authorization",
+      "consumed TEST results must not drive prompts, hyperparameters, checkpoint choice, or model selection",
+      "Harmony final-channel extraction must be deterministic and regression-tested before any future held-out evaluation"
+    ]
+  },
+  "preservation": {
+    "deleteExp001Artifacts": false,
+    "mutateHistoricalDecisions": false,
+    "retainAdapter": true,
+    "retainCheckpoints": true,
+    "retainTrainingLogs": true,
+    "retainEvaluationPredictions": true,
+    "retainFirstScoringPass": true
+  },
+  "references": [
+    "governance/DEC-0030-kaggle-execution-acceptance.json",
+    "governance/DEC-0046-evaluation-attempt-6-authorization.json",
+    "governance/DEC-0047-attempt-6-artifact-reconciliation.json",
+    "docs/RESEARCH_BENCHMARK.md",
+    "scripts/eval/build-eval-kernel-attempt6.mjs",
+    "apps/web/lib/workers/kaggle/notebook.template.ipynb"
+  ],
+  "next": "UPDATE_MASTER_STATE_AND_PREPARE_EXP_002_CONTRACT_WITHOUT_TRAINING",
+  "decisionHash": "7f4ef2fcd2b46fda2156d1f4c256b709045f3f9aa872ffa97a8a4f56cff8bb4a"
+}

@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.26.0 |
-| **Last Updated** | 2026-09-16 |
+| **Version** | 1.27.0 |
+| **Last Updated** | 2026-09-17 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
 > from [`governance/GHARIBO_MASTER_STATE.json`](../governance/GHARIBO_MASTER_STATE.json) by
@@ -21,9 +21,9 @@
 | Field | Value |
 | --- | --- |
 | Training status | COMPLETED |
-| Training invariant | TRAINING COMPLETED — EXPERIMENTAL ADAPTER ONLY; NO MODEL PROMOTION AND NO EVALUATION CLAIM |
+| Training invariant | TRAINING COMPLETED — GHARIBO-exp-001 IS HISTORICAL EXPERIMENTAL EVIDENCE ONLY; NON-PROMOTABLE AFTER DEC-0048 FORENSIC CLOSURE; GHARIBO-V0.1 NOT_CREATED |
 | Current milestone | M3C (COMPLETE) |
-| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=Attempt #6 is ready for its single authorized Kaggle kernel push after DEC-0047 binds the missing accepted private adapter input. No kernel push or TEST inference has occurred., note=DEC-0046 authorization remains unchanged. DEC-0047 reconciles only the launch artifact: notebook and evaluation semantics unchanged; one push remaining; no automatic retry or promotion. |
+| Blocker summary | openBlockers=0, closedBlockers=4, blockingNow=EXP-001 is closed as non-promotable after the DEC-0048 training-window forensic audit. EXP-002 is not created and training is not authorized., note=Attempt #6 consumed its single authorized push and the existing TEST split. EXP-002 preparation may use TRAIN and VALIDATION only; consumed TEST results cannot be used for optimization or claimed as a fresh independent holdout. |
 | Dataset | GHARIBO-Research-Gold-v0.1 |
 | Example count | 800 |
 | Split seed | 20260914 |
@@ -161,9 +161,9 @@ Notes:
 
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | NOT_RUN | ATTEMPT_6_AUTHORIZED_AWAITING_EXECUTION | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL | CLOSED_NON_PROMOTABLE_TRAINING_OBJECTIVE_DEFECT | 9/12 | GHARIBO-V0.1 | false |
 
-- **GHARIBO-exp-001 promotion blocked:** Training completed, but promotion requires at least one real evaluation result and none exists. Training completion is not model promotion (ADR-0008).
+- **GHARIBO-exp-001 promotion blocked:** DEC-0048: the 512-token SFT window excluded the assistant Gold payload from 640/640 TRAIN examples. EXP-001 is historical experimental evidence only and cannot be promoted.
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
 
 ## Models
@@ -385,6 +385,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0045 | 2026-09-16 | Record Evaluation Attempt #5 pre-inference failure and exhaust its one-push authorization | ACCEPTED | — |
 | DEC-0046 | 2026-09-16 | Authorize exactly one governed Evaluation Attempt #6 using the locally proven HF Hub post-install refresh repair | ACCEPTED | — |
 | DEC-0047 | 2026-09-16 | Reconcile Attempt #6 adapter attachment before its single authorized push | ACCEPTED | — |
+| DEC-0048 | 2026-09-17 | Close GHARIBO-exp-001 as non-promotable after training-window forensic audit | ACCEPTED | — |
 
 ## Validation
 
@@ -441,7 +442,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 
 | ID | Priority | Action | Requires | References |
 | --- | --- | --- | --- | --- |
-| ACT-0001 | P0 | READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH: use the DEC-0047 reconciled bundle under the existing DEC-0046 one-push authorization. This preparation task stops before execution. | DEC-0046 + DEC-0047 | governance/DEC-0047-attempt-6-artifact-reconciliation.json, governance/DEC-0046-evaluation-attempt-6-authorization.json, governance/DEC-0045-evaluation-attempt-5-failure.json, scripts/eval/prepare-eval-launch-attempt6.mjs, scripts/eval/check-attempt6-authorization-gate.mjs |
+| ACT-0001 | P0 | Prepare the EXP-002 training contract from TRAIN and VALIDATION only: prove assistant-target visibility inside the effective token window, explicit assistant/completion-only loss semantics, identical train/eval role contracts, and deterministic Harmony final-channel extraction. Stop before training authorization. | DEC-0048 | governance/DEC-0048-exp001-training-objective-defect.json, docs/TRAINING_STRATEGY.md, docs/RESEARCH_BENCHMARK.md, apps/web/lib/workers/kaggle/notebook.template.ipynb |
 | ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
 
 ## History
@@ -466,6 +467,7 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.24.0 | 2026-09-16 | DEC-0045: recorded Attempt #5 as FAILED_PRE_INFERENCE, exhausted its one-push authorization, and preserved the local repair as unmerged/unproven/unexecuted. | — | PENDING_CHECKPOINT |
 | 1.25.0 | 2026-09-16 | Accepted DEC-0046: one bounded Evaluation Attempt #6 using a distinct repaired artifact. Attempt #5 remains immutable historical evidence; no Kaggle push or TEST inference has occurred at this checkpoint. | — | PENDING_CHECKPOINT |
 | 1.26.0 | 2026-09-16 | DEC-0047 pre-launch artifact reconciliation: attach the accepted private adapter dataset to Attempt #6 without changing notebook bytes, evaluation semantics, or the single-push authorization. | — | PENDING_CHECKPOINT |
+| 1.27.0 | 2026-09-17 | DEC-0048 forensic closure of GHARIBO-exp-001: real execution preserved, promotion prohibited after proving the 512-token SFT window excluded every TRAIN assistant Gold payload. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -672,3 +674,13 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - preserved notebook SHA, 0 kernel pushes, 1 remaining, TEST inference false, and no promotion
 - The containing commit anchors this reconciliation; DEC-0045 and DEC-0046 remain byte-for-byte historical records.
 - Training executed: false
+
+**1.27.0 — changes**
+- recorded 640/640 TRAIN and 80/80 VALIDATION assistant Gold payloads entirely outside the effective 512-token SFT window
+- recorded assistant_only_loss=false and completion_only_loss=null from the accepted training artifact
+- closed GHARIBO-exp-001 as experimental non-promotable historical evidence
+- recorded Attempt #6 single push as consumed and existing TEST as unavailable for EXP-002 optimization
+- kept GHARIBO-V0.1 NOT_CREATED
+- permitted EXP-002 contract preparation only; no training authorized
+- This revision records post-evaluation forensic evidence and does not authorize EXP-002 training.
+- Training executed: —
