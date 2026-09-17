@@ -1,0 +1,57 @@
+{
+  "artifactKind": "GHARIBO_EXP002_QUALIFICATION_INFERENCE_FROZEN",
+  "goldPresentOnKaggle": false,
+  "integrityChecks": {
+    "allParseable": false,
+    "completionMarker": true,
+    "exactly20": true,
+    "finalChannelAll": true,
+    "matchesFrozenSet": true,
+    "noDuplicates": true,
+    "noGoldOnKaggle": true,
+    "noMissing": true,
+    "uniqueIds": true
+  },
+  "integrityVerdict": "FAIL",
+  "items": 20,
+  "kernelRef": "vokaigharibo/gharibo-exp-002-qualification",
+  "kernelStatus": "KernelWorkerStatus.COMPLETE",
+  "kernelVersion": 1,
+  "maxNewTokensCases": [
+    {
+      "generated_tokens": 3072,
+      "item_id": "344d7efe331d476e7da2457ae988c2ce510d72e928caff618d60dcb32f640a7a",
+      "total_seconds": 697.96
+    },
+    {
+      "generated_tokens": 3072,
+      "item_id": "69797dbc393bc043080c4f3c10f46e213c45b190547197b0756ea44f78547d5e",
+      "total_seconds": 693.874
+    },
+    {
+      "generated_tokens": 3072,
+      "item_id": "6462d145e3203cc278b32cf86411e9633a55b38291a7b8b73d5643b0f0eaee64",
+      "total_seconds": 693.331
+    }
+  ],
+  "performance": {
+    "device_map": null,
+    "items": null,
+    "lm_head_device": null,
+    "mean_tokens_per_second": 4.249,
+    "median_seconds": null,
+    "model_load_seconds": null,
+    "no_final_channel": null,
+    "ok": null,
+    "p95_seconds": null,
+    "peak_gpu_memory_GiB": null,
+    "termination_failures": null,
+    "total_runtime_seconds": null
+  },
+  "predictionsPath": "data/derived/exp002/qualification-recovered/benchmark-rows.jsonl",
+  "predictionsSha256": "dd4e2c33cd298259483304709c2ec47d965babce820bd07e82f066f9d8d5600d",
+  "schemaVersion": "1.0.0",
+  "subsetHash": "c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45",
+  "testPresentOnKaggle": false,
+  "uniqueItemIds": 20
+}
