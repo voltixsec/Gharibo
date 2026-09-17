@@ -1,0 +1,124 @@
+{
+  "artifact": {
+    "adapterSha256": "8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e",
+    "baseModel": "openai/gpt-oss-20b",
+    "loader": "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+    "recipeHash": "d1851753a05a0d2b560ccd8d47b82318fd69261b66aa0e9274f259e67a0e93a3",
+    "type": "LoRA adapter (not a merged model)"
+  },
+  "artifactKind": "GHARIBO_EXP002_V1_QUALIFICATION_RESULT",
+  "decision": "NOT_PROMOTED",
+  "diagnosis": {
+    "classification": "MODEL_QUALITY_INSUFFICIENCY",
+    "evidence": [
+      "13/20 predictions fail the required schema (empty_output_rate 0.65)",
+      "predictions emit `payload` where the contract requires `normalizedPayload`, and omit `classification`",
+      "valid_records 0/20",
+      "source_fidelity 0/20 - no valid citations produced",
+      "unsupported_claim_rate 1.0 across 17 decomposed claims"
+    ],
+    "notACause": [
+      "inference runtime (fixed and benchmarked GREEN)",
+      "final-channel extraction (20/20 succeeded)",
+      "gold leakage (none)",
+      "harness input (corrected and re-scored)"
+    ]
+  },
+  "failedGates": [
+    "schema_validity",
+    "extraction_accuracy",
+    "classification_accuracy",
+    "source_fidelity",
+    "source_coverage",
+    "unsupported_claim_rate",
+    "empty_output_rate",
+    "structured_output_reliability",
+    "record_precision"
+  ],
+  "inference": {
+    "deviceMap": "{'': 0}",
+    "goldOnKaggle": false,
+    "integrityVerdict": "PASS",
+    "kernelRef": "vokaigharibo/gharibo-exp-002-qualification",
+    "kernelVersion": 2,
+    "maxNewTokensItems": [
+      "344d7efe331d476e7da2457ae988c2ce510d72e928caff618d60dcb32f640a7a",
+      "69797dbc393bc043080c4f3c10f46e213c45b190547197b0756ea44f78547d5e",
+      "6462d145e3203cc278b32cf86411e9633a55b38291a7b8b73d5643b0f0eaee64"
+    ],
+    "maxNewTokensNote": "3 of 20 items ran to the 3072-token ceiling (~827-872 s each) instead of emitting <|return|>. Inspected under the normal scorer rules; not auto-passed and not discarded.",
+    "meanTokensPerSecond": 3.55,
+    "medianSeconds": 142.0,
+    "predictionsSha256": "677ca8651e86e883039d47c1e759276010c53f310c9b8781d89426b88259314f",
+    "status": "KernelWorkerStatus.COMPLETE"
+  },
+  "nextAction": "The 100-row pilot adapter did not learn the governed output schema. The evidence supports the governed 560-row EXP-002 production run as the next justified action; it is NOT authorized here and was NOT launched automatically.",
+  "notAuthorized": [
+    "retraining",
+    "560-row launch",
+    "V1 creation",
+    "threshold changes",
+    "item replacement"
+  ],
+  "qualification": {
+    "evaluated": 20,
+    "evidenceStrength": "20 items - NOT equivalent to 80; explicit evidence-budget reduction under DEC-0057.",
+    "population": 80,
+    "subsetHash": "c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45"
+  },
+  "schemaVersion": "1.0.0",
+  "scoring": {
+    "counts": {
+      "claims": 17,
+      "duplicate_entities": 0,
+      "empty_items": 13,
+      "gold_entities": 20,
+      "items": 20,
+      "items_without_citations": 13,
+      "matched_entities": 7,
+      "predicted_entities": 7,
+      "total_citations": 13,
+      "unsupported_claims": 17,
+      "valid_citations": 0,
+      "valid_records": 0
+    },
+    "harnessInputCorrectedBeforeReporting": true,
+    "harnessInputNote": "The first scoring pass was INVALID: the gold was passed as the raw canonical record, but the scorer reads gold.entities. That collapsed gold_entities to 0 and every derived metric to 0. It was NOT reported as a model failure; the gold was rebuilt with the reference wrapper shape from scripts/eval/build-eval-items.py and re-scored. This record is the corrected, valid result.",
+    "location": "LOCAL",
+    "rawCounts": {
+      "classification_accuracy": "7/20",
+      "duplicate_rate": "0/20",
+      "empty_output_rate": "13/20",
+      "extraction_accuracy": "0.5185",
+      "instruction_following": "20/20",
+      "record_precision": "0/20",
+      "schema_validity": "7/20",
+      "source_coverage": "0/20",
+      "source_fidelity": "0/20",
+      "structured_output_reliability": "14/20",
+      "unsupported_claim_rate": "17/17 claims",
+      "valid_records": "0/20"
+    },
+    "scorer": "scripts/eval/score-arm.mjs (gharibo-eval-harness-1.0.0)",
+    "scores": {
+      "classification_accuracy": 0.35,
+      "dedup_f1": null,
+      "duplicate_rate": 0,
+      "empty_output_rate": 0.65,
+      "extraction_accuracy": 0.5185185185185185,
+      "instruction_following": 1,
+      "record_precision": 0,
+      "relation_f1": null,
+      "schema_validity": 0.35,
+      "source_coverage": 0,
+      "source_fidelity": 0,
+      "structured_output_reliability": 0.7000000000000001,
+      "taxonomy_prefix_accuracy": 0.35,
+      "unsupported_claim_rate": 1
+    },
+    "status": "RUN",
+    "thresholdsUnchanged": true,
+    "verdict": "FAIL"
+  },
+  "v1Created": false
+}
