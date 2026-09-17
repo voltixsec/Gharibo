@@ -2987,7 +2987,7 @@
         "kernelPushesPerformed": 0
       },
       "qualification": {
-        "status": "FROZEN_20_RUNNING",
+        "status": "FAILED",
         "decisionId": "DEC-0057",
         "rows": 80,
         "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1",
@@ -3002,7 +3002,12 @@
         "subsetHash": "c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45",
         "benchmarkVerdict": "GREEN",
         "medianItemSeconds": 141.865,
-        "meanTokensPerSecond": 4.25
+        "meanTokensPerSecond": 4.25,
+        "verdict": "FAIL",
+        "resultArtifact": "data/derived/exp002/v1-qualification-result.json",
+        "decisionRecord": "governance/DEC-0058-v1-qualification-failed-not-promoted.json",
+        "outcomeRecorded": true,
+        "masterStateIntegration": "PENDING - DEC-0058 needs a 1.37.0 gate layer whose strip chain is unfinished"
       }
     }
   },

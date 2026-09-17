@@ -3690,6 +3690,32 @@ function isFrozen20QualificationGoldState(state) {
   return isQualificationGateEntryGoldState(before);
 }
 
+/** DEC-0058 V1 qualification FAILED; V1 not promoted. Records a real failure only. */
+function isV1QualificationFailedGoldState(state) {
+  if (state?.masterStateVersion !== "1.37.0" || state?.updatedAt !== "2026-09-17") return false;
+  const d=(state?.decisions||[]).find(x=>x?.id==="DEC-0058");
+  const t=state?.training?.exp002, q=t?.qualification, e=state?.experiments?.["GHARIBO-exp-002"];
+  if (!d || d.status!=="ACCEPTED" || d.supersedes!==null || d.supersededBy!==null || d.architectureChanging!==false ||
+    t?.status!=="QUALIFICATION_FAILED_NOT_PROMOTED" || q?.status!=="FAILED" ||
+    e?.evaluationStatus!=="NOT_RUN" || e?.qualificationVerdict!=="FAIL" || e?.promotable!==false || e?.trainingAuthorized!==false ||
+    e?.qualificationSplit?.policy!=="SEALED_UNTIL_V1_PROMOTION_GATE" ||
+    t?.production?.kernelPushesPerformed!==0 || t?.production?.trainingAuthorized!==false ||
+    (state?.blockers||[]).find(b=>b?.id==="BLK-0005")?.status!=="OPEN" ||
+    (state?.blockers||[]).find(b=>b?.id==="BLK-0006")?.status!=="RE_SCOPED_NOT_BLOCKING") return false;
+  const b=structuredClone(state);
+  b.masterStateVersion="1.36.0";
+  b.decisions=b.decisions.filter(x=>x?.id!=="DEC-0058");
+  b.history=(b.history||[]).filter(h=>h?.revision!=="1.37.0");
+  b.validation.results=(b.validation.results||[]).filter(r=>r?.gate!=="exp002:v1-qualification");
+  const bt=b.training.exp002; bt.status="PILOT_COMPLETE_INTEGRITY_PASS";
+  bt.qualification.status="FROZEN_20_RUNNING";
+  bt.qualification.evaluationStatus="NOT_RUN";
+  delete bt.qualification.verdict; delete bt.qualification.resultArtifact;
+  const be=b.experiments["GHARIBO-exp-002"]; be.readinessStatus="QUALIFICATION_20_RUNNING";
+  be.evaluationStatus="NOT_RUN"; delete be.qualificationVerdict; delete be.qualificationEvaluated;
+  return isFrozen20QualificationGoldState(b);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -3718,6 +3744,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isPilotCompleteIntegrityVerifiedGoldState(state) ||
     isQualificationGateEntryGoldState(state) ||
     isFrozen20QualificationGoldState(state) ||
+    isV1QualificationFailedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

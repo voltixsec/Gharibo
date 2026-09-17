@@ -1,0 +1,79 @@
+{
+  "artifact": {
+    "adapterSha256": "8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e",
+    "recipeHash": "d1851753a05a0d2b560ccd8d47b82318fd69261b66aa0e9274f259e67a0e93a3",
+    "type": "LoRA adapter over gpt-oss-20b"
+  },
+  "authority": "Mission instruction to apply the already-governed V1 promotion gate to the real 20-item result without changing thresholds.",
+  "consequences": {
+    "nextJustifiedAction": "The governed 560-row EXP-002 production run is the evidence-supported next step, but it requires explicit authorization and was NOT launched.",
+    "production560Launched": false,
+    "promoted": false,
+    "retrained": false,
+    "v1Created": false
+  },
+  "decision": "Record that the GHARIBO EXP-002 pilot adapter (sha256 8d80d7ca...) FAILED the governed V1 qualification gate on the frozen 20-item subset and is NOT promoted. GHARIBO V1 is NOT created. The gate thresholds were not changed. No item was replaced. No retraining was performed and the 560-row production run was NOT launched. The result is model-quality insufficiency: 13/20 predictions fail the required schema, valid_records is 0/20, and the adapter emits `payload` where the contract requires `normalizedPayload` while omitting `classification`.",
+  "decisionHash": "f338f26b3c7e5e98df02f5a6d264299e81bf4467fa5db35f0c12e8d33084f9d5",
+  "decisionId": "DEC-0058",
+  "diagnosis": {
+    "classification": "MODEL_QUALITY_INSUFFICIENCY",
+    "note": "An initial scoring pass was invalid because the gold was passed in the wrong shape; it was corrected BEFORE any conclusion was drawn and was never reported as a model failure.",
+    "ruledOut": [
+      "inference runtime (fixed, benchmarked GREEN)",
+      "final-channel extraction (20/20 succeeded)",
+      "gold leakage (none)",
+      "harness input (corrected and re-scored)"
+    ]
+  },
+  "next": "AWAIT_AUTHORIZATION_FOR_560_ROW_PRODUCTION_RUN",
+  "qualification": {
+    "evaluated": 20,
+    "evidenceStrength": "20 items, NOT equivalent to 80 (DEC-0057 evidence-budget reduction)",
+    "population": 80,
+    "subsetHash": "c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45"
+  },
+  "recordDate": "2026-09-17",
+  "recordKind": "V1_QUALIFICATION_RESULT_FAILED",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0057-v1-qualification-reduced-to-frozen-20.json",
+    "data/derived/exp002/v1-qualification-result.json",
+    "data/derived/exp002/qualification-inference-frozen.json",
+    "data/derived/exp002/qualification/v1-score.json"
+  ],
+  "result": {
+    "failedGates": [
+      "schema_validity",
+      "extraction_accuracy",
+      "classification_accuracy",
+      "source_fidelity",
+      "source_coverage",
+      "unsupported_claim_rate",
+      "empty_output_rate",
+      "structured_output_reliability",
+      "record_precision"
+    ],
+    "itemsReplaced": false,
+    "passing": [
+      "instruction_following 20/20",
+      "duplicate_rate 0/20"
+    ],
+    "rawCounts": {
+      "classification_accuracy": "7/20",
+      "duplicate_rate": "0/20",
+      "empty_output_rate": "13/20",
+      "extraction_accuracy": "0.5185",
+      "instruction_following": "20/20",
+      "record_precision": "0/20",
+      "schema_validity": "7/20",
+      "source_coverage": "0/20",
+      "source_fidelity": "0/20",
+      "structured_output_reliability": "14/20",
+      "unsupported_claim_rate": "17/17 claims",
+      "valid_records": "0/20"
+    },
+    "thresholdsChanged": false,
+    "verdict": "FAIL"
+  },
+  "status": "V1_QUALIFICATION_FAILED_NOT_PROMOTED_NO_RETRAIN"
+}
