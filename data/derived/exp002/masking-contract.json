@@ -1,0 +1,250 @@
+{
+  "artifactKind": "GHARIBO_EXP002_MASKING_CONTRACT_PROOF",
+  "batchProofs": [
+    {
+      "batchIndex": 0,
+      "checks": {
+        "batchRowsMatch": true,
+        "everyRowHasSupervision": true,
+        "labelsAre2d": true,
+        "paddingMasked": true,
+        "paddingNotSupervised": true,
+        "shapesAgree": true,
+        "supervisedMatchInput": true
+      },
+      "ok": true,
+      "perRowSupervised": [
+        385,
+        367,
+        728,
+        402
+      ],
+      "rows": 4,
+      "totalMasked": 5378,
+      "totalSupervised": 1882
+    },
+    {
+      "batchIndex": 1,
+      "checks": {
+        "batchRowsMatch": true,
+        "everyRowHasSupervision": true,
+        "labelsAre2d": true,
+        "paddingMasked": true,
+        "paddingNotSupervised": true,
+        "shapesAgree": true,
+        "supervisedMatchInput": true
+      },
+      "ok": true,
+      "perRowSupervised": [
+        595,
+        892,
+        1166,
+        412
+      ],
+      "rows": 4,
+      "totalMasked": 7691,
+      "totalSupervised": 3065
+    },
+    {
+      "batchIndex": 2,
+      "checks": {
+        "batchRowsMatch": true,
+        "everyRowHasSupervision": true,
+        "labelsAre2d": true,
+        "paddingMasked": true,
+        "paddingNotSupervised": true,
+        "shapesAgree": true,
+        "supervisedMatchInput": true
+      },
+      "ok": true,
+      "perRowSupervised": [
+        571,
+        720,
+        727,
+        407
+      ],
+      "rows": 4,
+      "totalMasked": 4819,
+      "totalSupervised": 2425
+    },
+    {
+      "batchIndex": 3,
+      "checks": {
+        "batchRowsMatch": true,
+        "everyRowHasSupervision": true,
+        "labelsAre2d": true,
+        "paddingMasked": true,
+        "paddingNotSupervised": true,
+        "shapesAgree": true,
+        "supervisedMatchInput": true
+      },
+      "ok": true,
+      "perRowSupervised": [
+        721,
+        396,
+        453,
+        396
+      ],
+      "rows": 4,
+      "totalMasked": 5234,
+      "totalSupervised": 1966
+    },
+    {
+      "batchIndex": 4,
+      "checks": {
+        "batchRowsMatch": true,
+        "everyRowHasSupervision": true,
+        "labelsAre2d": true,
+        "paddingMasked": true,
+        "paddingNotSupervised": true,
+        "shapesAgree": true,
+        "supervisedMatchInput": true
+      },
+      "ok": true,
+      "perRowSupervised": [
+        459,
+        353,
+        754,
+        380
+      ],
+      "rows": 4,
+      "totalMasked": 5522,
+      "totalSupervised": 1946
+    },
+    {
+      "batchIndex": 5,
+      "checks": {
+        "batchRowsMatch": true,
+        "everyRowHasSupervision": true,
+        "labelsAre2d": true,
+        "paddingMasked": true,
+        "paddingNotSupervised": true,
+        "shapesAgree": true,
+        "supervisedMatchInput": true
+      },
+      "ok": true,
+      "perRowSupervised": [
+        435,
+        342,
+        774,
+        403
+      ],
+      "rows": 4,
+      "totalMasked": 5686,
+      "totalSupervised": 1954
+    },
+    {
+      "batchIndex": 6,
+      "checks": {
+        "batchRowsMatch": true,
+        "everyRowHasSupervision": true,
+        "labelsAre2d": true,
+        "paddingMasked": true,
+        "paddingNotSupervised": true,
+        "shapesAgree": true,
+        "supervisedMatchInput": true
+      },
+      "ok": true,
+      "perRowSupervised": [
+        573,
+        523,
+        451,
+        385
+      ],
+      "rows": 4,
+      "totalMasked": 4100,
+      "totalSupervised": 1932
+    },
+    {
+      "batchIndex": 7,
+      "checks": {
+        "batchRowsMatch": true,
+        "everyRowHasSupervision": true,
+        "labelsAre2d": true,
+        "paddingMasked": true,
+        "paddingNotSupervised": true,
+        "shapesAgree": true,
+        "supervisedMatchInput": true
+      },
+      "ok": true,
+      "perRowSupervised": [
+        512,
+        569,
+        528,
+        599
+      ],
+      "rows": 4,
+      "totalMasked": 4068,
+      "totalSupervised": 2208
+    }
+  ],
+  "contextLength": 3072,
+  "gates": {
+    "allPerExampleMaskChecksPass": true,
+    "assistantTerminatorIsGoverned": true,
+    "batchLossContractPasses": true,
+    "everyTrainRowHasSupervisedTail": true,
+    "trainRowsPresent": true,
+    "zeroBuildFailures": true,
+    "zeroTrainAssistantEntirelyOutsideWindow": true,
+    "zeroTrainAssistantTruncated": true,
+    "zeroTrainZeroSupervisedTokens": true,
+    "zeroTruncation_dev": true,
+    "zeroTruncation_train": true,
+    "zeroZeroSupervised_dev": true,
+    "zeroZeroSupervised_train": true
+  },
+  "governedContract": {
+    "chatTemplateSha256": "a4c9919cbbd4acdd51ccffe22da049264b1b73e59055fa58811a99efbd7c8146",
+    "ignoreIndex": -100,
+    "lossContract": "assistant-only: every position outside the proven assistant span is -100",
+    "pinnedSystemDate": "2026-09-15",
+    "reasoningEffort": "medium",
+    "roleSequence": "system -> user -> assistant",
+    "terminator": "<|return|>"
+  },
+  "schemaVersion": "1.0.0",
+  "splits": {
+    "dev": {
+      "allMaskChecksPass": true,
+      "assistantEntirelyOutsideWindow": 0,
+      "assistantTruncatedAtContext": 0,
+      "buildFailureDetail": [],
+      "buildFailures": 0,
+      "builtExamples": 80,
+      "file": "dev.jsonl",
+      "fileSha256": "569bf37a96fd171621cb7946650dcdeec53936b7c11920ddb17352b3ef6cc334",
+      "maxAssistantEnd": 2493,
+      "minSupervisedTokens": 311,
+      "rows": 80,
+      "rowsWithSupervisedTail": 80,
+      "splitHash": "77b8040e8a85d310a6e4ad1a81a013ad9b1b6c3775cc929202a9830f1e0d49ec",
+      "zeroSupervisedTokens": 0
+    },
+    "train": {
+      "allMaskChecksPass": true,
+      "assistantEntirelyOutsideWindow": 0,
+      "assistantTruncatedAtContext": 0,
+      "buildFailureDetail": [],
+      "buildFailures": 0,
+      "builtExamples": 560,
+      "file": "train.jsonl",
+      "fileSha256": "491dbe363b5f7f29be7a92e968295d35915d784b58c14bf50cb6389d6db7e4c0",
+      "maxAssistantEnd": 2689,
+      "minSupervisedTokens": 297,
+      "rows": 560,
+      "rowsWithSupervisedTail": 560,
+      "splitHash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+      "zeroSupervisedTokens": 0
+    }
+  },
+  "testAccessed": false,
+  "testPolicy": "TRAIN and VALIDATION only; test.jsonl is never opened.",
+  "tokenizer": {
+    "class": "PreTrainedTokenizerFast",
+    "padTokenId": 199999,
+    "resolvedNameOrPath": "C:/Dev/GHARIBO/models/weights/exp002-tokenizer",
+    "torchVersion": "2.14.0+cpu"
+  },
+  "verdict": "PASS"
+}

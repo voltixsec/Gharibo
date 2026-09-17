@@ -60,9 +60,12 @@ describe("superseded Kaggle launch checkpoints (DEC-0027, DEC-0028)", () => {
     expect(isKaggleLaunchRepairedGoldState(state)).toBe(false);
     expect(isKaggleLaunchReauthorizedGoldState(state)).toBe(false);
 
-    // The accepted completion is the current tip, and the chain is still accepted.
-    expect(isKaggleExecutionCompletedGoldState(state)).toBe(true);
+    // The chain is still accepted at the tip. The DEC-0030 completed-execution
+    // checkpoint has since been advanced past by DEC-0048 (EXP-001 forensic
+    // closure) and DEC-0049 (EXP-002 contract preparation), so its point-in-time
+    // predicate is no longer true OF THE TIP while remaining a valid layer.
     expect(isAcceptedGoldGovernanceState(state)).toBe(true);
+    expect(isKaggleExecutionCompletedGoldState(state)).toBe(false);
 
     // ...and the DEC-0029 checkpoint it grew out of still validates on its own terms.
     expect(isKaggleLaunchReauthorizedGoldState(preExecution)).toBe(true);

@@ -32,7 +32,11 @@ export {
 /** Kaggle free-tier capabilities (m2-stack-facts.md §1). */
 export const KAGGLE_CAPABILITIES: WorkerCapabilities = {
   gpuClass: "NVIDIA T4 (16 GB, sm_75)",
-  dtype: "fp16",
+  // gpt-oss on Turing: Unsloth refuses fp16 and switches to float32
+  // ("Using float16 precision for gpt_oss won't work! Using float32"), so the
+  // declared capability is the dtype the engine actually honours. Declaring
+  // fp16 here was the class of contradiction that failed pilot Version 1.
+  dtype: "float32",
   supportsResume: true,
   supportsSecrets: true,
   persistentPath: "/kaggle/working",

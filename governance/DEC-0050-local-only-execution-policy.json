@@ -1,0 +1,156 @@
+{
+  "alternatives": [
+    {
+      "assessment": "FASTEST_TECHNICALLY_VALID_LOCAL_ALTERNATIVE",
+      "id": "ALT-A",
+      "recipeImpact": "NONE - the governed recipe runs unchanged",
+      "title": "Add a local GPU that meets the governed floor"
+    },
+    {
+      "assessment": "INFEASIBLE",
+      "id": "ALT-B",
+      "recipeImpact": "NONE, but the recipe cannot run as specified",
+      "title": "CPU-only training of the governed recipe"
+    },
+    {
+      "assessment": "NOT_A_SMALL_CHANGE",
+      "id": "ALT-C",
+      "recipeImpact": "MATERIAL - requires evidence and a governance update before training",
+      "title": "Swap to a smaller locally-runnable base model"
+    },
+    {
+      "assessment": "EXCLUDED_BY_POLICY",
+      "id": "ALT-D",
+      "recipeImpact": "NONE, but it is outside the current execution policy",
+      "title": "Remote or rented GPU compute"
+    }
+  ],
+  "authority": "Explicit human correction: EXP-002 training, evaluation, qualification, scoring and runtime validation are LOCAL ONLY. Kaggle is no longer an authorized compute path.",
+  "baselineCommit": "bb163fb48257a94fa8a803d3c91777b751111d4e",
+  "decision": "Adopt LOCAL ONLY as the binding execution policy for GHARIBO-exp-002 and supersede every pending governance statement that treated a Kaggle kernel launch as the next action, including the DEC-0049 externalLaunch authorization block and next-action ACT-0003. Accept the local hardware qualification finding that the governed EXP-002 recipe CANNOT execute on the current machine, because the available GPU is a GeForce GT 730 (GK208, sm_35) behind a 2018 driver with 1-4 GB of DDR3. No part of the training contract was reduced, and no training was started.",
+  "decisionHash": "ef2e3e6bab14877e6cfcb9e949667a24d8142cb212c4041b8a6349bad2463024",
+  "decisionId": "DEC-0050",
+  "executionPolicy": {
+    "evaluation": "LOCAL_ONLY",
+    "kaggleAuthorized": false,
+    "qualificationHoldout": "LOCAL_ONLY",
+    "runtimeValidation": "LOCAL_ONLY",
+    "scoring": "LOCAL_ONLY",
+    "supersedes": [
+      "DEC-0049.externalLaunch (Kaggle launch authorization gate)",
+      "nextAction ACT-0003 (await AUTHORIZE EXP-002 TRAINING LAUNCH)",
+      "master state training.exp002.authorizationPhrase"
+    ],
+    "training": "LOCAL_ONLY",
+    "uiIntegration": "LOCAL_ONLY"
+  },
+  "experimentId": "GHARIBO-exp-002",
+  "hardRuleCompliance": {
+    "silentlyChangedLossContract": false,
+    "silentlyReducedContextLength": false,
+    "silentlyReducedDataset": false,
+    "silentlyReducedModel": false,
+    "silentlyReducedPrecision": false,
+    "silentlyReducedSupervision": false,
+    "silentlyReducedTargetCoverage": false,
+    "statement": "STOPPED BEFORE TRAINING. The exact governed configuration does not fit the local hardware, so nothing was reduced and nothing was run.",
+    "trainingStarted": false
+  },
+  "infeasibility": {
+    "estimatedRequirement": {
+      "computeCapabilityMinimum": "7.0 (Turing or newer) so Triton is supported",
+      "driverMinimumWindows": "452.xx for the CUDA 11.8 runtime PyTorch 2.x links",
+      "measuredSource": "Accepted EXP-001 engine qualification (BLK-0002 / DEC-0030): gpt-oss-20b loaded 4-bit QLoRA on a 16 GB T4 with a 14 GB floor.",
+      "vramGbMinimum": 14.0,
+      "vramGbRecommended": 16.0
+    },
+    "fatalBlockerCount": 3,
+    "fatalBlockers": [
+      {
+        "blocker": "COMPUTE_CAPABILITY_BELOW_STACK_FLOOR",
+        "id": "HW-1",
+        "observed": "GK208 = sm_35 (compute capability 3.5)",
+        "required": "sm_50 or newer for any PyTorch 2.x CUDA build; sm_70 or newer for Triton"
+      },
+      {
+        "blocker": "DRIVER_CUDA_CEILING_FAR_BELOW_REQUIREMENT",
+        "id": "HW-2",
+        "observed": "NVIDIA driver 391.35 (2018-03); nvcuda.dll 23.21.13.9135",
+        "required": "Windows driver >= 452.xx for the CUDA 11.8 runtime that PyTorch 2.x links"
+      },
+      {
+        "blocker": "VRAM_SHORTFALL",
+        "id": "HW-3",
+        "observed": "1 GB / 2 GB / 4 GB DDR3 (GT 730 variants)",
+        "required": ">= 14.0 GB (16 GB recommended) for gpt-oss-20b 4-bit QLoRA at the declared context"
+      }
+    ],
+    "verdict": "NO"
+  },
+  "localHardware": {
+    "artifact": "data/derived/exp002/local-hardware-qualification.json",
+    "chip": "GK208 (Kepler 2.0)",
+    "computeCapability": "3.5",
+    "cpu": "Intel(R) Core(TM) i5-10500 (6C/12T @3.10GHz)",
+    "cudaToolkitInstalled": false,
+    "diskFreeGiB": {
+      "C:": 180.03,
+      "D:": 621.12
+    },
+    "driver": "391.35 (2018-03)",
+    "freePhysicalRamGiB": 13.38,
+    "gpu": "NVIDIA GeForce GT 730",
+    "nvidiaSmiFunctional": false,
+    "sm": "sm_35",
+    "totalRamGiB": 35.75,
+    "usableCudaDevice": false,
+    "vendorDeviceId": "10DE:0F02"
+  },
+  "next": "LOCAL_HARDWARE_REQUIRED_OR_GOVERNED_RECIPE_CHANGE",
+  "notAuthorizedByThisDecision": [
+    "any training execution",
+    "any evaluation",
+    "opening or scoring the sealed qualification split",
+    "any model promotion",
+    "GHARIBO-V1 creation",
+    "any Kaggle kernel push",
+    "any remote or paid compute"
+  ],
+  "qualificationHoldout": {
+    "mayBeUsedAs": "A pre-declared LOCAL held-out qualification set: it was sealed before EXP-002 training and does not influence training, prompt design, hyperparameters, checkpoint choice or model selection.",
+    "mustNotBeCalled": [
+      "an independent external benchmark",
+      "a second-corpus evaluation"
+    ],
+    "openCondition": "Not to be opened or scored until the training recipe and checkpoint policy are frozen.",
+    "rows": 80,
+    "split": "EXP-002 qualification",
+    "status": "SEALED_UNREAD",
+    "truthfulDescription": "An internal sealed qualification holdout drawn from the governed Gold distribution."
+  },
+  "recommendedAlternative": "ALT-A",
+  "recommendedAlternativeStatement": "Add a local GPU meeting the governed floor (>= 16 GB VRAM, compute capability >= 7.0, a driver new enough for CUDA 11.8+). It is the only option that preserves the governed training contract exactly, so it does not reopen the DEC-0048 defect class. Swapping the base model is a MATERIAL recipe change (new tokenizer, new chat template, new Harmony channel contract) and requires its own evidence and governance before any training.",
+  "recordDate": "2026-09-17",
+  "recordKind": "EXECUTION_POLICY_LOCAL_ONLY_AND_LOCAL_HARDWARE_QUALIFICATION",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0049-exp002-training-contract-preparation.json",
+    "governance/DEC-0048-exp001-training-objective-defect.json",
+    "data/derived/exp002/local-hardware-qualification.json",
+    "data/derived/exp002/preflight.json",
+    "data/derived/exp002/splits/split-manifest.json",
+    "docs/TRAINING_STRATEGY.md",
+    "docs/MODEL_REGISTRY.md"
+  ],
+  "status": "LOCAL_ONLY_POLICY_ACCEPTED_EXP002_BLOCKED_ON_LOCAL_HARDWARE",
+  "unchangedByThisDecision": {
+    "contextLength": 3072,
+    "devRows": 80,
+    "lossContract": "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK",
+    "preflightGateCount": 24,
+    "preflightVerdict": "PASS",
+    "recipeHash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee",
+    "statement": "The prepared EXP-002 contract is NOT discarded and NOT weakened. Every measured artifact, the governed chat template, the assistant-only loss proof, the sealed qualification split and the local preflight PASS all remain valid and are the contract a future local GPU must execute unchanged.",
+    "trainRows": 560
+  }
+}

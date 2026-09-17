@@ -5,7 +5,7 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Governance |
 | **Status** | Living |
-| **Version** | 1.27.0 |
+| **Version** | 1.34.0 |
 | **Last Updated** | 2026-09-17 |
 
 > **GENERATED FILE — DO NOT EDIT BY HAND.** This document is deterministically generated
@@ -162,9 +162,12 @@ Notes:
 | ID | Status | Base model | Dataset | Method | Engine | Worker | Training run | Package | Evaluation | Readiness | Engine deps (resolved/total) | Promotion target | Promotable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | GHARIBO-exp-001 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | ea6e30f2-ce26-4323-b35a-3436ee867eaf | 78dd1bf374ed1c53785ea50bf179b1b7a4764d40c121d3d41cda4e2a2e3e68f2 | ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL | CLOSED_NON_PROMOTABLE_TRAINING_OBJECTIVE_DEFECT | 9/12 | GHARIBO-V0.1 | false |
+| GHARIBO-exp-002 | EXPERIMENT | openai/gpt-oss-20b | GHARIBO-Research-Gold-v0.1 | QLoRA + SFT | Unsloth Core | KaggleTrainingWorker | — | faaae06551acda24897c5b95c19d290ed591f3be2fff3c33376525a768415332 | NOT_RUN | PILOT_COMPLETE_AWAITING_QUALIFICATION_AUTHORIZATION | undefined/undefined | GHARIBO-V1 | false |
 
 - **GHARIBO-exp-001 promotion blocked:** DEC-0048: the 512-token SFT window excluded the assistant Gold payload from 640/640 TRAIN examples. EXP-001 is historical experimental evidence only and cannot be promoted.
 - **GHARIBO-exp-001 references:** docs/MODEL_REGISTRY.md, docs/TRAINING_STRATEGY.md
+- **GHARIBO-exp-002 promotion blocked:** No training has run and no evaluation result exists. A pilot adapter is non-promotable by construction. Additionally BLK-0005 records that no independent source corpus exists, so any V1 claim must state that it rests on the sealed EXP-002 qualification split.
+- **GHARIBO-exp-002 references:** governance/DEC-0049-exp002-training-contract-preparation.json, data/derived/exp002/preflight.json, data/derived/exp002/package/launch-summary.json
 
 ## Models
 
@@ -179,7 +182,9 @@ Notes:
 | ID | Status | Note |
 | --- | --- | --- |
 | GHARIBO-exp-001 | EXPERIMENT | Registered as an EXPERIMENT. A real training run has completed (Kaggle kernel version 3, KernelWorkerStatus.COMPLETE) and an adapter exists, but no evaluation has run, so it is not promoted. |
+| GHARIBO-exp-002 | EXPERIMENT | Corrected training contract prepared and gated locally. No training has been authorized, no run exists and no evaluation has occurred. |
 | GHARIBO-V0.1 | NOT_CREATED | Reserved name. Cannot be created without evaluation and promotion (ADR-0008). Training completion alone does not create it. |
+| GHARIBO-V1 | NOT_CREATED | Reserved name for the first accepted, production-ready model. Cannot be created without evaluation and explicit promotion (ADR-0008). No evaluation result exists, so it stays NOT_CREATED. |
 
 ## Approved Roadmap
 
@@ -386,6 +391,13 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | DEC-0046 | 2026-09-16 | Authorize exactly one governed Evaluation Attempt #6 using the locally proven HF Hub post-install refresh repair | ACCEPTED | — |
 | DEC-0047 | 2026-09-16 | Reconcile Attempt #6 adapter attachment before its single authorized push | ACCEPTED | — |
 | DEC-0048 | 2026-09-17 | Close GHARIBO-exp-001 as non-promotable after training-window forensic audit | ACCEPTED | — |
+| DEC-0049 | 2026-09-17 | Prepare the corrected EXP-002 training contract; external launch not authorized | ACCEPTED | — |
+| DEC-0050 | 2026-09-17 | Adopt LOCAL ONLY execution policy; EXP-002 blocked on local hardware | ACCEPTED | — |
+| DEC-0051 | 2026-09-17 | Local V1 runtime/provider contract and local evaluation controller | ACCEPTED | — |
+| DEC-0052 | 2026-09-17 | Empirical EXP-002 runtime projection and governed 100-row pilot | ACCEPTED | — |
+| DEC-0053 | 2026-09-17 | Kaggle authorized as the EXP-002 training compute host | ACCEPTED | — |
+| DEC-0054 | 2026-09-17 | EXP-002 pilot V1 dtype failure corrected at source; V2 pushed and RUNNING | ACCEPTED | — |
+| DEC-0055 | 2026-09-17 | EXP-002 pilot COMPLETE and integrity-verified; not yet qualified or promoted | ACCEPTED | — |
 
 ## Validation
 
@@ -428,6 +440,13 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | build | npm run build | PASS | 0 | Next.js 14.2.35 production build compiled successfully; type/lint validation passed; 31/31 static pages generated; BUILD_ID pOXHhLltYfY5te-KN5oGA. Note: the first attempt in this session was interrupted by the WorkBuddy sandbox bulk-delete guard while Next removed its own .next/export directory; the build was re-run into a fresh .next and completed normally. No source change was required. | 2026-09-15 | false |
 | build:dec0030 | npm run build:dec0030 | PASS | 0 | governance/DEC-0030-kaggle-execution-acceptance.json is up to date; acceptanceHash=06194e95c22b07a4c433154f627f20f515dbb43100e7615885345f6b0cb0c647. | 2026-09-15 | — |
 | verify:result | npm run verify:result | PASS | 0 | Downloaded GHARIBO-exp-001 result: 130 manifest entries, 129 verified, 0 mismatches, rollup recomputed over the full manifest = 788bc0a77d465bcbc997e8698177fbd90c9e8e2720e549159a27684095284885 (matches declared). __notebook__.ipynb is Kaggle's internal executed-notebook copy: not served by the authenticated output API and not a model artifact; its declared hash still participates in the rollup. Requires the private local result directory. | 2026-09-15 | — |
+| exp002:preflight | node scripts/exp002/build-exp002-preflight.mjs | PASS | 0 | EXP-002 pre-GPU gate PASS: 24/24 gates, 560 TRAIN and 80 DEV rows, zero assistant spans outside the 3072-token context, zero truncated spans, zero zero-supervised rows, batch loss contract proven, deterministic Harmony final-channel extraction regression PASS, no consumed TEST access. | 2026-09-17 | — |
+| exp002:local-hardware | python scripts/exp002/build-local-hardware-qualification.py | PASS | 0 | Local hardware qualification recorded: GeForce GT 730 (GK208, sm_35), driver 391.35, 1-4 GB DDR3, i5-10500, 35.75 GiB RAM. Training feasibility verdict NO with 3 fatal blockers. No context length, model, dataset, supervision, precision, target coverage or loss contract was reduced; no training started. | 2026-09-17 | — |
+| exp002:v1-runtime-contract | node node_modules/vitest/vitest.mjs run --root apps/web | PASS | 0 | 279 tests PASS across 13 files, including 25 V1 runtime contract cases and 19 Harmony final-channel extraction cases. Typecheck PASS. Analysis exposure prevented on every path; no secret reaches client output. | 2026-09-17 | — |
+| exp002:runtime-projection | python scripts/exp002/build-runtime-projection.py | PASS | 0 | Empirical projection from the real EXP-001 execution: setup 263.574 s, core 4041.965 s, post 2.454 s, total 4310.044 s, cross-checked against train_runtime to within 0.06%. Cost ratio 1.082 from the pinned architecture. 100-row pilot projects to 0.61 h; governed 560-row configuration projects to 3.07 h; both inside the 4 h hard stop. | 2026-09-17 | — |
+| exp002:pilot-package | npx vite-node scripts/exp002/build-exp002-package.ts --mode=pilot | PASS | 0 | Pilot package built: 100 rows, splitHash b8250d98..., packageId 067bec301c6af0a2a675e41ba17548a6fb2b8f56b4787010322451b2b6668066. The rendered notebook's representation cells were executed against the real pilot payload and passed: 100 examples, 54,317 supervised tokens, 90,696 masked, max assistant end 2689/3072, min 300 supervised per row, zero truncated spans, zero zero-supervision rows. TEST and qualification payloads absent. | 2026-09-17 | — |
+| exp002:pilot-kaggle-bundle | python scripts/exp002/build_kaggle_pilot_bundle.py | PASS | 0 | 37/37 pre-push gates green. Verified: 100 train rows, train sha256 0de7275c...6151 at 572915 bytes matching the remote dataset, delivered dtype float32 agreeing with the recipe and the manifest, context 3072 with no silent downgrade in executable code, explicit assistant-only mask with fail-closed zero supervision, checkpoint policy matching 25 steps, TEST and qualification absent, no credential-shaped strings, metadata UTF-8 without BOM with LF newlines, GPU on, TPU off, internet on, kernel private, dataset source governed. | 2026-09-17 | — |
+| exp002:pilot-integrity | recover + verify pilot artifact | PASS | 0 | 29/29 integrity checks PASS on 121 recovered files. Adapter sha256 8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e (31,876,192 bytes). 25/25 optimizer steps, 1 epoch, train_loss 0.19649010464549066, train_runtime 1419.1747 s. Sealed qualification split not present in the recovered output. | 2026-09-17 | — |
 
 ## Blockers
 
@@ -437,6 +456,8 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | BLK-0002 | CLOSED | gpt-oss-20b model compatibility measured successfully | CLOSED 2026-09-15. openai/gpt-oss-20b loaded on the real free Kaggle GPU through the intended 4-bit QLoRA path; tokenizer/Harmony, adapter init, batch collation and one forward-only no_grad pass succeeded. Parameter digest remained 951055a91551d1d442d45f342a33ba3bfbb0efe500b8cc7c41ca0cf6a61a6331; TEST was not accessed; no training primitive executed and output hygiene passed. | STAGE-1 | docs/ENV_QUALIFICATION_CONTRACT.md, docs/adr/ADR-0018-real-model-compatibility-qualification.md |
 | BLK-0003 | CLOSED | Held-out TEST evaluation authorization obtained | CLOSED 2026-09-15 by DEC-0032. The CEO authorized ONE governed held-out TEST benchmark with the decision AUTHORIZED WITH LIMITS, scoped to BASE inference, CANDIDATE inference, M1-M13 measurement and required access logging, and explicitly forbidding training, tuning, selection, promotion, dataset mutation and second-pass optimization. The docs/RESEARCH_BENCHMARK.md 3.5 leakage audit subsequently PASSED (TRAIN∩TEST=0, VALIDATION∩TEST=0, AUDIT∩TEST=0, hash reproduction exact), which is the second and final condition for parsing TEST. This closure authorizes measurement only - it does not record a score and does not authorize promotion; GHARIBO-V0.1 stays NOT_CREATED. | STAGE-2 | docs/EVALUATION_AUTHORIZATION_REQUEST.md, docs/EVALUATION.md, docs/RESEARCH_BENCHMARK.md, governance/DEC-0032-evaluation-authorization.json, governance/EVALUATION-LEAKAGE-AUDIT.json, governance/DEC-0030-kaggle-execution-acceptance.json |
 | BLK-0004 | CLOSED | No GPU execution environment available for the authorized held-out TEST benchmark | OPENED 2026-09-16 by DEC-0033, CLOSED 2026-09-16. The blocker was the absence of a GPU execution environment and an unrepaired kernel generator. Both halves were resolved: the generator defects were repaired and gated (commit b29c043, extended by DEC-0035), and a governed Kaggle T4 route was established with a PRIVATE prompts-only dataset. DEC-0034 then launched the benchmark; that launch failed pre-inference on a further harness defect and is recorded as such. DEC-0035 repaired that defect and relaunched, which is the SAME single authorized execution restarted, not a second one. No TEST inference had occurred at the time this blocker was closed, and no metric value exists. From DEC-0035 onward no further relaunch is permitted without a new human decision. | STAGE-1 | docs/EVALUATION_EXECUTION_BLOCKER.md, docs/EVALUATION_BENCHMARK_LAUNCH.md, governance/DEC-0033-evaluation-infrastructure-blocker.json, governance/DEC-0034-evaluation-benchmark-launch.json, governance/DEC-0035-evaluation-kernel-relaunch.json |
+| BLK-0005 | OPEN | No new independent source corpus exists for an independent V1 benchmark | The repository has no committed deterministic generator that maps raw UCL source records to gold examples; the 800 governed examples were sampled during the M3A session. A genuinely new, previously-unused gold cohort therefore requires a new governed annotation process. Until it exists, the strongest available qualification set is the sealed EXP-002 split (80 rows drawn from Gold v0.1 TRAIN+VALIDATION before training), and any V1 claim must be stated in those terms rather than as an independent second-corpus benchmark. | V1-PROMOTION | governance/DEC-0049-exp002-training-contract-preparation.json, data/derived/exp002/splits/split-manifest.json, docs/RESEARCH_BENCHMARK.md |
+| BLK-0006 | RE_SCOPED_NOT_BLOCKING | Local hardware cannot execute the governed EXP-002 recipe (not blocking) | The only NVIDIA device on this machine is a GeForce GT 730 (GK208, sm_35) behind driver 391.35 with 1-4 GB of DDR3, below the compute-capability, driver and VRAM floors of the governed stack. DEC-0053 authorizes Kaggle T4-class hardware as the training compute host, so local capability is no longer a requirement and this issue no longer blocks training. It remains recorded because it is still true of the local machine. | — | governance/DEC-0050-local-only-execution-policy.json, data/derived/exp002/local-hardware-qualification.json |
 
 ## Next Actions
 
@@ -444,6 +465,9 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | --- | --- | --- | --- | --- |
 | ACT-0001 | P0 | Prepare the EXP-002 training contract from TRAIN and VALIDATION only: prove assistant-target visibility inside the effective token window, explicit assistant/completion-only loss semantics, identical train/eval role contracts, and deterministic Harmony final-channel extraction. Stop before training authorization. | DEC-0048 | governance/DEC-0048-exp001-training-objective-defect.json, docs/TRAINING_STRATEGY.md, docs/RESEARCH_BENCHMARK.md, apps/web/lib/workers/kaggle/notebook.template.ipynb |
 | ACT-0002 | P1 | Declare the effective dtype honestly (float32) for any future run, or re-qualify fp32 explicitly instead of inheriting a declared fp16 that the engine overrides. | DEC-0030 | docs/TRAINING_STRATEGY.md, scripts/training/build-dec0030-acceptance.mjs |
+| ACT-0003 | P0 | SUPERSEDED by DEC-0050. There is no Kaggle launch gate and no authorization phrase to await: Kaggle is not an authorized compute path for EXP-002. Retained here only so the supersession is auditable. | DEC-0050 | governance/DEC-0050-local-only-execution-policy.json, data/derived/exp002/local-hardware-qualification.json |
+| ACT-0004 | P1 | Decide the V1 qualification basis: either commission a new governed gold annotation process over previously-unused UCL source records, or accept the sealed EXP-002 qualification split and state the V1 claim in those exact terms. | BLK-0005 | governance/DEC-0049-exp002-training-contract-preparation.json, data/derived/exp002/splits/split-manifest.json |
+| ACT-0005 | P0 | Provide local compute that meets the governed floor, or authorize a governed recipe change. Fastest valid path: a local GPU with >= 16 GB VRAM, compute capability >= 7.0 and a driver new enough for CUDA 11.8+, which runs the prepared EXP-002 contract unchanged. A base-model swap is a MATERIAL change requiring new evidence and a new preflight before any training. | BLK-0006 | governance/DEC-0050-local-only-execution-policy.json, data/derived/exp002/local-hardware-qualification.json, data/derived/exp002/preflight.json |
 
 ## History
 
@@ -468,6 +492,13 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | 1.25.0 | 2026-09-16 | Accepted DEC-0046: one bounded Evaluation Attempt #6 using a distinct repaired artifact. Attempt #5 remains immutable historical evidence; no Kaggle push or TEST inference has occurred at this checkpoint. | — | PENDING_CHECKPOINT |
 | 1.26.0 | 2026-09-16 | DEC-0047 pre-launch artifact reconciliation: attach the accepted private adapter dataset to Attempt #6 without changing notebook bytes, evaluation semantics, or the single-push authorization. | — | PENDING_CHECKPOINT |
 | 1.27.0 | 2026-09-17 | DEC-0048 forensic closure of GHARIBO-exp-001: real execution preserved, promotion prohibited after proving the 512-token SFT window excluded every TRAIN assistant Gold payload. | — | PENDING_CHECKPOINT |
+| 1.28.0 | 2026-09-17 | DEC-0049 EXP-002 training-contract preparation: assistant-only supervision proven by token-prefix span proof, 3072-token context chosen from measured distributions, sealed qualification split created, deterministic Harmony final-channel extraction regression passing. External launch NOT authorized. | — | PENDING_CHECKPOINT |
+| 1.29.0 | 2026-09-17 | DEC-0050 LOCAL ONLY execution policy: Kaggle is no longer an authorized compute path, every pending Kaggle-launch next-action is superseded, and the local hardware qualification reports the governed EXP-002 recipe CANNOT execute on this machine (GT 730 sm_35, 2018 driver, 1-4 GB VRAM). No contract was reduced and no training was started. | — | PENDING_CHECKPOINT |
+| 1.30.0 | 2026-09-17 | DEC-0051 local V1 runtime/provider contract, final-channel guard wired into the chat path, and a local evaluation controller that never uploads the sealed holdout or any gold answer. 279 tests and typecheck PASS. Nothing authorized to run. | — | PENDING_CHECKPOINT |
+| 1.31.0 | 2026-09-17 | DEC-0052 empirical EXP-002 runtime projection anchored on the real EXP-001 execution (setup 4.39 min, core 67.37 min, post 2.45 s), with a governed 100-row pilot at 0.61 h projected and the governed 560-row contract left UNCHANGED at 3.07 h. Nothing authorized to run. | — | PENDING_CHECKPOINT |
+| 1.32.0 | 2026-09-17 | DEC-0053 Kaggle T4 authorized as the EXP-002 training compute host, superseding the DEC-0050 local-hardware restriction and re-scoping BLK-0006 so it no longer blocks training. Pilot (100 rows, 0.61 h) and production (560 rows, 3.07 h) packages prepared. Evaluation, scoring and the sealed holdout remain local. Nothing authorized to run. | — | PENDING_CHECKPOINT |
+| 1.33.0 | 2026-09-17 | DEC-0054 EXP-002 pilot V1 recorded as a pre-training dtype contract failure; the defect corrected at source in six places; a fail-closed artifact-agreement gate added; artifacts rebuilt; corrected Kaggle Version 2 pushed and observed RUNNING. | — | PENDING_CHECKPOINT |
+| 1.34.0 | 2026-09-17 | DEC-0055 EXP-002 pilot COMPLETE with integrity PASS (29/29). Artifact recorded, not promoted; sealed qualification untouched. | — | PENDING_CHECKPOINT |
 
 **1.0.0 — changes**
 - added governance/GHARIBO_MASTER_STATE.json
@@ -683,4 +714,89 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 - kept GHARIBO-V0.1 NOT_CREATED
 - permitted EXP-002 contract preparation only; no training authorized
 - This revision records post-evaluation forensic evidence and does not authorize EXP-002 training.
+- Training executed: —
+
+**1.28.0 — changes**
+- recorded the EXP-002 governed recipe hash 2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee
+- recorded the EXP-002 package id faaae06551acda24897c5b95c19d290ed591f3be2fff3c33376525a768415332
+- recorded the rendered notebook sha256 03850abeee72c5f87d75d30cfeb745decfaed7a09d03150fbaefed42f14e47a3
+- chose a 3072-token effective context from measured TRAIN and DEV distributions with zero truncated assistant spans
+- implemented an explicit assistant-only -100 label mask that fails closed on any unprovable record
+- governed the identity model's chat template by hash instead of inheriting the loader repository's patched template
+- pinned the template-injected system-header date to remove representation nondeterminism
+- created and sealed an EXP-002 qualification split (80 rows) before training
+- kept the consumed Gold v0.1 TEST split out of every EXP-002 source path
+- opened BLK-0005 for the absent independent source corpus
+- did not authorize any Kaggle launch, training, evaluation or promotion
+- Records preparation only. No Kaggle launch, no training, no evaluation and no promotion is authorized by this revision.
+- Training executed: —
+
+**1.29.0 — changes**
+- adopted LOCAL ONLY for training, evaluation, qualification, scoring, runtime validation and UI integration
+- superseded the DEC-0049 Kaggle launch authorization block and next-action ACT-0003
+- recorded the exact local hardware: GeForce GT 730 (GK208, sm_35), driver 391.35, 1-4 GB DDR3, i5-10500, 35.75 GiB RAM, 180 GiB free on C:
+- recorded three independent fatal blockers: compute capability below the PyTorch/Triton floor, driver CUDA ceiling below the PyTorch 2.x floor, and a 3.5x-14x VRAM shortfall
+- recorded that no context length, model, dataset, supervision, precision, target coverage or loss contract was reduced
+- preserved the prepared EXP-002 contract, its preflight PASS and its sealed qualification split unchanged
+- opened BLK-0006 for the local hardware shortfall
+- Records a policy change and a hardware determination only. Nothing is authorized to run.
+- Training executed: —
+
+**1.30.0 — changes**
+- added apps/web/lib/runtime/gharibo-v1.mjs: provider-neutral V1 runtime contract, env-only configuration, literal-credential rejection, real health probe, final-channel-only answer extraction
+- added apps/web/app/api/runtime/v1/route.ts: real health descriptor with no secret material
+- guarded the conversation chat path so a V1 runtime answer is final-channel-only and analysis can never reach a client
+- added scripts/eval/local-eval-controller.mjs: local-only evaluation with a sealed-split guard, seal-integrity re-derivation, prompts-only inference and no placeholder score
+- added 25 V1 runtime contract tests; total suite 279 PASS
+- recorded that the sealed qualification payload was NOT read this session
+- did not authorize any training, evaluation or promotion
+- Records local implementation only. No training, evaluation or promotion.
+- Training executed: —
+
+**1.31.0 — changes**
+- recovered the measured EXP-001 phase timings from the recorded derivedTimestamps and cross-checked them against train_runtime
+- derived a 3072/512 per-token cost ratio of 1.082 from the pinned gpt-oss-20b architecture (12 full-attention + 12 sliding-window layers)
+- projected the stated 100-row configuration to 0.61 h total and the governed 560-row configuration to 3.07 h, both inside the 4 h hard stop
+- recorded that the first-order rows x context proxy overstates the 100-row workload by 2.12x because batch size 1 with packing disabled means no padding
+- governed a 100-row PILOT configuration (deterministic prefix, re-derived 25-step checkpoint policy) without reducing the governed 560-row production contract
+- recorded that the 12 h evaluation run is inference evaluation and is excluded from the projection
+- did not authorize any training, evaluation or promotion
+- Records a projection and a pilot configuration only. No training is authorized.
+- Training executed: —
+
+**1.32.0 — changes**
+- authorized Kaggle T4-class GPU as the EXP-002 training compute host
+- superseded DEC-0050's LOCAL_ONLY training restriction and removed BLK-0006 from the training block path
+- re-scoped BLK-0006 to record that local training is unavailable but not required
+- prepared the governed 100-row PILOT package (non-promotable, no V1 claim)
+- prepared the governed 560-row PRODUCTION package, gated on a successful pilot
+- preserved the corrected contract: context 3072, no silent downgrade, governed template, explicit response-only masking, zero zero-supervision rows
+- kept evaluation, scoring and the gold/qualification answers local; neither the sealed holdout nor the consumed TEST split is uploaded
+- recorded that the production notebook hash moved on rebuild while the recipe hash is unchanged
+- recorded that no Kaggle Dataset slug exists and none was invented
+- Records a compute-host policy correction and prepared packages only.
+- Training executed: —
+
+**1.33.0 — changes**
+- recorded pilot Kaggle Version 1 as a REAL pre-training contract failure with zero optimizer steps and no training evidence
+- recorded the dtype root cause across six sites: package builder, shared package type, worker type, worker capability, validator rule 8, and the notebook hardware cell
+- corrected the source of truth so the package builder reads dtype from the governed recipe
+- widened the validator to admit float32 while still rejecting bf16 (Turing has no bf16 units)
+- admitted sequence_length 3072 as a measured, allow-listed governed value
+- added the fail-closed packageDtypeAgreesAcrossArtifacts preflight gate, which parses the manifest the notebook actually receives
+- rebuilt the pilot and production packages and recorded old -> new identities; the recipe hash is unchanged because the recipe was always correct
+- verified the remote Kaggle Dataset by downloading and re-hashing it; not recreated
+- passed 37/37 pre-push gates and pushed corrected kernel Version 2
+- recorded Version 2 as RUNNING; no training result, promotion or V1 claim is made
+- Records a repair and a relaunch. No training result is claimed; the pilot remains non-promotable.
+- Training executed: —
+
+**1.34.0 — changes**
+- recorded kernel version 6 as COMPLETE
+- recovered 121 artifacts to data/derived/exp002/pilot-recovered
+- verified 29/29 integrity checks including package id, recipe hash, split hash, template hash, LoRA config, context 3072, loss contract and 25/25 steps
+- confirmed adapter, outputs/final and outputs/checkpoint-25 are byte-identical (terminal checkpoint)
+- preserved the historical non-promotable origin of the pilot without rewriting it
+- did not open the sealed qualification split, did not evaluate, did not promote, did not run the 560-row job
+- Records artifact recovery and verification only. No evaluation, promotion or V1 creation.
 - Training executed: —

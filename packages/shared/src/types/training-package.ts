@@ -182,6 +182,78 @@ export interface PackagePreviewProvenance {
   testUsage: "HASH_INTEGRITY_ONLY";
 }
 
+/**
+ * The governed EXP-002 contract block.
+ *
+ * ADDITIVE and OPTIONAL. Every 1.1.0 manifest that does not carry it stays valid
+ * and byte-stable, so historical packages (GHARIBO-exp-001) are untouched. When
+ * it IS present, the training notebook treats it as mandatory and asserts every
+ * value: the governed chat template hash, the pinned system date, the role
+ * sequence, the explicit assistant-only label mask, the sealed qualification
+ * split and the consumed-TEST exclusion.
+ *
+ * It lives inside the package because the package is the content-addressed
+ * contract: the recipe hash must be covered by `packageId`.
+ */
+export interface Exp002GovernedContract {
+  /** sha256 of the canonical EXP-002 recipe definition. */
+  recipeHash: string;
+  /** sha256 of the governed chat template (the identity model's own template). */
+  governedChatTemplateSha256: string;
+  /** Reasoning effort written into the template's system header. */
+  governedReasoningEffort: string;
+  /** Pinned `strftime_now` value, removing template date nondeterminism. */
+  governedSystemDate: string;
+  /** The governed conversation shape, e.g. "system -> user -> assistant". */
+  roleSequence: string;
+  /** The Harmony channel the supervised answer occupies. */
+  finalChannel: string;
+  /** The governed end-of-final-message marker. */
+  terminator: string;
+  /** Label value substituted for every non-supervised position. */
+  ignoreIndex: number;
+  /**
+   * The dtype the governed recipe declares. The package-level `dtype` and the
+   * notebook's runtime assertion must both equal this. Pilot Version 1 failed
+   * pre-training because they did not.
+   */
+  declaredDtype: "fp16" | "bf16" | "float32";
+  lossContract: {
+    kind: "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK";
+    reliesOnTrainerDefault: false;
+    collator: string;
+    failClosedOnZeroSupervisedRow: true;
+  };
+  splits: {
+    train: Exp002SplitRef;
+    dev: Exp002SplitRef;
+    /** Sealed: never read before the V1 promotion gate. */
+    qualification: Exp002SplitRef;
+    splitSeed: string;
+  };
+  consumedTest: {
+    splitHash: string;
+    /** Always false. Attempt #6 consumed this split. */
+    reusableAsPromotionEvidence: false;
+  };
+  contextPolicy: {
+    chosenContextLength: number;
+    measuredMaxRenderedTokens: number;
+    rule: string;
+  };
+  /** Always true: the qualification payload never travels. */
+  qualificationSealed: true;
+}
+
+/** One governed EXP-002 split reference. */
+export interface Exp002SplitRef {
+  file: string;
+  rows: number;
+  splitHash: string;
+  /** Present on the sealed qualification split only. */
+  readPolicy?: "SEALED_UNTIL_V1_PROMOTION_GATE";
+}
+
 /** The dataset version the package trains on (content-addressed). */
 export interface DatasetRef {
   datasetId: string;
@@ -207,12 +279,24 @@ export interface TrainingPackage {
   experimentId: string;
   gitCommitSha: string;
   preview?: PackagePreviewProvenance;
+  /**
+   * The governed EXP-002 contract. Optional and additive: absent for historical
+   * packages, mandatory for any run that declares it.
+   */
+  exp002?: Exp002GovernedContract;
   /** "openai/gpt-oss-20b" (identity / lineage). */
   baseModel: string;
   /** Pinned revision of the base model. */
   baseModelRevision: string;
   /** "unsloth/gpt-oss-20b" (the 4-bit representation actually loaded). */
   loaderModelId: string;
+  /**
+   * Pinned revision of the loader repository. Optional and additive.
+   *
+   * The loader repository ships a PATCHED chat template, so an unpinned loader is
+   * a mutable dependency on the trained representation. EXP-002 pins it.
+   */
+  loaderModelRevision?: string;
   dataset: DatasetRef;
   engine: EngineConfig;
   quantization: "4-bit";
@@ -228,7 +312,20 @@ export interface TrainingPackage {
   warmupSteps: number;
   lrSchedulerType: string;
   weightDecay: number;
-  dtype: "fp16";
+  /**
+   * The dtype the run DECLARES.
+   *
+   * This must be the dtype the engine actually uses, not the one that looks
+   * conventional for the hardware. GHARIBO-exp-001 declared `fp16` and Unsloth
+   * overrode it at runtime ("Using float16 precision for gpt_oss won't work!
+   * Using float32"), producing an F32 adapter under an fp16 declaration — a
+   * MATERIAL_RUNTIME_DEVIATION recorded in DEC-0030.
+   *
+   * GHARIBO-exp-002-pilot Kaggle Version 1 failed pre-training because the
+   * package said `fp16` while the notebook asserted `float32`. The declaration
+   * and the assertion are now required to agree.
+   */
+  dtype: "fp16" | "bf16" | "float32";
   seed: number;
   checkpointPolicy: CheckpointPolicy;
   /** null = local fallback. */

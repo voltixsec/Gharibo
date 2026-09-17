@@ -1,0 +1,110 @@
+{
+  "authority": "Explicit mission instruction to prepare the corrected EXP-002 training contract from TRAIN and VALIDATION only, prove the supervision contract locally, and stop at the external Kaggle launch authorization gate.",
+  "baselineCommit": "bb163fb48257a94fa8a803d3c91777b751111d4e",
+  "decision": "Accept the prepared GHARIBO-exp-002 training contract. The EXP-001 defect class is made structurally impossible: the assistant Gold payload is located per record by a token-prefix proof, every non-assistant position is masked to -100, and any record that cannot be proven fails closed. The effective context length is 3072, chosen from measured TRAIN and DEV token distributions with zero truncated assistant spans. A new governed qualification split is sealed for the V1 promotion gate. The consumed Gold v0.1 TEST split is never a source. No Kaggle launch is authorized by this decision.",
+  "decisionHash": "4955d1d8e44e156baa787311da753fd6ef3684ec16f840aaa63379686d00ea73",
+  "decisionId": "DEC-0049",
+  "effectiveContextLength": 3072,
+  "experimentId": "GHARIBO-exp-002",
+  "externalLaunch": {
+    "authorizationPhrase": "AUTHORIZE EXP-002 TRAINING LAUNCH",
+    "authorized": false,
+    "kernelPushesPerformed": 0,
+    "maximumKernelPushes": 1,
+    "required": true
+  },
+  "gates": {
+    "batchLossContractProven": true,
+    "everyTrainRowHasSupervisedTail": true,
+    "extractionRegressionCases": 18,
+    "extractionRegressionPass": true,
+    "failedGates": [],
+    "gateCount": 24,
+    "noConsumedTestAccess": true,
+    "preflightVerdict": "PASS",
+    "roleContractParity": "PROVEN_BY_TOKEN_PREFIX",
+    "zeroTrainAssistantEntirelyOutsideWindow": true,
+    "zeroTrainAssistantTruncated": true,
+    "zeroTrainZeroSupervisedTokens": true
+  },
+  "lossContract": {
+    "assistantOnlyLossFlagReason": "TRL's assistant_only_loss requires {% generation %} markers in the chat template; the governed gpt-oss template does not carry them.",
+    "assistantOnlyLossFlagUsable": false,
+    "collator": "AssistantOnlyCollator",
+    "failClosedOnZeroSupervisedRow": true,
+    "ignoreIndex": -100,
+    "kind": "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK",
+    "reliesOnTrainerDefault": false
+  },
+  "measuredMaxRenderedTokens": 2689,
+  "next": "AWAIT_EXPLICIT_HUMAN_LAUNCH_AUTHORIZATION",
+  "notAuthorizedByThisDecision": [
+    "Kaggle kernel push",
+    "training execution",
+    "qualification-set access",
+    "evaluation",
+    "model promotion",
+    "GHARIBO-V1 creation"
+  ],
+  "notebookSha256": "03850abeee72c5f87d75d30cfeb745decfaed7a09d03150fbaefed42f14e47a3",
+  "openIssue": {
+    "detail": "The EXP-002 qualification split is drawn from Gold v0.1 TRAIN+VALIDATION and is sealed before training, so it is a valid held-out measurement over the EXP-002 development distribution. It is NOT an independent second corpus: the repository has no committed deterministic generator mapping raw UCL source records to gold examples, so a genuinely new gold cohort requires a new governed annotation process. A V1 promotion claim must state exactly which of the two it rests on.",
+    "id": "BLK-0005",
+    "title": "No new independent source corpus exists for an independent V1 benchmark"
+  },
+  "packageId": "faaae06551acda24897c5b95c19d290ed591f3be2fff3c33376525a768415332",
+  "recipeHash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee",
+  "recordDate": "2026-09-17",
+  "recordKind": "EXP002_TRAINING_CONTRACT_PREPARATION",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0048-exp001-training-objective-defect.json",
+    "governance/DEC-0030-kaggle-execution-acceptance.json",
+    "data/derived/exp002/preflight.json",
+    "data/derived/exp002/token-window-exp002.json",
+    "data/derived/exp002/masking-contract.json",
+    "data/derived/exp002/splits/split-manifest.json",
+    "data/derived/exp002/package/launch-summary.json",
+    "apps/web/lib/training/exp002-recipe.mjs",
+    "apps/web/lib/runtime/harmony-final.mjs",
+    "apps/web/lib/workers/kaggle/notebook.template.ipynb",
+    "scripts/exp002/build-exp002-preflight.mjs",
+    "scripts/exp002/build_masking_contract.py",
+    "scripts/exp002/cut_exp002_split.py",
+    "docs/TRAINING_STRATEGY.md"
+  ],
+  "representation": {
+    "chatTemplateSha256": "a4c9919cbbd4acdd51ccffe22da049264b1b73e59055fa58811a99efbd7c8146",
+    "chatTemplateSource": {
+      "repoId": "openai/gpt-oss-20b",
+      "revision": "6cee5e81ee83917806bbde320786a8fb61efebee"
+    },
+    "finding": "The loader repository (unsloth/gpt-oss-20b) ships a patched chat template whose only behavioural difference for this dataset is that it terminates the final assistant message with <|end|> where the identity model's template terminates it with <|return|>. <|return|> is the unambiguous end-of-final-message marker, so the identity template is governed and is SET explicitly and asserted by hash rather than inherited from the loader repo.",
+    "pinnedSystemDate": "2026-09-15",
+    "roleContractFinding": "Under the governed template a leading `system` and a leading `developer` message render to byte-identical text, so the declared role-contract mismatch recorded in DEC-0048 does not manifest as a rendered-token difference. The governed contract preserves the frozen dataset's own `system` role and pins the template by hash so no future divergence can pass unnoticed.",
+    "roleSequence": "system -> user -> assistant",
+    "terminator": "<|return|>"
+  },
+  "splits": {
+    "consumedTest": {
+      "reusableAsPromotionEvidence": false,
+      "splitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+      "used": false
+    },
+    "dev": {
+      "rows": 80,
+      "splitHash": "77b8040e8a85d310a6e4ad1a81a013ad9b1b6c3775cc929202a9830f1e0d49ec"
+    },
+    "qualification": {
+      "policy": "SEALED_UNTIL_V1_PROMOTION_GATE",
+      "rows": 80,
+      "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1"
+    },
+    "seed": "20260917",
+    "train": {
+      "rows": 560,
+      "splitHash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8"
+    }
+  },
+  "status": "EXP002_CONTRACT_PREPARED_TRAINING_NOT_AUTHORIZED"
+}

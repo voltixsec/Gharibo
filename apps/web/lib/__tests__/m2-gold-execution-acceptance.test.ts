@@ -59,8 +59,21 @@ const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 describe("DEC-0030 — completed execution is the operative governance tip", () => {
   it("is the accepted tip while every earlier authorization stays in history", () => {
-    expect(isKaggleExecutionCompletedGoldState(state)).toBe(true);
+    // The DEC-0030 acceptance remains a valid, unweakened governance layer, and the
+    // composed predicate still accepts the tip. The tip itself has since advanced
+    // past this checkpoint (DEC-0048 forensic closure, then DEC-0049 EXP-002
+    // preparation), so the point-in-time DEC-0030 predicate is no longer true OF
+    // THE TIP — which is exactly what "advanced past it" means, and is asserted
+    // explicitly here rather than left implicit.
     expect(isAcceptedGoldGovernanceState(state)).toBe(true);
+    expect(isKaggleExecutionCompletedGoldState(state)).toBe(false);
+
+    // The DEC-0030 acceptance facts are still carried verbatim in the state.
+    expect(state.training.executionCompletion.runId).toBe(
+      "ea6e30f2-ce26-4323-b35a-3436ee867eaf",
+    );
+    expect(state.training.executionCompletion.trainingCompleted).toBe(true);
+    expect(state.training.executionCompletion.experimentId).toBe("GHARIBO-exp-001");
 
     // The pre-execution checkpoints are no longer operative.
     expect(isKaggleLaunchReauthorizedGoldState(state)).toBe(false);
@@ -239,7 +252,13 @@ describe("DEC-0030 — completion is not promotion and not an evaluation result"
     expect(evaluation.nextGate).toBe("EXPLICIT_EVALUATION_AUTHORIZATION_REQUIRED");
 
     expect(state.training.evaluationResults).toBe(0);
-    expect(state.experiments["GHARIBO-exp-001"].evaluationStatus).toBe("NOT_RUN");
+    // DEC-0048: Evaluation Attempt #6 ran inference over the consumed TEST split
+    // and the first scoring pass was non-decisional, so the recorded status moved
+    // past NOT_RUN — while still producing NO score and NO promotion. The
+    // invariant that matters is unchanged: no evaluation result exists.
+    expect(state.experiments["GHARIBO-exp-001"].evaluationStatus).toBe(
+      "ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL",
+    );
     expect(state.experiments["GHARIBO-exp-001"].evaluationScore).toBeNull();
     expect(state.experiments["GHARIBO-exp-001"].promotable).toBe(false);
   });

@@ -1,0 +1,90 @@
+{
+  "authority": "Mission instruction to complete the V1 runtime/provider contract, the local evaluation controller and the UI integration locally, without GPU execution.",
+  "baselineCommit": "bb163fb48257a94fa8a803d3c91777b751111d4e",
+  "decision": "Accept the local GHARIBO V1 runtime contract and the local evaluation controller. The runtime is addressed as a provider-neutral OpenAI-compatible endpoint configured entirely from environment variable references, so model identity is independent of its host. Every answer passes through deterministic final-channel extraction before it can leave the server, so Harmony analysis can never reach a user or a scorer. Health is a real network probe that never reports ready from configuration alone. The evaluation controller keeps the sealed qualification payload and all gold answers local, refuses to open the sealed split without an explicit flag, and emits no placeholder score. Nothing is authorized to run.",
+  "decisionHash": "465c6b4f68966cc678b3fdb59291f56fc8b82ce8c320f30c9d5ec704bf79c076",
+  "decisionId": "DEC-0051",
+  "evaluationController": {
+    "guarantees": [
+      "refuses to run without an explicit --open-qualification flag",
+      "plan mode does NOT read the sealed payload at all (status SEALED_NOT_READ)",
+      "re-derives the seal hash at run time and aborts on mismatch",
+      "health-probes the runtime and aborts if it is not ONLINE",
+      "sends one prompt per item; the holdout payload never leaves the process",
+      "gold answers never leave the process; only local hashes are persisted",
+      "every output passes through final-channel extraction before scoring",
+      "emits no placeholder score: scoring is delegated to the repository metric implementation"
+    ],
+    "holdoutDescription": "An internal sealed qualification holdout drawn from the governed Gold distribution. It must not be called an independent external benchmark or a second-corpus evaluation.",
+    "module": "scripts/eval/local-eval-controller.mjs",
+    "payloadReadThisSession": false,
+    "planArtifact": "data/derived/exp002/eval/eval-plan.json"
+  },
+  "executionPolicy": "LOCAL_ONLY",
+  "next": "AWAIT_LOCAL_COMPUTE_MEETING_THE_GOVERNED_FLOOR",
+  "notAuthorizedByThisDecision": [
+    "any training execution",
+    "any evaluation run",
+    "opening or scoring the sealed qualification split",
+    "any model promotion",
+    "GHARIBO-V1 creation",
+    "any remote or paid compute"
+  ],
+  "recordDate": "2026-09-17",
+  "recordKind": "LOCAL_RUNTIME_CONTRACT_AND_EVALUATION_CONTROLLER",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0050-local-only-execution-policy.json",
+    "governance/DEC-0049-exp002-training-contract-preparation.json",
+    "apps/web/lib/runtime/gharibo-v1.mjs",
+    "apps/web/lib/runtime/harmony-final.mjs",
+    "apps/web/app/api/runtime/v1/route.ts",
+    "apps/web/app/api/conversations/[id]/messages/route.ts",
+    "apps/web/lib/__tests__/exp002-v1-runtime.test.ts",
+    "scripts/eval/local-eval-controller.mjs",
+    "data/derived/exp002/local-hardware-qualification.json"
+  ],
+  "runtimeContract": {
+    "configuration": {
+      "apiKeyRef": "GHARIBO_V1_API_KEY_REF",
+      "baseUrl": "GHARIBO_V1_BASE_URL",
+      "modelId": "GHARIBO_V1_MODEL_ID"
+    },
+    "extractionModule": "apps/web/lib/runtime/harmony-final.mjs",
+    "finalChannelPolicy": "extractV1Answer runs every response through deterministic final-channel extraction. A response carrying hidden-channel content but no final channel fails closed rather than surfacing raw model text.",
+    "healthPolicy": "ONLINE is returned only after a real 2xx probe of /v1/models. Configuration alone is reported UNCONFIGURED. A reachable-but-rejecting endpoint is UNAUTHORIZED. No state is ever invented.",
+    "hostingBinding": "NONE - configured from environment only",
+    "hostingLabelPolicy": "A self-hosted endpoint is labelled DEVELOPMENT_EPHEMERAL_RUNTIME and isProduction is always false. No production hosting is claimed.",
+    "modelIdentity": "GHARIBO-V1",
+    "module": "apps/web/lib/runtime/gharibo-v1.mjs",
+    "providerNeutral": true,
+    "secretPolicy": "The credential is held as an environment variable NAME. A literal credential in the reference slot is rejected outright, and only a redacted descriptor (host, model id, reference name) may cross a client boundary.",
+    "statusEndpoint": "apps/web/app/api/runtime/v1/route.ts"
+  },
+  "status": "RUNTIME_CONTRACT_AND_EVAL_CONTROLLER_COMPLETE_NOTHING_AUTHORIZED_TO_RUN",
+  "testEvidence": {
+    "covers": [
+      "provider configuration resolves",
+      "health state is truthful",
+      "request body uses the canonical V1 inference contract",
+      "final-only Harmony response is returned",
+      "analysis channel is excluded",
+      "API errors propagate safely",
+      "unavailable runtime is handled",
+      "no secret reaches client output",
+      "model identity/version is correct"
+    ],
+    "harmonyFinalCases": 19,
+    "suiteResult": "PASS",
+    "totalSuite": 279,
+    "typecheck": "PASS",
+    "v1RuntimeCases": 25,
+    "v1RuntimeTestFile": "apps/web/lib/__tests__/exp002-v1-runtime.test.ts"
+  },
+  "uiIntegration": {
+    "analysisExposure": "PREVENTED",
+    "chatPath": "apps/web/app/api/conversations/[id]/messages/route.ts",
+    "detection": "Endpoint identity, not a new schema field: no migration, and any provider pointing at the same runtime receives the same guard.",
+    "guard": "When the conversation's provider endpoint IS the configured V1 runtime, the streamed deltas are buffered and only the extracted final channel is emitted. Other providers stream unchanged, so no unrelated UI behaviour is rewritten."
+  }
+}

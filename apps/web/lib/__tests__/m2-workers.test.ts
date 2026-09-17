@@ -106,7 +106,9 @@ describe("worker registry", () => {
   });
 
   it("declares T4 / fp16 / resume / secrets capabilities", () => {
-    expect(KAGGLE_CAPABILITIES.dtype).toBe("fp16");
+    // DEC-0030 runtimeDeviation: the gpt-oss path on T4 is engine-forced to
+    // float32, so the declared capability must be float32, not fp16.
+    expect(KAGGLE_CAPABILITIES.dtype).toBe("float32");
     expect(KAGGLE_CAPABILITIES.supportsResume).toBe(true);
     expect(KAGGLE_CAPABILITIES.supportsSecrets).toBe(true);
     expect(KAGGLE_CAPABILITIES.persistentPath).toBe("/kaggle/working");
@@ -137,9 +139,12 @@ describe("notebook-render.ts", () => {
       )
       .join("\n");
 
-    expect(source).toContain("harmony-messages-v1");
+    // EXP-002 (DEC-0048): the governed representation is built from the record's
+    // own messages[] and rendered through the pinned governed chat template.
     expect(source).toContain("record.get('messages')");
     expect(source).toContain("tokenizer.apply_chat_template");
+    expect(source).toContain("GOVERNED_ROLE_SEQUENCE");
+    expect(source).toContain("' -> '.join(roles)");
   });
 
   it("renders deterministically (same package → byte-identical content + sha256)", () => {
@@ -324,6 +329,66 @@ describe("notebook template regression guards", () => {
       .cells.map((cell) => (Array.isArray(cell.source) ? cell.source.join("") : String(cell.source)))
       .join("\n");
 
+  it("refuses a bundle carrying the consumed TEST or sealed QUALIFICATION payload", () => {
+    const s = templateSource();
+
+    // EXP-002 (DEC-0048): Gold v0.1 TEST was consumed by Attempt #6, and the
+    // EXP-002 qualification split is sealed until the V1 promotion gate. Neither
+    // payload may ever travel in an execution bundle.
+    expect(s).toContain("FORBIDDEN_PAYLOAD_FILES = ('test.jsonl', 'qualification.jsonl')");
+    expect(s).toContain("SPLIT POLICY VIOLATION");
+    expect(s).toContain("qualification split hash");
+    expect(s).toContain("consumed TEST split hash");
+    expect(s).not.toContain("for name in ('train', 'validation', 'test'):");
+  });
+
+  it("proves the assistant span by token prefix instead of trusting the render", () => {
+    const s = templateSource();
+
+    // The EXP-001 defect class: the assistant payload was never located, so it
+    // could sit outside the window and outside the loss without anyone noticing.
+    expect(s).toContain("full_ids[:len(prompt_ids)] == prompt_ids");
+    expect(s).toContain("assistant span cannot be located deterministically");
+    expect(s).toContain("example['assistant_end'] <= max_seq_length");
+  });
+
+  it("supervises only the assistant span with an explicit -100 label mask", () => {
+    const s = templateSource();
+
+    expect(s).toContain("labels[start:end] = input_ids[start:end]");
+    expect(s).toContain("zero supervised assistant tokens - FAIL CLOSED");
+    // The collator must not be the default MLM collator, which rebuilds labels
+    // from input_ids and would erase the assistant-only mask.
+    expect(s).toContain("class AssistantOnlyCollator");
+    expect(s).toContain("data_collator=collator");
+    expect(s).toContain("'labels': torch.tensor(labels, dtype=torch.long)");
+    expect(s).not.toContain("DataCollatorForLanguageModeling");
+  });
+
+  it("never silently downgrades the declared context length", () => {
+    const s = templateSource();
+
+    // Regression guard for DEC-0048: EXP-001 shipped a silent
+    // `max_seq_length -> 512` downgrade, which is how the assistant Gold payload
+    // ended up outside the effective window in 640/640 TRAIN examples.
+    expect(s).not.toContain("downgrading max_seq_length");
+    expect(s).toContain("NO SILENT DOWNGRADE");
+    expect(s).toContain("assert max_seq_length == CONTEXT_POLICY['chosen_context_length']");
+  });
+
+  it("pins the governed chat template and the system-header date", () => {
+    const s = templateSource();
+
+    // The loader repository ships a patched template that terminates the final
+    // assistant message with <|end|> instead of <|return|>. The governed template
+    // is asserted by hash, and the injected date is pinned so the rendered
+    // representation is reproducible across training and inference.
+    expect(s).toContain("GOVERNED_TEMPLATE_SHA256");
+    expect(s).toContain("GOVERNED_SYSTEM_DATE");
+    expect(s).toContain("def _pinned_strftime(_fmt):");
+    expect(s).toContain("revision=PACKAGE['base_model_revision']");
+  });
+
   it("installs with full observability — the suppressed-output shape is gone", () => {
     const s = templateSource();
     expect(s).not.toContain("'-qqq', *install_args");
@@ -361,12 +426,16 @@ describe("notebook template regression guards", () => {
     expect(s).toContain("'--constraint'");
   });
 
-  it("verifies TRAIN + VALIDATION and hard-fails on a held-out TEST payload", () => {
+  it("refuses a bundle carrying the consumed TEST or sealed QUALIFICATION payload", () => {
     const s = templateSource();
-    expect(s).toContain("TEST_HELD_OUT");
-    expect(s).toContain("TEST POLICY VIOLATION");
-    expect(s).toContain("split_names = ('train', 'validation')");
-    expect(s).toContain("HASH_INTEGRITY_ONLY");
+
+    // EXP-002 (DEC-0048): Gold v0.1 TEST was consumed by Attempt #6, and the
+    // EXP-002 qualification split is sealed until the V1 promotion gate. Neither
+    // payload may ever travel in an execution bundle.
+    expect(s).toContain("FORBIDDEN_PAYLOAD_FILES = ('test.jsonl', 'qualification.jsonl')");
+    expect(s).toContain("SPLIT POLICY VIOLATION");
+    expect(s).toContain("qualification split hash");
+    expect(s).toContain("consumed TEST split hash");
     expect(s).not.toContain("for name in ('train', 'validation', 'test'):");
   });
 

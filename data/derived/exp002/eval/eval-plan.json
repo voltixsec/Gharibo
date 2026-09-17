@@ -1,0 +1,40 @@
+{
+  "artifactKind": "GHARIBO_LOCAL_EVAL_PLAN",
+  "schemaVersion": "1.0.0",
+  "executionPolicy": "LOCAL_ONLY",
+  "recipeHash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee",
+  "qualification": {
+    "path": "data/derived/exp002/splits/qualification.jsonl",
+    "rows": 80,
+    "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1",
+    "readPolicy": "SEALED_UNTIL_V1_PROMOTION_GATE",
+    "sealVerified": true,
+    "sealDetail": {
+      "ok": true,
+      "verified": false,
+      "status": "SEALED_NOT_READ",
+      "expectedHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1",
+      "expectedRows": 80,
+      "note": "Payload not opened. Integrity is re-derived at run time."
+    }
+  },
+  "holdoutPolicy": {
+    "truthfulDescription": "An internal sealed qualification holdout drawn from the governed Gold distribution.",
+    "mustNotBeCalled": [
+      "an independent external benchmark",
+      "a second-corpus evaluation"
+    ],
+    "leavesThisMachine": false,
+    "goldAnswersLeaveThisMachine": false,
+    "promptsSentIndividually": true,
+    "scoringLocation": "LOCAL"
+  },
+  "stages": [
+    "verify seal integrity (hash + row count)",
+    "health-probe the runtime; abort if not ONLINE",
+    "send one prompt per item; never the payload",
+    "extract the final channel per output; never score analysis",
+    "score locally with the repository metric implementation",
+    "emit a local report; upload nothing"
+  ]
+}

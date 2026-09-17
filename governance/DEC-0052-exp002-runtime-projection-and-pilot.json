@@ -1,0 +1,178 @@
+{
+  "authority": "Human instruction to use the real EXP-001 runtime as the primary timing baseline, with a stated EXP-002 configuration of TRAIN=100 and context=3072, and explicit runtime thresholds: target 1-2 h, investigate above 3 h, do not launch above 4 h.",
+  "baselineCommit": "bb163fb48257a94fa8a803d3c91777b751111d4e",
+  "blockingFindings": [
+    {
+      "detail": "The request states TRAIN = 100. The governed EXP-002 contract prepared under DEC-0049 uses the 560-row split. Adopting 100 rows would remove 460 training examples (an 82% reduction in training data) and is a MATERIAL dataset change that the standing rule requires to be evidenced and governed before training. This projection is the evidence; the governance decision is separate and has NOT been taken.",
+      "finding": "CONFIGURATION_DISCREPANCY",
+      "id": "RP-1",
+      "severity": "MATERIAL"
+    },
+    {
+      "detail": "This projection is anchored on the EXP-001 T4 baseline. The local machine has no usable CUDA device (BLK-0006: GT 730, sm_35, 2018 driver, 1-4 GB VRAM), so the projected runtime cannot be realised locally. A projection is not a launch authorization, and there is currently nothing to launch on.",
+      "finding": "NO_LOCAL_COMPUTE_TARGET",
+      "id": "RP-2",
+      "severity": "BLOCKING"
+    },
+    {
+      "detail": "The declared EXP-002 checkpoint policy uses save_steps=140, derived from 560 rows / (batch 1 x grad-accum 4) = 140 optimizer steps. At 100 rows the run is 25 optimizer steps, so save_steps=140 would never fire and only the terminal checkpoint would exist. The policy must be re-declared coherently with the row count, and the checkpoint selection rule (terminal checkpoint only) must be restated for the new step count.",
+      "finding": "CHECKPOINT_POLICY_MUST_BE_REDERIVED_IF_ROW_COUNT_CHANGES",
+      "id": "RP-3",
+      "severity": "ADVISORY"
+    }
+  ],
+  "costRatioModel": {
+    "attentionShareAt3072": 0.09074796171570365,
+    "attentionShareAt512": 0.01636200945928672,
+    "method": "forward-FLOPs-per-token model using the pinned gpt-oss-20b config. The per-token cost is linear + quadratic-in-L: only the 12 full_attention layers contribute the quadratic term; the 12 sliding_attention layers (window 128) contribute an L-independent term that is present at both lengths and therefore cancels in the ratio.",
+    "ratio3072over512": 1.0818100472964336
+  },
+  "decision": "Accept the empirical runtime projection anchored on the real EXP-001 execution and govern a 100-row PILOT configuration for EXP-002. The projection shows the pilot total run time at 0.61 h and the currently governed 560-row configuration at 3.07 h, both INSIDE the 4 h hard stop. The 560-row governed contract is therefore NOT reduced: it remains the production configuration, and the 100-row set is recorded as a governed PILOT for pipeline validation. No training is authorized anywhere, and the local hardware blocker BLK-0006 is unchanged.",
+  "decisionHash": "bfbfbcf36d630f16a86616244e4fb570b47c40263143fe0dfbd9d19bb12bf38b",
+  "decisionId": "DEC-0052",
+  "empiricalBaseline": {
+    "contextLength": 512,
+    "coreTrainingSeconds": 4041.9648,
+    "crossCheck": {
+      "derivedCoreFromOffsets": 4044.015249487,
+      "differenceSeconds": 2.050449487,
+      "reportedTrainRuntime": 4041.9648,
+      "verdict": "CONSISTENT (trainer-internal bookkeeping overhead, <0.06%)"
+    },
+    "derivedFrom": "authenticated Kaggle lastRunTime anchor plus relative kernel-log offsets (DEC-0030)",
+    "examples": 640,
+    "experiment": "GHARIBO-exp-001",
+    "hardware": "NVIDIA Tesla T4 (Turing, sm_75), 16 GB",
+    "postTrainingSeconds": 2.454462751,
+    "processedTokens": 327680,
+    "setupSeconds": 263.574344109,
+    "source": "governance/GHARIBO_MASTER_STATE.json -> training.executionCompletion.derivedTimestamps",
+    "totalRunSeconds": 4310.044056347
+  },
+  "executionPolicy": "LOCAL_ONLY",
+  "explicitlyNotUsed": {
+    "evaluationRunDuration": "The ~12 h evaluation run was INFERENCE evaluation, not training. It is excluded from this projection entirely."
+  },
+  "firstOrderModelCorrection": {
+    "exp001FirstOrderTokens": 327680,
+    "exp002ActualTokensFor100Rows": 145013,
+    "exp002FirstOrderTokensAsStated": 307200,
+    "explanation": "The first-order model is a valid workload PROXY for EXP-001, where every example was truncated to exactly max_length=512, so it is exact there. It is NOT exact for EXP-002: with per-device batch size 1 and packing disabled there is no padding, so the cost is driven by the REAL rendered lengths (mean 1450 tokens at context 3072), not by the context ceiling. The first-order figure therefore overstates the 100-row workload by about 2.1x. The conclusion is unchanged and in fact more favourable, but the correct driver is the measured length distribution.",
+    "model": "processed tokens = rows x context length (every sequence assumed full length)",
+    "overstatementFactor": 2.118430761380014,
+    "ratioAsStated": 0.9375
+  },
+  "next": "AWAIT_LOCAL_COMPUTE_MEETING_THE_GOVERNED_FLOOR",
+  "notAuthorizedByThisDecision": [
+    "any training execution, pilot or production",
+    "any evaluation run",
+    "opening or scoring the sealed qualification split",
+    "any model promotion",
+    "GHARIBO-V1 creation",
+    "any remote or paid compute",
+    "any reduction of the governed 560-row training contract"
+  ],
+  "overheadSeparation": {
+    "coreTrainingSecondsReportedSeparately": true,
+    "note": "Setup and post-training overhead are reported separately from core training time, as requested. Setup is dominated by fixed work (dependency install and the 4-bit model load) and does not scale with row count at these sizes.",
+    "postTrainingSeconds": 2.454462751,
+    "setupSeconds": 263.574344109
+  },
+  "pilotConfiguration": {
+    "checkpointPolicy": {
+      "derivation": "100 rows / (per-device batch 1 x grad-accum 4) = 25 optimizer steps",
+      "note": "The governed 560-row policy used save_steps=140, which would never fire at 100 rows. The pilot policy is re-derived so exactly one checkpoint exists: the terminal one.",
+      "optimizerSteps": 25,
+      "saveSteps": 25,
+      "saveStrategy": "steps",
+      "saveTotalLimit": 1,
+      "selectionRule": "TERMINAL_CHECKPOINT_ONLY"
+    },
+    "definition": "the first 100 rows of the governed EXP-002 train ordering (a deterministic prefix)",
+    "fileBytes": 572915,
+    "id": "GHARIBO-exp-002-pilot",
+    "notASubstituteFor": "It is NOT a substitute for the governed 560-row production run and cannot be promoted. A pilot adapter carries no promotion claim.",
+    "processedTokens": 145013,
+    "projectedTotalHours": 0.6114211127294575,
+    "projectedVerdict": "WITHIN_TARGET_1_TO_2_HOURS",
+    "purpose": "Validate the governed pipeline end to end (representation, assistant-only mask, final-channel contract, artifact capture) at roughly one sixth of the production cost, before committing to a full run.",
+    "rows": 100,
+    "sourceSplitHash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+    "splitHash": "b8250d987dc50cfbceb1a4cf3b69dd9cbe1b03ae6ab073d3beb36d103d81f023"
+  },
+  "productionContractUnchanged": {
+    "projectedTotalHours": 3.0656478878680464,
+    "projectedVerdict": "INVESTIGATE_BEFORE_LAUNCH",
+    "rows": 560,
+    "splitHash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+    "statement": "The governed EXP-002 contract is NOT reduced. The runtime constraint does not require it: the governed configuration projects to 3.07 h, inside the 4 h hard stop. Reducing to 100 rows would remove 460 training examples (82% of the training data) for a runtime saving that the evidence shows is not needed."
+  },
+  "projections": [
+    {
+      "coreTrainingMinutes": 32.251453316100786,
+      "id": "A_STATED_100_ROWS",
+      "inGovernedContract": false,
+      "label": "TRAIN = 100, context 3072 (the configuration stated in the request)",
+      "processedTokens": 145013,
+      "rows": 100,
+      "setupMinutes": 4.392905735149999,
+      "totalHours": 0.6114211127294575,
+      "verdict": "WITHIN_TARGET_1_TO_2_HOURS",
+      "verdictRange": {
+        "architectureModel": "WITHIN_TARGET_1_TO_2_HOURS",
+        "conservative": "WITHIN_TARGET_1_TO_2_HOURS",
+        "optimistic": "WITHIN_TARGET_1_TO_2_HOURS",
+        "pathologicalLinearInLength": "INVESTIGATE_BEFORE_LAUNCH"
+      }
+    },
+    {
+      "coreTrainingMinutes": 179.50505982441612,
+      "id": "B_GOVERNED_560_ROWS",
+      "inGovernedContract": true,
+      "label": "TRAIN = 560, context 3072 (the currently GOVERNED EXP-002 split)",
+      "processedTokens": 807113,
+      "rows": 560,
+      "setupMinutes": 4.392905735149999,
+      "totalHours": 3.0656478878680464,
+      "verdict": "INVESTIGATE_BEFORE_LAUNCH",
+      "verdictRange": {
+        "architectureModel": "INVESTIGATE_BEFORE_LAUNCH",
+        "conservative": "INVESTIGATE_BEFORE_LAUNCH",
+        "optimistic": "ACCEPTABLE_ABOVE_TARGET",
+        "pathologicalLinearInLength": "DO_NOT_LAUNCH"
+      }
+    },
+    {
+      "coreTrainingMinutes": 205.96378177801034,
+      "id": "C_ORIGINAL_GOLD_TRAIN_640",
+      "inGovernedContract": false,
+      "label": "TRAIN = 640, context 3072 (the original Gold v0.1 TRAIN split)",
+      "processedTokens": 926080,
+      "rows": 640,
+      "setupMinutes": 4.392905735149999,
+      "totalHours": 3.5066265870946167,
+      "verdict": "INVESTIGATE_BEFORE_LAUNCH",
+      "verdictRange": {
+        "architectureModel": "INVESTIGATE_BEFORE_LAUNCH",
+        "conservative": "DO_NOT_LAUNCH",
+        "optimistic": "INVESTIGATE_BEFORE_LAUNCH",
+        "pathologicalLinearInLength": "DO_NOT_LAUNCH"
+      }
+    }
+  ],
+  "recordDate": "2026-09-17",
+  "recordKind": "EMPIRICAL_RUNTIME_PROJECTION_AND_GOVERNED_PILOT_CONFIGURATION",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0051-local-runtime-and-evaluation-contract.json",
+    "governance/DEC-0050-local-only-execution-policy.json",
+    "governance/DEC-0049-exp002-training-contract-preparation.json",
+    "governance/DEC-0030-kaggle-execution-acceptance.json",
+    "data/derived/exp002/runtime-projection.json",
+    "data/derived/exp002/token-window-exp002.json",
+    "data/derived/exp002/splits/split-manifest.json",
+    "data/derived/exp002/local-hardware-qualification.json",
+    "docs/TRAINING_STRATEGY.md"
+  ],
+  "status": "PROJECTION_ACCEPTED_PILOT_GOVERNED_PRODUCTION_CONTRACT_UNCHANGED"
+}

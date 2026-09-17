@@ -1,0 +1,368 @@
+{
+  "architecture": {
+    "headDim": 64,
+    "hiddenSize": 2880,
+    "intermediateSize": 2880,
+    "layerTypes": "alternating: 12 sliding_attention + 12 full_attention",
+    "numAttentionHeads": 64,
+    "numExpertsPerTok": 4,
+    "numHiddenLayers": 24,
+    "numKeyValueHeads": 8,
+    "numLocalExperts": 32,
+    "slidingWindow": 128,
+    "source": "openai/gpt-oss-20b config.json @ 6cee5e81ee83917806bbde320786a8fb61efebee",
+    "totalParameters": 20918738496
+  },
+  "artifactKind": "GHARIBO_EXP002_RUNTIME_PROJECTION",
+  "baseline": {
+    "contextLength": 512,
+    "crossCheck": {
+      "derivedCoreFromOffsets": 4044.015249487,
+      "differenceSeconds": 2.050449487,
+      "reportedTrainRuntime": 4041.9648,
+      "verdict": "CONSISTENT (trainer-internal bookkeeping overhead, <0.06%)"
+    },
+    "effectivePrecision": "float32 (engine-imposed for gpt-oss on Turing)",
+    "epochs": 1,
+    "examples": 640,
+    "experimentId": "GHARIBO-exp-001",
+    "gradientAccumulationSteps": 4,
+    "hardware": "NVIDIA Tesla T4 (Turing, sm_75), 16 GB",
+    "optimizerSteps": 160,
+    "perDeviceTrainBatchSize": 1,
+    "processedTokens": 327680,
+    "processedTokensBasis": "every example truncated to exactly max_length=512 (DEC-0048 forensic audit)",
+    "timings": {
+      "coreBasis": "train_runtime reported by the trainer (DEC-0030 / docs/TRAINING_STRATEGY.md v1.4.0)",
+      "coreTrainingSeconds": 4041.9648,
+      "postBasis": "training finished -> run complete (checkpoint save, manifest, checksums)",
+      "postTrainingSeconds": 2.454462751,
+      "setupBasis": "run start -> trainer start, from derivedTimestamps.trainerStartOffsetSeconds",
+      "setupIncludes": "dependency install, 4-bit model load, tokenizer/template setup, rendering, dataset build",
+      "setupSeconds": 263.574344109,
+      "totalRunSeconds": 4310.044056347
+    }
+  },
+  "blockingFindings": [
+    {
+      "detail": "The request states TRAIN = 100. The governed EXP-002 contract prepared under DEC-0049 uses the 560-row split. Adopting 100 rows would remove 460 training examples (an 82% reduction in training data) and is a MATERIAL dataset change that the standing rule requires to be evidenced and governed before training. This projection is the evidence; the governance decision is separate and has NOT been taken.",
+      "finding": "CONFIGURATION_DISCREPANCY",
+      "id": "RP-1",
+      "severity": "MATERIAL"
+    },
+    {
+      "detail": "This projection is anchored on the EXP-001 T4 baseline. The local machine has no usable CUDA device (BLK-0006: GT 730, sm_35, 2018 driver, 1-4 GB VRAM), so the projected runtime cannot be realised locally. A projection is not a launch authorization, and there is currently nothing to launch on.",
+      "finding": "NO_LOCAL_COMPUTE_TARGET",
+      "id": "RP-2",
+      "severity": "BLOCKING"
+    },
+    {
+      "detail": "The declared EXP-002 checkpoint policy uses save_steps=140, derived from 560 rows / (batch 1 x grad-accum 4) = 140 optimizer steps. At 100 rows the run is 25 optimizer steps, so save_steps=140 would never fire and only the terminal checkpoint would exist. The policy must be re-declared coherently with the row count, and the checkpoint selection rule (terminal checkpoint only) must be restated for the new step count.",
+      "finding": "CHECKPOINT_POLICY_MUST_BE_REDERIVED_IF_ROW_COUNT_CHANGES",
+      "id": "RP-3",
+      "severity": "ADVISORY"
+    }
+  ],
+  "costRatioModel": {
+    "attentionShareAt3072": 0.09074796171570365,
+    "attentionShareAt512": 0.01636200945928672,
+    "flopsPerTokenAt3072": {
+      "attentionPerToken": 603979776.0,
+      "linearPerToken": 6051594240.0,
+      "totalPerToken": 6655574016.0
+    },
+    "flopsPerTokenAt512": {
+      "attentionPerToken": 100663296.0,
+      "linearPerToken": 6051594240.0,
+      "totalPerToken": 6152257536.0
+    },
+    "method": "forward-FLOPs-per-token model using the pinned gpt-oss-20b config. The per-token cost is linear + quadratic-in-L: only the 12 full_attention layers contribute the quadratic term; the 12 sliding_attention layers (window 128) contribute an L-independent term that is present at both lengths and therefore cancels in the ratio.",
+    "ratio3072over512": 1.0818100472964336,
+    "ratioRounded": 1.0818
+  },
+  "executionPolicy": "LOCAL_ONLY",
+  "explicitlyNotUsed": {
+    "evaluationRunDuration": "The ~12 h evaluation run was INFERENCE evaluation, not training. It is excluded from this projection entirely."
+  },
+  "firstOrderModelComparison": {
+    "exp001FirstOrderTokens": 327680,
+    "exp002ActualTokensFor100Rows": 145013,
+    "exp002FirstOrderTokensAsStated": 307200,
+    "explanation": "The first-order model is a valid workload PROXY for EXP-001, where every example was truncated to exactly max_length=512, so it is exact there. It is NOT exact for EXP-002: with per-device batch size 1 and packing disabled there is no padding, so the cost is driven by the REAL rendered lengths (mean 1450 tokens at context 3072), not by the context ceiling. The first-order figure therefore overstates the 100-row workload by about 2.1x. The conclusion is unchanged and in fact more favourable, but the correct driver is the measured length distribution.",
+    "model": "processed tokens = rows x context length (every sequence assumed full length)",
+    "overstatementFactor": 2.118430761380014,
+    "ratioAsStated": 0.9375
+  },
+  "overheadSeparation": {
+    "coreTrainingSecondsReportedSeparately": true,
+    "note": "Setup and post-training overhead are reported separately from core training time, as requested. Setup is dominated by fixed work (dependency install and the 4-bit model load) and does not scale with row count at these sizes.",
+    "postTrainingSeconds": 2.454462751,
+    "setupSeconds": 263.574344109
+  },
+  "projections": [
+    {
+      "bands": {
+        "architectureModel": {
+          "coreTrainingMinutes": 32.251453316100786,
+          "coreTrainingSeconds": 1935.0871989660473,
+          "optimizerSteps": 25,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 145013,
+          "ratio": 1.0818100472964336,
+          "rows": 100,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 0.6114211127294575,
+          "totalMinutes": 36.68526676376745,
+          "totalSeconds": 2201.116005826047
+        },
+        "conservative": {
+          "coreTrainingMinutes": 38.756239522558595,
+          "coreTrainingSeconds": 2325.3743713535155,
+          "optimizerSteps": 25,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 145013,
+          "ratio": 1.3,
+          "rows": 100,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 0.7198342161704209,
+          "totalMinutes": 43.19005297022525,
+          "totalSeconds": 2591.4031782135153
+        },
+        "optimistic": {
+          "coreTrainingMinutes": 29.81249194042969,
+          "coreTrainingSeconds": 1788.7495164257814,
+          "optimizerSteps": 25,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 145013,
+          "ratio": 1.0,
+          "rows": 100,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 0.5707717564682726,
+          "totalMinutes": 34.24630538809636,
+          "totalSeconds": 2054.7783232857814
+        },
+        "pathologicalLinearInLength": {
+          "coreTrainingMinutes": 178.87495164257814,
+          "coreTrainingSeconds": 10732.497098554688,
+          "optimizerSteps": 25,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 145013,
+          "ratio": 6.0,
+          "rows": 100,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 3.0551460848374132,
+          "totalMinutes": 183.3087650902448,
+          "totalSeconds": 10998.525905414688
+        }
+      },
+      "centralTotalHours": 0.6114211127294575,
+      "centralTotalMinutes": 36.68526676376745,
+      "id": "A_STATED_100_ROWS",
+      "inGovernedContract": false,
+      "label": "TRAIN = 100, context 3072 (the configuration stated in the request)",
+      "processedTokens": 145013,
+      "rows": 100,
+      "verdict": "WITHIN_TARGET_1_TO_2_HOURS",
+      "verdictRange": {
+        "architectureModel": "WITHIN_TARGET_1_TO_2_HOURS",
+        "conservative": "WITHIN_TARGET_1_TO_2_HOURS",
+        "optimistic": "WITHIN_TARGET_1_TO_2_HOURS",
+        "pathologicalLinearInLength": "INVESTIGATE_BEFORE_LAUNCH"
+      }
+    },
+    {
+      "bands": {
+        "architectureModel": {
+          "coreTrainingMinutes": 179.50505982441612,
+          "coreTrainingSeconds": 10770.303589464967,
+          "optimizerSteps": 140,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 807113,
+          "ratio": 1.0818100472964336,
+          "rows": 560,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 3.0656478878680464,
+          "totalMinutes": 183.9388732720828,
+          "totalSeconds": 11036.332396324968
+        },
+        "conservative": {
+          "coreTrainingMinutes": 215.709382950293,
+          "coreTrainingSeconds": 12942.56297701758,
+          "optimizerSteps": 140,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 807113,
+          "ratio": 1.3,
+          "rows": 560,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 3.669053273299328,
+          "totalMinutes": 220.14319639795968,
+          "totalSeconds": 13208.59178387758
+        },
+        "optimistic": {
+          "coreTrainingMinutes": 165.93029457714843,
+          "coreTrainingSeconds": 9955.817674628906,
+          "optimizerSteps": 140,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 807113,
+          "ratio": 1.0,
+          "rows": 560,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 2.8394018004135853,
+          "totalMinutes": 170.36410802481512,
+          "totalSeconds": 10221.846481488907
+        },
+        "pathologicalLinearInLength": {
+          "coreTrainingMinutes": 995.5817674628906,
+          "coreTrainingSeconds": 59734.90604777344,
+          "optimizerSteps": 140,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 807113,
+          "ratio": 6.0,
+          "rows": 560,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 16.66692634850929,
+          "totalMinutes": 1000.0155809105573,
+          "totalSeconds": 60000.93485463344
+        }
+      },
+      "centralTotalHours": 3.0656478878680464,
+      "centralTotalMinutes": 183.9388732720828,
+      "id": "B_GOVERNED_560_ROWS",
+      "inGovernedContract": true,
+      "label": "TRAIN = 560, context 3072 (the currently GOVERNED EXP-002 split)",
+      "processedTokens": 807113,
+      "rows": 560,
+      "verdict": "INVESTIGATE_BEFORE_LAUNCH",
+      "verdictRange": {
+        "architectureModel": "INVESTIGATE_BEFORE_LAUNCH",
+        "conservative": "INVESTIGATE_BEFORE_LAUNCH",
+        "optimistic": "ACCEPTABLE_ABOVE_TARGET",
+        "pathologicalLinearInLength": "DO_NOT_LAUNCH"
+      }
+    },
+    {
+      "bands": {
+        "architectureModel": {
+          "coreTrainingMinutes": 205.96378177801034,
+          "coreTrainingSeconds": 12357.82690668062,
+          "optimizerSteps": 160,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 926080,
+          "ratio": 1.0818100472964336,
+          "rows": 640,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 3.5066265870946167,
+          "totalMinutes": 210.397595225677,
+          "totalSeconds": 12623.85571354062
+        },
+        "conservative": {
+          "coreTrainingMinutes": 247.50455681250003,
+          "coreTrainingSeconds": 14850.273408750001,
+          "optimizerSteps": 160,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 926080,
+          "ratio": 1.3,
+          "rows": 640,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 4.198972837669444,
+          "totalMinutes": 251.9383702601667,
+          "totalSeconds": 15116.302215610001
+        },
+        "optimistic": {
+          "coreTrainingMinutes": 190.388120625,
+          "coreTrainingSeconds": 11423.2872375,
+          "optimizerSteps": 160,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 926080,
+          "ratio": 1.0,
+          "rows": 640,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 3.2470322345444447,
+          "totalMinutes": 194.8219340726667,
+          "totalSeconds": 11689.31604436
+        },
+        "pathologicalLinearInLength": {
+          "coreTrainingMinutes": 1142.32872375,
+          "coreTrainingSeconds": 68539.723425,
+          "optimizerSteps": 160,
+          "postTrainingSeconds": 2.454462751,
+          "processedTokens": 926080,
+          "ratio": 6.0,
+          "rows": 640,
+          "secondsPerTokenAt512": 0.01233509765625,
+          "setupMinutes": 4.392905735149999,
+          "setupSeconds": 263.574344109,
+          "totalHours": 19.112708953294447,
+          "totalMinutes": 1146.762537197667,
+          "totalSeconds": 68805.75223186001
+        }
+      },
+      "centralTotalHours": 3.5066265870946167,
+      "centralTotalMinutes": 210.397595225677,
+      "id": "C_ORIGINAL_GOLD_TRAIN_640",
+      "inGovernedContract": false,
+      "label": "TRAIN = 640, context 3072 (the original Gold v0.1 TRAIN split)",
+      "processedTokens": 926080,
+      "rows": 640,
+      "verdict": "INVESTIGATE_BEFORE_LAUNCH",
+      "verdictRange": {
+        "architectureModel": "INVESTIGATE_BEFORE_LAUNCH",
+        "conservative": "DO_NOT_LAUNCH",
+        "optimistic": "INVESTIGATE_BEFORE_LAUNCH",
+        "pathologicalLinearInLength": "DO_NOT_LAUNCH"
+      }
+    }
+  ],
+  "ratioBands": {
+    "architectureModel": 1.0818100472964336,
+    "conservative": 1.3,
+    "optimistic": 1.0,
+    "pathologicalLinearInLength": 6.0
+  },
+  "schemaVersion": "1.0.0",
+  "tokenGeometry": {
+    "allRows": {
+      "renderedTokensMax": 2689,
+      "renderedTokensMean": 1441.27,
+      "renderedTokensTotal": 807113,
+      "rows": 560
+    },
+    "firstHundredRows": {
+      "note": "The first 100 rows of the governed train ordering, i.e. a deterministic prefix. If a 100-row training set is adopted, the SUBSET DEFINITION must be governed explicitly; this projection uses the deterministic prefix as the concrete instance.",
+      "renderedTokensMax": 2689,
+      "renderedTokensMean": 1450.13,
+      "renderedTokensTotal": 145013,
+      "rows": 100
+    },
+    "governedSplitHash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+    "governedSplitRows": 560,
+    "source": "measured with the governed template and the pinned tokenizer"
+  },
+  "verdict": {
+    "governedConfigurationVerdict": "INVESTIGATE_BEFORE_LAUNCH",
+    "statedConfigurationWithinTarget": "WITHIN_TARGET_1_TO_2_HOURS",
+    "statement": "The stated 100-row configuration projects to well inside the 1-2 hour target band. The currently governed 560-row configuration projects to roughly 3 hours, which is the investigate-before-launch band rather than the do-not-launch band. Neither can run locally, and adopting the 100-row set is an ungovened material change."
+  }
+}

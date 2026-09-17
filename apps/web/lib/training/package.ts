@@ -201,6 +201,64 @@ export function toManifest(pkg: TrainingPackage): Record<string, unknown> {
     base_model: pkg.baseModel,
     base_model_revision: pkg.baseModelRevision,
     loader_model_id: pkg.loaderModelId,
+    // The loader revision is pinned so the trained representation cannot drift
+    // with a third-party repository. Optional and additive.
+    ...(pkg.loaderModelRevision ? { loader_model_revision: pkg.loaderModelRevision } : {}),
+    // ADDITIVE OPTIONAL EXTENSION. Present only for a run that declares the
+    // governed EXP-002 contract, so historical manifests stay byte-stable.
+    ...(pkg.exp002
+      ? {
+          exp002: {
+            recipe_hash: pkg.exp002.recipeHash,
+            governed_chat_template_sha256: pkg.exp002.governedChatTemplateSha256,
+            governed_reasoning_effort: pkg.exp002.governedReasoningEffort,
+            governed_system_date: pkg.exp002.governedSystemDate,
+            role_sequence: pkg.exp002.roleSequence,
+            final_channel: pkg.exp002.finalChannel,
+            terminator: pkg.exp002.terminator,
+            ignore_index: pkg.exp002.ignoreIndex,
+            declared_dtype: pkg.exp002.declaredDtype,
+            loss_contract: {
+              kind: pkg.exp002.lossContract.kind,
+              relies_on_trainer_default: pkg.exp002.lossContract.reliesOnTrainerDefault,
+              collator: pkg.exp002.lossContract.collator,
+              fail_closed_on_zero_supervised_row:
+                pkg.exp002.lossContract.failClosedOnZeroSupervisedRow,
+            },
+            splits: {
+              train: {
+                file: pkg.exp002.splits.train.file,
+                rows: pkg.exp002.splits.train.rows,
+                split_hash: pkg.exp002.splits.train.splitHash,
+              },
+              dev: {
+                file: pkg.exp002.splits.dev.file,
+                rows: pkg.exp002.splits.dev.rows,
+                split_hash: pkg.exp002.splits.dev.splitHash,
+              },
+              qualification: {
+                file: pkg.exp002.splits.qualification.file,
+                rows: pkg.exp002.splits.qualification.rows,
+                split_hash: pkg.exp002.splits.qualification.splitHash,
+                read_policy: pkg.exp002.splits.qualification.readPolicy,
+              },
+              split_seed: pkg.exp002.splits.splitSeed,
+            },
+            consumed_test: {
+              split_hash: pkg.exp002.consumedTest.splitHash,
+              reusable_as_promotion_evidence:
+                pkg.exp002.consumedTest.reusableAsPromotionEvidence,
+            },
+            context_policy: {
+              chosen_context_length: pkg.exp002.contextPolicy.chosenContextLength,
+              measured_max_rendered_tokens:
+                pkg.exp002.contextPolicy.measuredMaxRenderedTokens,
+              rule: pkg.exp002.contextPolicy.rule,
+            },
+            qualification_sealed: pkg.exp002.qualificationSealed,
+          },
+        }
+      : {}),
     dataset: {
       dataset_id: pkg.dataset.datasetId,
       ...(pkg.schemaVersion === "1.0.0"

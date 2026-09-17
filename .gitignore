@@ -103,3 +103,14 @@ Thumbs.db
 # Next.js generated
 # --------------------------------------------------------------------------
 next-env.d.ts
+
+# --------------------------------------------------------------------------
+# EXP-002 recovered Kaggle artifacts — model binaries and runtime output.
+# Evidence is referenced by hash in governance; the payloads are not versioned.
+# --------------------------------------------------------------------------
+data/derived/exp002/pilot-recovered/
+data/derived/exp002/kaggle-pilot/
+data/derived/exp002/package/
+data/derived/exp002/package-pilot/
+data/derived/exp002/package-production/
+data/derived/exp002/splits/*.jsonl

@@ -1,0 +1,72 @@
+{
+  "artifactIdentity": {
+    "adapterBasePath": "unsloth/gpt-oss-20b-unsloth-bnb-4bit",
+    "adapterBytes": 31876192,
+    "adapterSha256": "8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e",
+    "baseModel": "openai/gpt-oss-20b",
+    "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "checkpoint25AdapterSha256": "8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e",
+    "checksumsRollup": "73a69398bbcb6adbc789e290088774b3c36be039f8ec1e3f3c7f0f829ce04902",
+    "completionMarker": "69477068f524892b0537167afe898cb026216e3bd802962f3d16126e4707f6b4",
+    "finalAdapterSha256": "8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e",
+    "loaderModelId": "unsloth/gpt-oss-20b",
+    "loaderRevision": "e220476dc09936adfed96d0451acfa3601c23bd7",
+    "packageId": "69477068f524892b0537167afe898cb026216e3bd802962f3d16126e4707f6b4",
+    "recipeHash": "d1851753a05a0d2b560ccd8d47b82318fd69261b66aa0e9274f259e67a0e93a3"
+  },
+  "authority": "Mission instruction to recover and verify the completed EXP-002 pilot artifact before any qualification or promotion step.",
+  "decision": "Record that GHARIBO-exp-002-pilot Kaggle version 6 reached KernelWorkerStatus.COMPLETE and that the recovered artifact PASSES all 29 integrity checks. The trained artifact is a LoRA adapter, NOT a merged model, over unsloth/gpt-oss-20b. This decision does NOT promote it, does NOT claim evaluation success, and does NOT open the sealed qualification split. It records the artifact identity, preserves the historical fact that the pilot was declared non-promotable at preparation time, and states that a further explicit governance decision is required before this artifact may enter the V1 promotion gate.",
+  "decisionHash": "f00f7e51b85d0bb841fefd076fb59fb0e56d7b38d9caf119042bd69f24813ffb",
+  "decisionId": "DEC-0055",
+  "integrity": {
+    "artifactPath": "data/derived/exp002/pilot-integrity.json",
+    "checks": 28,
+    "failed": [],
+    "verdict": "PASS"
+  },
+  "kernel": {
+    "ref": "vokaigharibo/gharibo-exp-002-pilot",
+    "status": "KernelWorkerStatus.COMPLETE",
+    "version": 6
+  },
+  "next": "AWAIT_QUALIFICATION_RUN_AUTHORIZATION",
+  "nonPromotableOrigin": {
+    "preserved": true,
+    "requirement": "Promotion of this exact artifact requires a NEW, truthful superseding governance decision taken AFTER a real qualification result exists. It cannot be granted retroactively and cannot be inferred from training completion.",
+    "statement": "The pilot was declared non-promotable pipeline validation when it was prepared (DEC-0052 pilotConfiguration promotable=false; DEC-0053 pilotPackage.v1Claim=false). That historical fact is PRESERVED and not rewritten. This decision therefore does not promote the artifact and does not claim V1."
+  },
+  "notAuthorized": [
+    "opening the sealed qualification split",
+    "any evaluation run",
+    "V1 creation",
+    "the 560-row production run"
+  ],
+  "notClaimed": [
+    "V1 promotion",
+    "evaluation success",
+    "qualification scoring",
+    "model quality",
+    "production readiness"
+  ],
+  "recordDate": "2026-09-17",
+  "recordKind": "EXP002_PILOT_COMPLETION_AND_INTEGRITY_VERIFICATION",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0054-pilot-v1-dtype-failure-and-v2-relaunch.json",
+    "governance/DEC-0053-kaggle-authorized-compute-host.json",
+    "data/derived/exp002/pilot-integrity.json",
+    "data/derived/exp002/package-pilot/launch-summary.json"
+  ],
+  "status": "PILOT_COMPLETE_INTEGRITY_PASS_NOT_YET_QUALIFIED_NOT_PROMOTED",
+  "trainingOutcome": {
+    "epochs": 1.0,
+    "finalStepLoss": null,
+    "logEntryCount": 26,
+    "optimizerSteps": 25,
+    "totalFlos": 1.7700506939896704e+16,
+    "trainLoss": 0.19649010464549066,
+    "trainRuntimeSeconds": 1419.1747,
+    "trainSamplesPerSecond": 0.07,
+    "trainStepsPerSecond": 0.018
+  }
+}

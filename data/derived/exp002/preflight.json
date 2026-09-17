@@ -1,0 +1,628 @@
+{
+  "artifactKind": "GHARIBO_EXP002_PREFLIGHT",
+  "schemaVersion": "1.0.0",
+  "experimentId": "GHARIBO-exp-002",
+  "recipeHash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee",
+  "recipe": {
+    "experimentId": "GHARIBO-exp-002",
+    "baseModel": "openai/gpt-oss-20b",
+    "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "loaderModelId": "unsloth/gpt-oss-20b",
+    "loaderModelRevision": "e220476dc09936adfed96d0451acfa3601c23bd7",
+    "governedChatTemplateSha256": "a4c9919cbbd4acdd51ccffe22da049264b1b73e59055fa58811a99efbd7c8146",
+    "governedReasoningEffort": "medium",
+    "governedSystemDate": "2026-09-15",
+    "roleSequence": "system -> user -> assistant",
+    "finalChannel": "final",
+    "terminator": "<|return|>",
+    "ignoreIndex": -100,
+    "lossContract": {
+      "kind": "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK",
+      "description": "Every token position outside the proven assistant span is set to -100 before collation; the collator pads labels with -100 and never rebuilds labels from input_ids. No trainer default is relied upon.",
+      "reliesOnTrainerDefault": false,
+      "assistantOnlyLossFlag": false,
+      "assistantOnlyLossFlagReason": "TRL's assistant_only_loss requires {% generation %} markers in the chat template. The governed gpt-oss template does not carry them, so the flag is not usable and an explicit mask is implemented instead.",
+      "collator": "AssistantOnlyCollator",
+      "failClosedOnZeroSupervisedRow": true
+    },
+    "splits": {
+      "train": {
+        "rows": 560,
+        "splitHash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8"
+      },
+      "dev": {
+        "rows": 80,
+        "splitHash": "77b8040e8a85d310a6e4ad1a81a013ad9b1b6c3775cc929202a9830f1e0d49ec"
+      },
+      "qualification": {
+        "rows": 80,
+        "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1"
+      },
+      "splitSeed": "20260917"
+    },
+    "sequenceLength": 3072,
+    "hyperparameters": {
+      "method": "QLoRA + SFT",
+      "quantization": "4-bit",
+      "epochs": 1,
+      "maxSteps": null,
+      "perDeviceTrainBatchSize": 1,
+      "gradientAccumulationSteps": 4,
+      "learningRate": 0.0002,
+      "warmupSteps": 5,
+      "lrSchedulerType": "linear",
+      "weightDecay": 0.01,
+      "optimizer": "adamw_8bit",
+      "seed": 20260917,
+      "lora": {
+        "r": 16,
+        "alpha": 16,
+        "dropout": 0,
+        "bias": "none"
+      },
+      "dtype": "float32",
+      "dtypeNote": "The Unsloth gpt-oss path on Turing refuses fp16 and trains in float32. Declared float32 rather than inheriting a declared fp16 that the engine overrides.",
+      "packing": false,
+      "gradientCheckpointing": "unsloth"
+    },
+    "checkpointPolicy": {
+      "saveStrategy": "steps",
+      "saveSteps": 140,
+      "saveTotalLimit": 2,
+      "resumeFromCheckpoint": null,
+      "selectionRule": "TERMINAL_CHECKPOINT_ONLY",
+      "selectionRuleDetail": "One epoch at 560 examples / (batch 1 x grad-accum 4) = 140 optimizer steps. The terminal checkpoint is the only candidate. No checkpoint may be selected using qualification-set performance."
+    },
+    "expectedRuntime": {
+      "worker": "KaggleTrainingWorker",
+      "provider": "Kaggle Notebooks free tier",
+      "accelerator": "NVIDIA T4 (Turing, sm_75)",
+      "acceleratorCount": 1,
+      "vramGbMinimum": 14,
+      "precision": "float32 (engine-imposed for gpt-oss on Turing)",
+      "bf16Supported": false,
+      "flashAttention2": false,
+      "multiGpuRequired": false,
+      "estimatedOptimizerSteps": 140,
+      "sessionLimitHours": 12,
+      "weeklyGpuQuotaHours": 30,
+      "persistence": "/kaggle/working only (<= 20 GB)",
+      "kaggleSecretsOnly": true
+    }
+  },
+  "data": {
+    "trainRows": 560,
+    "devRows": 80,
+    "qualificationRows": 80,
+    "splitSeed": "20260917",
+    "splitHashes": {
+      "train": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+      "dev": "77b8040e8a85d310a6e4ad1a81a013ad9b1b6c3775cc929202a9830f1e0d49ec",
+      "qualification": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1"
+    },
+    "qualificationSealed": true,
+    "consumedTestSplitHash": "55466db2de013b7ff629eb87fd9f66bd30f86afc2df4f3ffc139e45c8350e45b",
+    "consumedTestUsed": false,
+    "lineageDisclosure": {
+      "derivedFrom": "GHARIBO-Research-Gold-v0.1 TRAIN + VALIDATION",
+      "independentOfConsumedTest": true,
+      "newIndependentSourceCorpus": false,
+      "whatThisDoesNotSupport": "A claim of an independent second benchmark corpus, or any use of the consumed Gold v0.1 TEST split as promotion evidence.",
+      "whatThisSupports": "A held-out qualification measurement over the EXP-002 development distribution, fixed before training and never inspected.",
+      "whyNoNewCorpus": "The repository has no committed deterministic generator mapping raw UCL source records to gold examples; the 800 governed examples were sampled during the M3A session. A genuinely new gold cohort therefore requires a new governed annotation process and cannot be produced by re-running code."
+    }
+  },
+  "contractAgreement": {
+    "governedDtype": "float32",
+    "governedSequenceLength": 3072,
+    "packages": [
+      {
+        "mode": "pilot",
+        "manifestDtype": "float32",
+        "recipeDtype": "float32",
+        "governedDtype": "float32",
+        "deliveredDtype": "float32",
+        "deliveredDeclaredDtype": "float32",
+        "deliveredSequenceLength": 3072,
+        "assertsDtypeIsGoverned": true,
+        "rejectsSilentDowngrade": true,
+        "assertsContextLength": true,
+        "agree": true
+      },
+      {
+        "mode": "production",
+        "manifestDtype": "float32",
+        "recipeDtype": "float32",
+        "governedDtype": "float32",
+        "deliveredDtype": "float32",
+        "deliveredDeclaredDtype": "float32",
+        "deliveredSequenceLength": 3072,
+        "assertsDtypeIsGoverned": true,
+        "rejectsSilentDowngrade": true,
+        "assertsContextLength": true,
+        "agree": true
+      }
+    ],
+    "statement": "Each generated package's declared dtype, the governed recipe dtype, and the dtype the rendered notebook asserts are all required to be equal. Pilot Kaggle Version 1 failed pre-training because they were not."
+  },
+  "tokenizer": {
+    "class": "PreTrainedTokenizerFast",
+    "governedChatTemplateBytes": 16738,
+    "governedChatTemplatePath": "apps/web/lib/workers/kaggle/governed-chat-template.jinja",
+    "governedChatTemplateSha256": "a4c9919cbbd4acdd51ccffe22da049264b1b73e59055fa58811a99efbd7c8146",
+    "modelMaxLength": 1e+30,
+    "pinnedSystemDate": "2026-09-15",
+    "reasoningEffort": "medium",
+    "requestedId": "C:/Dev/GHARIBO/models/weights/exp002-tokenizer",
+    "resolvedNameOrPath": "C:/Dev/GHARIBO/models/weights/exp002-tokenizer",
+    "revision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "tokenizersVersion": "0.22.2",
+    "transformersVersion": "4.56.2",
+    "vocabSize": 199998
+  },
+  "roleSequence": "system -> user -> assistant",
+  "contextPolicy": {
+    "chosenContextLength": 3072,
+    "measuredMaxRenderedTokens": 2689,
+    "rule": "smallest candidate context with zero partial and zero zero-visibility assistant spans across TRAIN and DEV",
+    "train": {
+      "renderedTokens": {
+        "count": 560,
+        "max": 2689,
+        "mean": 1441.2732,
+        "min": 949,
+        "p50": 1313,
+        "p90": 1873,
+        "p95": 2139,
+        "p99": 2491
+      },
+      "assistantStart": {
+        "count": 560,
+        "max": 1523,
+        "mean": 902.5268,
+        "min": 652,
+        "p50": 840,
+        "p90": 1116,
+        "p95": 1248,
+        "p99": 1424
+      },
+      "assistantEnd": {
+        "count": 560,
+        "max": 2689,
+        "mean": 1441.2732,
+        "min": 949,
+        "p50": 1313,
+        "p90": 1873,
+        "p95": 2139,
+        "p99": 2491
+      },
+      "supervisedTokens": {
+        "count": 560,
+        "max": 1166,
+        "mean": 538.7464,
+        "min": 297,
+        "p50": 472,
+        "p90": 757,
+        "p95": 891,
+        "p99": 1067
+      },
+      "assistantContentTokens": {
+        "count": 560,
+        "max": 1162,
+        "mean": 534.7464,
+        "min": 293,
+        "p50": 468,
+        "p90": 753,
+        "p95": 887,
+        "p99": 1063
+      }
+    },
+    "dev": {
+      "renderedTokens": {
+        "count": 80,
+        "max": 2493,
+        "mean": 1436.7375,
+        "min": 978,
+        "p50": 1204,
+        "p90": 2071,
+        "p95": 2185,
+        "p99": 2284
+      },
+      "assistantStart": {
+        "count": 80,
+        "max": 1435,
+        "mean": 900.125,
+        "min": 667,
+        "p50": 786,
+        "p90": 1217,
+        "p95": 1273,
+        "p99": 1321
+      },
+      "assistantEnd": {
+        "count": 80,
+        "max": 2493,
+        "mean": 1436.7375,
+        "min": 978,
+        "p50": 1204,
+        "p90": 2071,
+        "p95": 2185,
+        "p99": 2284
+      },
+      "supervisedTokens": {
+        "count": 80,
+        "max": 1058,
+        "mean": 536.6125,
+        "min": 311,
+        "p50": 420,
+        "p90": 857,
+        "p95": 912,
+        "p99": 963
+      },
+      "assistantContentTokens": {
+        "count": 80,
+        "max": 1054,
+        "mean": 532.6125,
+        "min": 307,
+        "p50": 416,
+        "p90": 853,
+        "p95": 908,
+        "p99": 959
+      }
+    },
+    "visibilityAtChosenContext": {
+      "trainFull": 560,
+      "trainPartial": 0,
+      "trainZero": 0,
+      "devFull": 80,
+      "devPartial": 0,
+      "devZero": 0
+    },
+    "visibilityAcrossCandidateContexts": {
+      "train": {
+        "1024": {
+          "full": 11,
+          "partial": 387,
+          "zero": 162
+        },
+        "1536": {
+          "full": 372,
+          "partial": 188,
+          "zero": 0
+        },
+        "2048": {
+          "full": 525,
+          "partial": 35,
+          "zero": 0
+        },
+        "2560": {
+          "full": 558,
+          "partial": 2,
+          "zero": 0
+        },
+        "3072": {
+          "full": 560,
+          "partial": 0,
+          "zero": 0
+        },
+        "3584": {
+          "full": 560,
+          "partial": 0,
+          "zero": 0
+        },
+        "4096": {
+          "full": 560,
+          "partial": 0,
+          "zero": 0
+        }
+      },
+      "dev": {
+        "1024": {
+          "full": 5,
+          "partial": 49,
+          "zero": 26
+        },
+        "1536": {
+          "full": 53,
+          "partial": 27,
+          "zero": 0
+        },
+        "2048": {
+          "full": 69,
+          "partial": 11,
+          "zero": 0
+        },
+        "2560": {
+          "full": 80,
+          "partial": 0,
+          "zero": 0
+        },
+        "3072": {
+          "full": 80,
+          "partial": 0,
+          "zero": 0
+        },
+        "3584": {
+          "full": 80,
+          "partial": 0,
+          "zero": 0
+        },
+        "4096": {
+          "full": 80,
+          "partial": 0,
+          "zero": 0
+        }
+      }
+    }
+  },
+  "lossContract": {
+    "kind": "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK",
+    "description": "Every token position outside the proven assistant span is set to -100 before collation; the collator pads labels with -100 and never rebuilds labels from input_ids. No trainer default is relied upon.",
+    "reliesOnTrainerDefault": false,
+    "assistantOnlyLossFlag": false,
+    "assistantOnlyLossFlagReason": "TRL's assistant_only_loss requires {% generation %} markers in the chat template. The governed gpt-oss template does not carry them, so the flag is not usable and an explicit mask is implemented instead.",
+    "collator": "AssistantOnlyCollator",
+    "failClosedOnZeroSupervisedRow": true,
+    "supervisedTokens": {
+      "train": 297,
+      "dev": 311,
+      "trainMin": 297
+    },
+    "batchProofs": [
+      {
+        "batchIndex": 0,
+        "checks": {
+          "batchRowsMatch": true,
+          "everyRowHasSupervision": true,
+          "labelsAre2d": true,
+          "paddingMasked": true,
+          "paddingNotSupervised": true,
+          "shapesAgree": true,
+          "supervisedMatchInput": true
+        },
+        "ok": true,
+        "perRowSupervised": [
+          385,
+          367,
+          728,
+          402
+        ],
+        "rows": 4,
+        "totalMasked": 5378,
+        "totalSupervised": 1882
+      },
+      {
+        "batchIndex": 1,
+        "checks": {
+          "batchRowsMatch": true,
+          "everyRowHasSupervision": true,
+          "labelsAre2d": true,
+          "paddingMasked": true,
+          "paddingNotSupervised": true,
+          "shapesAgree": true,
+          "supervisedMatchInput": true
+        },
+        "ok": true,
+        "perRowSupervised": [
+          595,
+          892,
+          1166,
+          412
+        ],
+        "rows": 4,
+        "totalMasked": 7691,
+        "totalSupervised": 3065
+      },
+      {
+        "batchIndex": 2,
+        "checks": {
+          "batchRowsMatch": true,
+          "everyRowHasSupervision": true,
+          "labelsAre2d": true,
+          "paddingMasked": true,
+          "paddingNotSupervised": true,
+          "shapesAgree": true,
+          "supervisedMatchInput": true
+        },
+        "ok": true,
+        "perRowSupervised": [
+          571,
+          720,
+          727,
+          407
+        ],
+        "rows": 4,
+        "totalMasked": 4819,
+        "totalSupervised": 2425
+      },
+      {
+        "batchIndex": 3,
+        "checks": {
+          "batchRowsMatch": true,
+          "everyRowHasSupervision": true,
+          "labelsAre2d": true,
+          "paddingMasked": true,
+          "paddingNotSupervised": true,
+          "shapesAgree": true,
+          "supervisedMatchInput": true
+        },
+        "ok": true,
+        "perRowSupervised": [
+          721,
+          396,
+          453,
+          396
+        ],
+        "rows": 4,
+        "totalMasked": 5234,
+        "totalSupervised": 1966
+      },
+      {
+        "batchIndex": 4,
+        "checks": {
+          "batchRowsMatch": true,
+          "everyRowHasSupervision": true,
+          "labelsAre2d": true,
+          "paddingMasked": true,
+          "paddingNotSupervised": true,
+          "shapesAgree": true,
+          "supervisedMatchInput": true
+        },
+        "ok": true,
+        "perRowSupervised": [
+          459,
+          353,
+          754,
+          380
+        ],
+        "rows": 4,
+        "totalMasked": 5522,
+        "totalSupervised": 1946
+      },
+      {
+        "batchIndex": 5,
+        "checks": {
+          "batchRowsMatch": true,
+          "everyRowHasSupervision": true,
+          "labelsAre2d": true,
+          "paddingMasked": true,
+          "paddingNotSupervised": true,
+          "shapesAgree": true,
+          "supervisedMatchInput": true
+        },
+        "ok": true,
+        "perRowSupervised": [
+          435,
+          342,
+          774,
+          403
+        ],
+        "rows": 4,
+        "totalMasked": 5686,
+        "totalSupervised": 1954
+      },
+      {
+        "batchIndex": 6,
+        "checks": {
+          "batchRowsMatch": true,
+          "everyRowHasSupervision": true,
+          "labelsAre2d": true,
+          "paddingMasked": true,
+          "paddingNotSupervised": true,
+          "shapesAgree": true,
+          "supervisedMatchInput": true
+        },
+        "ok": true,
+        "perRowSupervised": [
+          573,
+          523,
+          451,
+          385
+        ],
+        "rows": 4,
+        "totalMasked": 4100,
+        "totalSupervised": 1932
+      },
+      {
+        "batchIndex": 7,
+        "checks": {
+          "batchRowsMatch": true,
+          "everyRowHasSupervision": true,
+          "labelsAre2d": true,
+          "paddingMasked": true,
+          "paddingNotSupervised": true,
+          "shapesAgree": true,
+          "supervisedMatchInput": true
+        },
+        "ok": true,
+        "perRowSupervised": [
+          512,
+          569,
+          528,
+          599
+        ],
+        "rows": 4,
+        "totalMasked": 4068,
+        "totalSupervised": 2208
+      }
+    ],
+    "perExampleMaskChecksPass": true
+  },
+  "harmonyFinalContract": {
+    "finalChannel": "final",
+    "terminator": "<|return|>",
+    "hiddenChannels": [
+      "analysis",
+      "commentary"
+    ],
+    "deterministic": true,
+    "regression": {
+      "pass": true,
+      "caseCount": 18,
+      "passed": 18,
+      "failed": 0,
+      "failures": []
+    }
+  },
+  "expectedRuntime": {
+    "worker": "KaggleTrainingWorker",
+    "provider": "Kaggle Notebooks free tier",
+    "accelerator": "NVIDIA T4 (Turing, sm_75)",
+    "acceleratorCount": 1,
+    "vramGbMinimum": 14,
+    "precision": "float32 (engine-imposed for gpt-oss on Turing)",
+    "bf16Supported": false,
+    "flashAttention2": false,
+    "multiGpuRequired": false,
+    "estimatedOptimizerSteps": 140,
+    "sessionLimitHours": 12,
+    "weeklyGpuQuotaHours": 30,
+    "persistence": "/kaggle/working only (<= 20 GB)",
+    "kaggleSecretsOnly": true
+  },
+  "isolation": {
+    "testAccessed": false,
+    "testPolicy": "The consumed Gold v0.1 TEST split is never read, tokenized or scored as EXP-002 promotion evidence.",
+    "qualificationReadPolicy": "SEALED_UNTIL_V1_PROMOTION_GATE",
+    "kagglePayloadContainsTest": false,
+    "kagglePayloadContainsQualification": false,
+    "kagglePayloadContainsGoldAnswersForScoring": false
+  },
+  "externalLaunch": {
+    "required": true,
+    "authorizationPhrase": "AUTHORIZE EXP-002 TRAINING LAUNCH",
+    "authorizedLaunches": 0,
+    "maximumKernelPushes": 1,
+    "kernelPushesPerformed": 0
+  },
+  "gates": {
+    "trainRowsMatchGovernedSplit": true,
+    "devRowsMatchGovernedSplit": true,
+    "splitIsPartitionOf720": true,
+    "splitHashesMatchManifest": true,
+    "zeroTrainAssistantEntirelyOutsideWindow": true,
+    "zeroTrainAssistantTruncated": true,
+    "zeroDevAssistantTruncated": true,
+    "zeroTrainZeroSupervisedTokens": true,
+    "zeroDevZeroSupervisedTokens": true,
+    "everyTrainRowHasSupervisedTail": true,
+    "measuredMaxFitsChosenContext": true,
+    "governedTemplateHashMatches": true,
+    "tokenizerIdentityMatchesGovernedTemplate": true,
+    "pinnedSystemDateApplied": true,
+    "lossContractIsExplicitMask": true,
+    "maskingContractVerdictPass": true,
+    "batchLossContractPasses": true,
+    "roleSequenceIsGoverned": true,
+    "roleSequenceParityTrainDev": true,
+    "trainInferencePromptParityProvenByPrefix": true,
+    "extractionRegressionPass": true,
+    "packageDtypeAgreesAcrossArtifacts": true,
+    "pilotPackageDtypeIsGoverned": true,
+    "productionPackageDtypeIsGoverned": true,
+    "noConsumedTestAccess": true,
+    "qualificationSealed": true,
+    "consumedTestNotReusable": true
+  },
+  "verdict": "PASS",
+  "failedGates": []
+}

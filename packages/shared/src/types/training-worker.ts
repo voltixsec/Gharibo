@@ -25,7 +25,14 @@ export interface WorkerCapabilities {
   /** e.g. "NVIDIA T4 (16 GB, sm_75)". */
   gpuClass: string;
   /** T4 = Turing: bf16 unsupported. */
-  dtype: "fp16";
+  /**
+   * The dtype the worker can actually deliver for the governed model.
+   *
+   * This is the dtype the ENGINE honours, not the one the hardware nominally
+   * prefers. Unsloth refuses fp16 for gpt-oss on Turing and forces float32
+   * (DEC-0030 runtimeDeviation), so the Kaggle T4 capability is float32.
+   */
+  dtype: "fp16" | "bf16" | "float32";
   supportsResume: boolean;
   /** Kaggle Secrets. */
   supportsSecrets: boolean;

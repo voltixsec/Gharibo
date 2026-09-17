@@ -2898,6 +2898,669 @@ function isExp001ForensicClosureGoldState(state) {
   );
 }
 
+/**
+ * DEC-0049 EXP-002 training-contract preparation.
+ *
+ * This layer records PREPARATION ONLY. It does not authorize a Kaggle launch, a
+ * training run, an evaluation or a promotion, and it does not weaken any
+ * historical authorization: it recognizes the exact v1.28 EXP-002 contract
+ * preparation, then reconstructs the accepted v1.27 DEC-0048 forensic closure
+ * and delegates to the existing validator beneath it.
+ */
+function isExp002ContractPreparedGoldState(state) {
+  if (
+    state?.masterStateVersion !== "1.28.0" ||
+    state?.updatedAt !== "2026-09-17"
+  ) {
+    return false;
+  }
+
+  const training = state?.training?.exp002;
+  const experiment = state?.experiments?.["GHARIBO-exp-002"];
+  const blocker = (state?.blockers || []).find((b) => b?.id === "BLK-0005");
+
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0049");
+
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.date !== "2026-09-17" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // PREPARATION ONLY. Nothing may have been launched, trained or measured.
+    !training ||
+    training.status !== "CONTRACT_PREPARED_NOT_AUTHORIZED" ||
+    training.trainingAuthorized !== false ||
+    training.kernelPushesPerformed !== 0 ||
+    training.maximumKernelPushes !== 1 ||
+    training.testPayloadInBundle !== false ||
+    training.qualificationPayloadInBundle !== false ||
+    training.preflightVerdict !== "PASS" ||
+
+    !experiment ||
+    experiment.trainingAuthorized !== false ||
+    experiment.authorizationDecisionId !== null ||
+    experiment.kernelPushesPerformed !== 0 ||
+    experiment.kernelPushesRemaining !== 1 ||
+    experiment.evaluationStatus !== "NOT_RUN" ||
+    experiment.evaluationScore !== null ||
+    experiment.promotable !== false ||
+    experiment.readinessStatus !== "CONTRACT_PREPARED_AWAITING_LAUNCH_AUTHORIZATION" ||
+    experiment.lossContract !== "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK" ||
+    experiment.qualificationSplit?.policy !== "SEALED_UNTIL_V1_PROMOTION_GATE" ||
+
+    // The EXP-001 closure must remain exactly as DEC-0048 left it.
+    state?.experiments?.["GHARIBO-exp-001"]?.promotable !== false ||
+    state?.experiments?.["GHARIBO-exp-001"]?.readinessStatus !==
+      "CLOSED_NON_PROMOTABLE_TRAINING_OBJECTIVE_DEFECT" ||
+
+    // No evaluation result may be claimed anywhere.
+    state?.training?.evaluationResults !== 0 ||
+
+    // The independent-corpus gap must stay recorded, not be quietly dropped.
+    !blocker ||
+    blocker.status !== "OPEN" ||
+    blocker.blocks?.includes("V1-PROMOTION") !== true
+  ) {
+    return false;
+  }
+
+  // Strip ONLY the DEC-0049 layer and prove the accepted state underneath.
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.27.0";
+
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0049");
+
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.28.0");
+
+  delete before.experiments["GHARIBO-exp-002"];
+
+  before.models.derivedModels = (before.models.derivedModels || []).filter(
+    (m) => m?.id !== "GHARIBO-exp-002" && m?.id !== "GHARIBO-V1"
+  );
+
+  delete before.training.exp002;
+
+  before.blockers = (before.blockers || []).filter((b) => b?.id !== "BLK-0005");
+
+  before.nextActions = (before.nextActions || []).filter(
+    (a) => a?.id !== "ACT-0003" && a?.id !== "ACT-0004"
+  );
+
+  for (const action of before.nextActions) {
+    if (action.id === "ACT-0001") {
+      action.status = "READY_FOR_THE_SINGLE_KAGGLE_KERNEL_PUSH";
+      delete action.note;
+    }
+    if (action.id === "ACT-0002") {
+      delete action.status;
+      delete action.note;
+    }
+  }
+
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:preflight"
+  );
+
+  return isExp001ForensicClosureGoldState(before);
+}
+
+/**
+ * DEC-0050 LOCAL ONLY execution policy + local hardware infeasibility.
+ *
+ * This layer records a POLICY CHANGE and a HARDWARE DETERMINATION. It authorizes
+ * nothing to run, and it does not weaken any historical authorization: it
+ * recognizes the exact v1.29 state, then reconstructs the accepted v1.28 DEC-0049
+ * contract preparation and delegates to the validator beneath it.
+ */
+function isLocalOnlyPolicyGoldState(state) {
+  if (
+    state?.masterStateVersion !== "1.29.0" ||
+    state?.updatedAt !== "2026-09-17"
+  ) {
+    return false;
+  }
+
+  const training = state?.training?.exp002;
+  const experiment = state?.experiments?.["GHARIBO-exp-002"];
+  const blocker = (state?.blockers || []).find((b) => b?.id === "BLK-0006");
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0050");
+
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.date !== "2026-09-17" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // LOCAL ONLY, and nothing running anywhere.
+    !training ||
+    training.status !== "BLOCKED_LOCAL_HARDWARE_INFEASIBLE" ||
+    training.executionPolicy !== "LOCAL_ONLY" ||
+    training.trainingAuthorized !== false ||
+    training.localHardwareVerdict !== "NO" ||
+    training.kaggleAuthorized !== false ||
+    training.testPayloadInBundle !== false ||
+    training.qualificationPayloadInBundle !== false ||
+
+    // The Kaggle launch gate must be GONE, not merely annotated.
+    "authorizationPhrase" in training ||
+    "maximumKernelPushes" in training ||
+    "kernelPushesPerformed" in training ||
+
+    !experiment ||
+    experiment.trainingAuthorized !== false ||
+    experiment.evaluationStatus !== "NOT_RUN" ||
+    experiment.evaluationScore !== null ||
+    experiment.promotable !== false ||
+    experiment.executionPolicy !== "LOCAL_ONLY" ||
+    experiment.localHardwareVerdict !== "NO" ||
+    experiment.readinessStatus !== "BLOCKED_LOCAL_HARDWARE_INFEASIBLE" ||
+    experiment.qualificationSplit?.policy !== "SEALED_UNTIL_V1_PROMOTION_GATE" ||
+
+    // No evaluation result may be claimed anywhere.
+    state?.training?.evaluationResults !== 0 ||
+
+    // The EXP-001 closure must remain exactly as DEC-0048 left it.
+    state?.experiments?.["GHARIBO-exp-001"]?.promotable !== false ||
+
+    // Both open issues must stay recorded.
+    !blocker ||
+    blocker.status !== "OPEN" ||
+    blocker.blocks?.includes("V1-PROMOTION") !== true ||
+    (state?.blockers || []).find((b) => b?.id === "BLK-0005")?.status !== "OPEN" ||
+
+    // The superseded Kaggle next-action must not be operative.
+    (state?.nextActions || []).find((a) => a?.id === "ACT-0003")?.status !== "SUPERSEDED"
+  ) {
+    return false;
+  }
+
+  // Strip ONLY the DEC-0050 layer and prove the accepted state underneath.
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.28.0";
+
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0050");
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.29.0");
+  before.blockers = (before.blockers || []).filter((b) => b?.id !== "BLK-0006");
+  before.nextActions = (before.nextActions || []).filter((a) => a?.id !== "ACT-0005");
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:local-hardware"
+  );
+
+  for (const action of before.nextActions) {
+    if (action.id === "ACT-0003") {
+      action.status = "BLOCKED_ON_HUMAN_AUTHORIZATION";
+      delete action.supersededBy;
+      action.action =
+        "Await the single explicit human authorization 'AUTHORIZE EXP-002 TRAINING " +
+        "LAUNCH' before any Kaggle kernel push. The prepared package, notebook and " +
+        "private training payload are ready; one push is the maximum.";
+      action.requires = "DEC-0049";
+      action.references = [
+        "governance/DEC-0049-exp002-training-contract-preparation.json",
+        "data/derived/exp002/preflight.json",
+        "data/derived/exp002/package/launch-summary.json",
+      ];
+      action.note =
+        "Zero pushes performed; one available. No training, evaluation or promotion performed.";
+    }
+  }
+
+  const e = before.experiments["GHARIBO-exp-002"];
+  e.readinessStatus = "CONTRACT_PREPARED_AWAITING_LAUNCH_AUTHORIZATION";
+  e.promotionBlockedReason =
+    "Training has not been authorized, no run exists and no evaluation result exists. " +
+    "Additionally BLK-0005 records that no independent source corpus exists, so any V1 " +
+    "claim must state that it rests on the sealed EXP-002 qualification split.";
+  delete e.executionPolicy;
+  delete e.localHardwareVerdict;
+  delete e.localHardwareArtifact;
+
+  const t = before.training.exp002;
+  t.status = "CONTRACT_PREPARED_NOT_AUTHORIZED";
+  t.trainingAuthorized = false;
+  t.authorizationPhrase = "AUTHORIZE EXP-002 TRAINING LAUNCH";
+  t.maximumKernelPushes = 1;
+  t.kernelPushesPerformed = 0;
+  delete t.executionPolicy;
+  delete t.localHardwareVerdict;
+  delete t.localHardwareArtifact;
+  delete t.kaggleAuthorized;
+  delete t.supersededNextAction;
+
+  return isExp002ContractPreparedGoldState(before);
+}
+
+/**
+ * DEC-0051 local V1 runtime contract + local evaluation controller.
+ *
+ * This layer records LOCAL IMPLEMENTATION only. It authorizes nothing to run and
+ * weakens no historical authorization: it recognizes the exact v1.30 state, then
+ * reconstructs the accepted v1.29 LOCAL ONLY policy layer and delegates beneath it.
+ */
+function isLocalRuntimeContractGoldState(state) {
+  if (
+    state?.masterStateVersion !== "1.30.0" ||
+    state?.updatedAt !== "2026-09-17"
+  ) {
+    return false;
+  }
+
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0051");
+  const training = state?.training?.exp002;
+  const experiment = state?.experiments?.["GHARIBO-exp-002"];
+
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.date !== "2026-09-17" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // The LOCAL ONLY posture from DEC-0050 must be entirely unchanged.
+    training?.executionPolicy !== "LOCAL_ONLY" ||
+    training?.kaggleAuthorized !== false ||
+    training?.trainingAuthorized !== false ||
+    training?.localHardwareVerdict !== "NO" ||
+    "authorizationPhrase" in (training || {}) ||
+
+    experiment?.executionPolicy !== "LOCAL_ONLY" ||
+    experiment?.trainingAuthorized !== false ||
+    experiment?.promotable !== false ||
+    experiment?.evaluationScore !== null ||
+    experiment?.localHardwareVerdict !== "NO" ||
+
+    // Still nothing measured anywhere.
+    state?.training?.evaluationResults !== 0 ||
+
+    // Both open issues must remain recorded.
+    (state?.blockers || []).find((b) => b?.id === "BLK-0005")?.status !== "OPEN" ||
+    (state?.blockers || []).find((b) => b?.id === "BLK-0006")?.status !== "OPEN"
+  ) {
+    return false;
+  }
+
+  // Strip ONLY the DEC-0051 layer and prove the accepted state underneath.
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.29.0";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0051");
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.30.0");
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:v1-runtime-contract"
+  );
+
+  return isLocalOnlyPolicyGoldState(before);
+}
+
+/**
+ * DEC-0052 empirical runtime projection + governed 100-row pilot.
+ *
+ * Records a PROJECTION and a PILOT configuration only. It does not authorize a
+ * run, and it does not reduce the governed 560-row contract: this layer asserts
+ * that the governed split hash is UNCHANGED. It recognizes the exact v1.31 state,
+ * then reconstructs the accepted v1.30 layer and delegates beneath it.
+ */
+function isRuntimeProjectionGoldState(state) {
+  if (
+    state?.masterStateVersion !== "1.31.0" ||
+    state?.updatedAt !== "2026-09-17"
+  ) {
+    return false;
+  }
+
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0052");
+  const training = state?.training?.exp002;
+  const projection = training?.runtimeProjection;
+  const pilot = training?.pilotConfiguration;
+  const experiment = state?.experiments?.["GHARIBO-exp-002"];
+
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.date !== "2026-09-17" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // LOCAL ONLY and nothing running.
+    training?.executionPolicy !== "LOCAL_ONLY" ||
+    training?.kaggleAuthorized !== false ||
+    training?.trainingAuthorized !== false ||
+    training?.localHardwareVerdict !== "NO" ||
+    "authorizationPhrase" in (training || {}) ||
+
+    // The projection must be recorded and must not have crossed the hard stop.
+    !projection ||
+    projection.hardStopHours !== 4.0 ||
+    projection.governedConfigProjectedHours > projection.hardStopHours ||
+    projection.pilotConfigProjectedHours > projection.hardStopHours ||
+
+    // The PILOT must not be promotable or authorized.
+    !pilot ||
+    pilot.promotable !== false ||
+    pilot.trainingAuthorized !== false ||
+    pilot.rows !== 100 ||
+    pilot.optimizerSteps !== 25 ||
+
+    // The governed production contract must be UNCHANGED.
+    experiment?.qualificationSplit?.policy !== "SEALED_UNTIL_V1_PROMOTION_GATE" ||
+    experiment?.trainingAuthorized !== false ||
+    experiment?.promotable !== false ||
+    experiment?.evaluationScore !== null ||
+    experiment?.localHardwareVerdict !== "NO" ||
+
+    // Still nothing measured anywhere.
+    state?.training?.evaluationResults !== 0 ||
+
+    // Both open issues must remain recorded.
+    (state?.blockers || []).find((b) => b?.id === "BLK-0005")?.status !== "OPEN" ||
+    (state?.blockers || []).find((b) => b?.id === "BLK-0006")?.status !== "OPEN"
+  ) {
+    return false;
+  }
+
+  // Strip ONLY the DEC-0052 layer and prove the accepted state underneath.
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.30.0";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0052");
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.31.0");
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:runtime-projection"
+  );
+  delete before.training.exp002.runtimeProjection;
+  delete before.training.exp002.pilotConfiguration;
+
+  return isLocalRuntimeContractGoldState(before);
+}
+
+/**
+ * DEC-0053 Kaggle authorized as the EXP-002 training compute host.
+ *
+ * Supersedes the DEC-0050 restriction of compute to local hardware and re-scopes
+ * BLK-0006 so it no longer blocks training. It authorizes no RUN: it recognizes
+ * the exact v1.32 state, then reconstructs the accepted v1.31 layer and delegates.
+ */
+function isKaggleComputeAuthorizedGoldState(state) {
+  if (
+    state?.masterStateVersion !== "1.32.0" ||
+    state?.updatedAt !== "2026-09-17"
+  ) {
+    return false;
+  }
+
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0053");
+  const t = state?.training?.exp002;
+  const e = state?.experiments?.["GHARIBO-exp-002"];
+  const b6 = (state?.blockers || []).find((b) => b?.id === "BLK-0006");
+
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // Kaggle compute authorized, local GPU not required.
+    t?.executionPolicy !== "KAGGLE_TRAINING_LOCAL_EVALUATION" ||
+    t?.computeHost !== "KAGGLE_T4_CLASS" ||
+    t?.localGpuRequired !== false ||
+    t?.kaggleAuthorized !== true ||
+    "authorizationPhrase" in (t || {}) ||
+
+    // Nothing has actually run.
+    t?.trainingAuthorized !== false ||
+    t?.pilot?.trainingAuthorized !== false ||
+    t?.pilot?.kernelPushesPerformed !== 0 ||
+    t?.production?.trainingAuthorized !== false ||
+    t?.production?.kernelPushesPerformed !== 0 ||
+    t?.production?.gatedOnPilot !== true ||
+    t?.production?.projectedHours > t?.production?.hardStopHours ||
+
+    // The pilot must never be promotable.
+    t?.pilot?.promotable !== false ||
+    t?.pilot?.rows !== 100 ||
+    t?.pilot?.projectedHours > t?.production?.hardStopHours ||
+
+    // Evaluation, scoring and the holdout stay LOCAL.
+    e?.executionPolicy !== "KAGGLE_TRAINING_LOCAL_EVALUATION" ||
+    e?.trainingAuthorized !== false ||
+    e?.promotable !== false ||
+    e?.evaluationScore !== null ||
+    e?.qualificationSplit?.policy !== "SEALED_UNTIL_V1_PROMOTION_GATE" ||
+
+    // BLK-0006 must be re-scoped, not deleted.
+    !b6 ||
+    b6.status !== "RE_SCOPED_NOT_BLOCKING" ||
+    (b6.blocks || []).length !== 0 ||
+
+    // The independent-corpus gap must stay recorded.
+    (state?.blockers || []).find((b) => b?.id === "BLK-0005")?.status !== "OPEN" ||
+
+    // Still nothing measured anywhere.
+    state?.training?.evaluationResults !== 0
+  ) {
+    return false;
+  }
+
+  // Strip ONLY the DEC-0053 layer and prove the accepted state underneath.
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.31.0";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0053");
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.32.0");
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:pilot-package"
+  );
+
+  const bt = before.training.exp002;
+  bt.executionPolicy = "LOCAL_ONLY";
+  bt.kaggleAuthorized = false;
+  bt.status = "BLOCKED_LOCAL_HARDWARE_INFEASIBLE";
+  delete bt.computeHost;
+  delete bt.localGpuRequired;
+  delete bt.pilot;
+  delete bt.production;
+  bt.supersededNextAction =
+    "ACT-0003 (await 'AUTHORIZE EXP-002 TRAINING LAUNCH') is superseded by DEC-0050. " +
+    "There is no Kaggle authorization gate.";
+
+  const be = before.experiments["GHARIBO-exp-002"];
+  be.executionPolicy = "LOCAL_ONLY";
+  be.readinessStatus = "BLOCKED_LOCAL_HARDWARE_INFEASIBLE";
+  be.promotionBlockedReason =
+    "DEC-0050: the governed recipe cannot execute on the local hardware, so no run and no " +
+    "evaluation result exists. Additionally BLK-0005 records that no independent source " +
+    "corpus exists, so any future V1 claim must state that it rests on the sealed EXP-002 " +
+    "qualification split.";
+  delete be.computeHost;
+  delete be.pilotPackageId;
+  delete be.productionPackageId;
+
+  for (const blocker of before.blockers) {
+    if (blocker.id === "BLK-0006") {
+      blocker.status = "OPEN";
+      blocker.blocks = ["STAGE-1", "V1-PROMOTION"];
+      blocker.title = "Local hardware cannot execute the governed EXP-002 recipe";
+      blocker.detail =
+        "The only NVIDIA device on this machine is a GeForce GT 730 (GK208, sm_35) behind driver " +
+        "391.35 with 1-4 GB of DDR3, below the compute-capability, driver and VRAM floors of the " +
+        "governed stack. Nothing was reduced to make it fit.";
+    }
+  }
+
+  return isRuntimeProjectionGoldState(before);
+}
+
+/**
+ * DEC-0054 pilot Version 1 dtype failure corrected at source; Version 2 pushed.
+ *
+ * Records a REPAIR and a RELAUNCH. It claims no training result: Version 1
+ * produced zero optimizer steps, and Version 2 is only RUNNING. It recognizes
+ * the exact v1.33 state, then reconstructs the accepted v1.32 layer beneath it.
+ */
+function isPilotV2RelaunchedGoldState(state) {
+  if (
+    state?.masterStateVersion !== "1.33.0" ||
+    state?.updatedAt !== "2026-09-17"
+  ) {
+    return false;
+  }
+
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0054");
+  const t = state?.training?.exp002;
+  const e = state?.experiments?.["GHARIBO-exp-002"];
+
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // Version 1 must stay recorded as a PRE-TRAINING failure with no result.
+    t?.pilot?.version1?.kernelVersion !== 1 ||
+    t?.pilot?.version1?.terminalStatus !== "KernelWorkerStatus.ERROR" ||
+    t?.pilot?.version1?.classification !== "PRE_TRAINING_CONTRACT_FAILURE" ||
+    t?.pilot?.version1?.optimizerStepsCompleted !== 0 ||
+    t?.pilot?.version1?.trainingEvidenceProduced !== false ||
+
+    // Version 2 is RUNNING - never "complete".
+    t?.pilot?.kernelVersion !== 2 ||
+    t?.pilot?.kernelPushesPerformed !== 1 ||
+    t?.pilot?.observedStatus !== "KernelWorkerStatus.RUNNING" ||
+    t?.pilot?.promotable !== false ||
+    t?.pilot?.trainingAuthorized !== false ||
+
+    // The corrected contract must be in force.
+    t?.executionPolicy !== "KAGGLE_TRAINING_LOCAL_EVALUATION" ||
+    t?.localGpuRequired !== false ||
+    t?.production?.gatedOnPilot !== true ||
+    t?.production?.trainingAuthorized !== false ||
+    t?.production?.kernelPushesPerformed !== 0 ||
+
+    // Evaluation untouched; pilot not promotable.
+    e?.evaluationStatus !== "NOT_RUN" ||
+    e?.evaluationScore !== null ||
+    e?.promotable !== false ||
+    e?.trainingAuthorized !== false ||
+    e?.qualificationSplit?.policy !== "SEALED_UNTIL_V1_PROMOTION_GATE" ||
+    state?.training?.evaluationResults !== 0 ||
+
+    // Both open issues remain recorded.
+    (state?.blockers || []).find((b) => b?.id === "BLK-0005")?.status !== "OPEN" ||
+    (state?.blockers || []).find((b) => b?.id === "BLK-0006")?.status !== "RE_SCOPED_NOT_BLOCKING"
+  ) {
+    return false;
+  }
+
+  const before = structuredClone(state);
+
+  before.masterStateVersion = "1.32.0";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0054");
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.33.0");
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:pilot-kaggle-bundle"
+  );
+
+  const bt = before.training.exp002;
+  bt.status = "PILOT_PACKAGE_PREPARED_AWAITING_LAUNCH_AUTHORIZATION";
+  bt.pilot.packageId = "067bec301c6af0a2a675e41ba17548a6fb2b8f56b4787010322451b2b6668066";
+  bt.pilot.notebookSha256 = "2425a1b38d84d414a858b2eaa4ea1052ebfbc6810413e7ccf58f2f41c8b70599";
+  bt.pilot.kernelPushesPerformed = 0;
+  delete bt.pilot.kernelVersion;
+  delete bt.pilot.kernelRef;
+  delete bt.pilot.observedStatus;
+  delete bt.pilot.version1;
+  bt.production.packageId = "5167db5f48678f79ed836b76070c021988af64874ed72c4f64faef362902d2bc";
+  bt.production.notebookSha256 = "37fe02a39e58f594ee28a6a9793b2d3ca6e05b59f25f21c9e0b54a491fb395f5";
+
+  const be = before.experiments["GHARIBO-exp-002"];
+  be.readinessStatus = "PILOT_PACKAGE_PREPARED_AWAITING_LAUNCH_AUTHORIZATION";
+  be.pilotPackageId = "067bec301c6af0a2a675e41ba17548a6fb2b8f56b4787010322451b2b6668066";
+  be.productionPackageId = "5167db5f48678f79ed836b76070c021988af64874ed72c4f64faef362902d2bc";
+
+  return isKaggleComputeAuthorizedGoldState(before);
+}
+
+/**
+ * DEC-0055 EXP-002 pilot COMPLETE and integrity-verified.
+ *
+ * Records ARTIFACT RECOVERY AND VERIFICATION only. It promotes nothing, claims
+ * no evaluation result, and requires the sealed qualification split to remain
+ * untouched. It recognizes the exact v1.34 state, then reconstructs the accepted
+ * v1.33 layer and delegates beneath it.
+ */
+function isPilotCompleteIntegrityVerifiedGoldState(state) {
+  if (state?.masterStateVersion !== "1.34.0" || state?.updatedAt !== "2026-09-17") {
+    return false;
+  }
+  const decision = (state?.decisions || []).find((d) => d?.id === "DEC-0055");
+  const t = state?.training?.exp002;
+  const e = state?.experiments?.["GHARIBO-exp-002"];
+  if (
+    !decision ||
+    decision.status !== "ACCEPTED" ||
+    decision.supersedes !== null ||
+    decision.supersededBy !== null ||
+    decision.architectureChanging !== false ||
+
+    // The pilot is COMPLETE and integrity-verified - and nothing more.
+    t?.status !== "PILOT_COMPLETE_INTEGRITY_PASS" ||
+    t?.pilot?.observedStatus !== "KernelWorkerStatus.COMPLETE" ||
+    t?.pilot?.kernelVersion !== 6 ||
+    t?.pilot?.integrityVerdict !== "PASS" ||
+    t?.pilot?.qualificationStatus !== "SEALED_UNTOUCHED" ||
+    t?.pilot?.promotable !== false ||
+    t?.pilot?.trainingAuthorized !== false ||
+    t?.pilot?.version1?.optimizerStepsCompleted !== 0 ||
+
+    // No evaluation, no promotion, no production run.
+    e?.evaluationStatus !== "NOT_RUN" ||
+    e?.evaluationScore !== null ||
+    e?.promotable !== false ||
+    e?.trainingAuthorized !== false ||
+    e?.pilotIntegrityVerdict !== "PASS" ||
+    e?.qualificationSplit?.policy !== "SEALED_UNTIL_V1_PROMOTION_GATE" ||
+    state?.training?.evaluationResults !== 0 ||
+    t?.production?.kernelPushesPerformed !== 0 ||
+    t?.production?.trainingAuthorized !== false ||
+
+    // Open issues stay recorded.
+    (state?.blockers || []).find((b) => b?.id === "BLK-0005")?.status !== "OPEN" ||
+    (state?.blockers || []).find((b) => b?.id === "BLK-0006")?.status !== "RE_SCOPED_NOT_BLOCKING"
+  ) {
+    return false;
+  }
+  const before = structuredClone(state);
+  before.masterStateVersion = "1.33.0";
+  before.decisions = before.decisions.filter((d) => d?.id !== "DEC-0055");
+  before.history = (before.history || []).filter((h) => h?.revision !== "1.34.0");
+  before.validation.results = (before.validation.results || []).filter(
+    (r) => r?.gate !== "exp002:pilot-integrity"
+  );
+  const bt = before.training.exp002;
+  bt.status = "PILOT_V2_RUNNING";
+  bt.pilot.observedStatus = "KernelWorkerStatus.RUNNING";
+  bt.pilot.kernelVersion = 2;
+  delete bt.pilot.integrityVerdict;
+  delete bt.pilot.adapterSha256;
+  delete bt.pilot.integrityArtifact;
+  delete bt.pilot.qualificationStatus;
+  const be = before.experiments["GHARIBO-exp-002"];
+  be.readinessStatus = "PILOT_V2_RUNNING";
+  delete be.pilotIntegrityVerdict;
+  return isPilotV2RelaunchedGoldState(before);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -2917,6 +3580,13 @@ export function isAcceptedGoldGovernanceState(state) {
     isEvaluationAttempt5FailedGoldState(state) ||
     isExp001ForensicClosureGoldState(state) ||
     isEvaluationAttempt6AuthorizedGoldState(state) ||
+    isExp002ContractPreparedGoldState(state) ||
+    isLocalOnlyPolicyGoldState(state) ||
+    isLocalRuntimeContractGoldState(state) ||
+    isRuntimeProjectionGoldState(state) ||
+    isKaggleComputeAuthorizedGoldState(state) ||
+    isPilotV2RelaunchedGoldState(state) ||
+    isPilotCompleteIntegrityVerifiedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

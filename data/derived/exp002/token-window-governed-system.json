@@ -1,0 +1,320 @@
+{
+  "artifactKind": "GHARIBO_EXP002_TOKEN_WINDOW_MEASUREMENT",
+  "candidateContexts": [
+    1024,
+    1536,
+    2048,
+    2560,
+    3072,
+    3584,
+    4096
+  ],
+  "contextDecision": {
+    "chosenContextLength": 3072,
+    "rule": "smallest candidate context with zero partial and zero zero-visibility assistant spans across TRAIN and VALIDATION"
+  },
+  "measurements": {
+    "train": {
+      "assistantContentTokens": {
+        "count": 640,
+        "max": 1162,
+        "mean": 537.7234,
+        "min": 293,
+        "p50": 456,
+        "p90": 756,
+        "p95": 887,
+        "p99": 1054
+      },
+      "assistantEnd": {
+        "count": 640,
+        "max": 2689,
+        "mean": 1447.075,
+        "min": 949,
+        "p50": 1291,
+        "p90": 1880,
+        "p95": 2139,
+        "p99": 2491
+      },
+      "assistantMessageTokens": {
+        "count": 640,
+        "max": 1162,
+        "mean": 537.7234,
+        "min": 293,
+        "p50": 456,
+        "p90": 756,
+        "p95": 887,
+        "p99": 1054
+      },
+      "assistantStart": {
+        "count": 640,
+        "max": 1523,
+        "mean": 905.3516,
+        "min": 652,
+        "p50": 831,
+        "p90": 1120,
+        "p95": 1248,
+        "p99": 1424
+      },
+      "assistantVisibilityByContext": {
+        "1024": {
+          "full": 16,
+          "partial": 427,
+          "zero": 197
+        },
+        "1536": {
+          "full": 418,
+          "partial": 222,
+          "zero": 0
+        },
+        "2048": {
+          "full": 595,
+          "partial": 45,
+          "zero": 0
+        },
+        "2560": {
+          "full": 638,
+          "partial": 2,
+          "zero": 0
+        },
+        "3072": {
+          "full": 640,
+          "partial": 0,
+          "zero": 0
+        },
+        "3584": {
+          "full": 640,
+          "partial": 0,
+          "zero": 0
+        },
+        "4096": {
+          "full": 640,
+          "partial": 0,
+          "zero": 0
+        }
+      },
+      "promptOverheadTokens": {
+        "count": 640,
+        "max": 207,
+        "mean": 207.0,
+        "min": 207,
+        "p50": 207,
+        "p90": 207,
+        "p95": 207,
+        "p99": 207
+      },
+      "redundantProcessStepsTokens": {
+        "count": 640,
+        "max": 102,
+        "mean": 102.0,
+        "min": 102,
+        "p50": 102,
+        "p90": 102,
+        "p95": 102,
+        "p99": 102
+      },
+      "renderFailureDetail": [],
+      "renderFailures": 0,
+      "renderedTokens": {
+        "count": 640,
+        "max": 2689,
+        "mean": 1447.075,
+        "min": 949,
+        "p50": 1291,
+        "p90": 1880,
+        "p95": 2139,
+        "p99": 2491
+      },
+      "roleSequences": {
+        "system -> user -> assistant": 640
+      },
+      "rows": 640,
+      "supervisedTokens": {
+        "count": 640,
+        "max": 1166,
+        "mean": 541.7234,
+        "min": 297,
+        "p50": 460,
+        "p90": 760,
+        "p95": 891,
+        "p99": 1058
+      },
+      "userPayloadTokens": {
+        "count": 640,
+        "max": 1241,
+        "mean": 623.3516,
+        "min": 370,
+        "p50": 549,
+        "p90": 838,
+        "p95": 966,
+        "p99": 1142
+      }
+    },
+    "validation": {
+      "assistantContentTokens": {
+        "count": 80,
+        "max": 1092,
+        "mean": 512.9625,
+        "min": 296,
+        "p50": 422,
+        "p90": 735,
+        "p95": 754,
+        "p99": 1054
+      },
+      "assistantEnd": {
+        "count": 80,
+        "max": 2554,
+        "mean": 1397.9125,
+        "min": 956,
+        "p50": 1222,
+        "p90": 1834,
+        "p95": 1877,
+        "p99": 2473
+      },
+      "assistantMessageTokens": {
+        "count": 80,
+        "max": 1092,
+        "mean": 512.9625,
+        "min": 296,
+        "p50": 422,
+        "p90": 735,
+        "p95": 754,
+        "p99": 1054
+      },
+      "assistantStart": {
+        "count": 80,
+        "max": 1458,
+        "mean": 880.95,
+        "min": 656,
+        "p50": 796,
+        "p90": 1096,
+        "p95": 1119,
+        "p99": 1415
+      },
+      "assistantVisibilityByContext": {
+        "1024": {
+          "full": 2,
+          "partial": 59,
+          "zero": 19
+        },
+        "1536": {
+          "full": 56,
+          "partial": 24,
+          "zero": 0
+        },
+        "2048": {
+          "full": 76,
+          "partial": 4,
+          "zero": 0
+        },
+        "2560": {
+          "full": 80,
+          "partial": 0,
+          "zero": 0
+        },
+        "3072": {
+          "full": 80,
+          "partial": 0,
+          "zero": 0
+        },
+        "3584": {
+          "full": 80,
+          "partial": 0,
+          "zero": 0
+        },
+        "4096": {
+          "full": 80,
+          "partial": 0,
+          "zero": 0
+        }
+      },
+      "promptOverheadTokens": {
+        "count": 80,
+        "max": 207,
+        "mean": 207.0,
+        "min": 207,
+        "p50": 207,
+        "p90": 207,
+        "p95": 207,
+        "p99": 207
+      },
+      "redundantProcessStepsTokens": {
+        "count": 80,
+        "max": 102,
+        "mean": 102.0,
+        "min": 102,
+        "p50": 102,
+        "p90": 102,
+        "p95": 102,
+        "p99": 102
+      },
+      "renderFailureDetail": [],
+      "renderFailures": 0,
+      "renderedTokens": {
+        "count": 80,
+        "max": 2554,
+        "mean": 1397.9125,
+        "min": 956,
+        "p50": 1222,
+        "p90": 1834,
+        "p95": 1877,
+        "p99": 2473
+      },
+      "roleSequences": {
+        "system -> user -> assistant": 80
+      },
+      "rows": 80,
+      "supervisedTokens": {
+        "count": 80,
+        "max": 1096,
+        "mean": 516.9625,
+        "min": 300,
+        "p50": 426,
+        "p90": 739,
+        "p95": 758,
+        "p99": 1058
+      },
+      "userPayloadTokens": {
+        "count": 80,
+        "max": 1176,
+        "mean": 598.95,
+        "min": 374,
+        "p50": 514,
+        "p90": 814,
+        "p95": 837,
+        "p99": 1133
+      }
+    }
+  },
+  "roleContract": "governed-system",
+  "roleContractProjection": "verbatim",
+  "schemaVersion": "1.0.0",
+  "splits": {
+    "train": {
+      "file": "train.jsonl",
+      "fileBytes": 3669915,
+      "fileSha256": "911b1c9b86af89bc94008e810e49c524d6255df241ce51a7fa4f2cb680e95f49",
+      "rows": 640,
+      "splitHash": "84025de18403b8660d9702877b2b6fd329cedb886cad0095ab67e4daa3828ad2"
+    },
+    "validation": {
+      "file": "validation.jsonl",
+      "fileBytes": 442023,
+      "fileSha256": "b6f3c055a504625c73b1f63caf4eb517ed4b1fe2dcae3d207bca4d451f197e60",
+      "rows": 80,
+      "splitHash": "063fb4422aed247b3f92c0f0d5b1291af46fd4357ca48829a7e7f6ce98815787"
+    }
+  },
+  "testAccessed": false,
+  "testPolicy": "TRAIN and VALIDATION only; test.jsonl is never opened by this script.",
+  "tokenizer": {
+    "chatTemplateSha256": "a4c9919cbbd4acdd51ccffe22da049264b1b73e59055fa58811a99efbd7c8146",
+    "class": "PreTrainedTokenizerFast",
+    "modelMaxLength": 1000000000000000019884624838656,
+    "requestedId": "C:/Dev/GHARIBO/models/weights/exp002-tokenizer",
+    "resolvedNameOrPath": "C:/Dev/GHARIBO/models/weights/exp002-tokenizer",
+    "revision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "tokenizersVersion": "0.22.2",
+    "transformersVersion": "4.56.2",
+    "vocabSize": 199998
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "artifactKind": "GHARIBO_EXP002_PILOT_SPLIT",
+  "checkpointPolicy": {
+    "derivation": "100 rows / (per-device batch 1 x grad-accum 4) = 25 optimizer steps",
+    "optimizerSteps": 25,
+    "saveSteps": 25,
+    "saveStrategy": "steps",
+    "saveTotalLimit": 1,
+    "selectionRule": "TERMINAL_CHECKPOINT_ONLY"
+  },
+  "consumedTestTouched": false,
+  "definition": "Deterministic prefix of the governed EXP-002 train ordering (seed 20260917). A prefix is used rather than a re-shuffle so the pilot cannot select for easier or shorter examples.",
+  "fileBytes": 572915,
+  "pilotFileSha256": "0de7275c492f4e3234ee808ba127c41e4bb094a37c4f1e7bf8ba4a5856126151",
+  "pilotRows": 100,
+  "pilotSplitHash": "b8250d987dc50cfbceb1a4cf3b69dd9cbe1b03ae6ab073d3beb36d103d81f023",
+  "promotable": false,
+  "purpose": "End-to-end pipeline validation only. No V1 claim.",
+  "schemaVersion": "1.0.0",
+  "sealedSplitTouched": false,
+  "sourceSplit": "data/derived/exp002/splits/train.jsonl",
+  "sourceSplitHash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8",
+  "sourceSplitRows": 560
+}

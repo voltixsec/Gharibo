@@ -98,9 +98,21 @@ check(
   `evaluationResults=${JSON.stringify(results_count)}`,
 );
 check(
-  "experiment.evaluationStatus is NOT_RUN",
-  experiment.evaluationStatus === "NOT_RUN",
+  "experiment.evaluationStatus records no evaluation RESULT (NOT_RUN, or the DEC-0048 non-decisional closure)",
+  // DEC-0048 recorded that Evaluation Attempt #6 completed inference over the
+  // consumed TEST split and that the first scoring pass was NON-DECISIONAL. The
+  // literal status therefore moved past NOT_RUN while still producing no score.
+  // The invariant this check exists to protect is "no evaluation result", which
+  // is asserted directly and independently below.
+  experiment.evaluationStatus === "NOT_RUN" ||
+    experiment.evaluationStatus ===
+      "ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL",
   `evaluationStatus=${JSON.stringify(experiment.evaluationStatus)}`,
+);
+check(
+  "experiment.evaluationScore is null (no score exists, whatever the status)",
+  experiment.evaluationScore === null,
+  `evaluationScore=${JSON.stringify(experiment.evaluationScore)}`,
 );
 check(
   "experiment.runStatus is COMPLETED (training unchanged)",
@@ -642,7 +654,14 @@ if (evalAuth.attempt4AuthorizationDecisionId) {
       evalAuth.evaluationStatus === "NOT_RUN" &&
       evalAuth.evaluationResults === 0 &&
       results_count === 0 &&
-      experiment?.evaluationStatus === "NOT_RUN" &&
+      // See the note on the top-level status check: DEC-0048 moved the recorded
+      // status past NOT_RUN for a non-decisional Attempt #6 while producing no
+      // score. Both the status and the score are asserted, so nothing can hide
+      // behind the wider status set.
+      (experiment?.evaluationStatus === "NOT_RUN" ||
+        experiment?.evaluationStatus ===
+          "ATTEMPT_6_INFERENCE_COMPLETE_SCORING_NON_DECISIONAL") &&
+      experiment?.evaluationScore === null &&
       experiment?.promotable === false,
     `attempt4Inference=${JSON.stringify(evalAuth.attempt4TestInferenceOccurred)} evaluationStatus=${JSON.stringify(evalAuth.evaluationStatus)} experimentStatus=${JSON.stringify(experiment?.evaluationStatus)} results=${JSON.stringify(results_count)} promotable=${JSON.stringify(experiment?.promotable)}`,
   );

@@ -336,8 +336,8 @@ change with it** — that is what keeps the frozen baseline honest.
 <!-- docs:facts -->
 | Metric | Value |
 |--------|-------|
-| api_route_files | 36 |
-| api_handlers | 53 |
+| api_route_files | 37 |
+| api_handlers | 54 |
 | sqlite_tables | 17 |
 | dashboard_pages | 11 |
 | adrs | 20 |

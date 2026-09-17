@@ -1,0 +1,186 @@
+{
+  "artifactIdentities": {
+    "note": "A changed package/notebook hash after a legitimate contract correction is EXPECTED. The recipe hash is unchanged because the recipe was always correct.",
+    "pilot": {
+      "manifestSha256": "b911f37cd5c986a2919475788327ff475a4e2038fe29dda873e1c586f09136e8",
+      "notebookSha256": {
+        "new": "95ed4d279df02d6fe7f5788faeee2d022cf3377cedc1088026fa251537b4f050",
+        "old": "2425a1b38d84d414a858b2eaa4ea1052ebfbc6810413e7ccf58f2f41c8b70599"
+      },
+      "packageId": {
+        "new": "3d770b8996ed3e7bc460544d374152731e718a6e6339a5dc25332ed4660aaf97",
+        "old": "067bec301c6af0a2a675e41ba17548a6fb2b8f56b4787010322451b2b6668066"
+      }
+    },
+    "production": {
+      "notebookSha256": {
+        "new": "65a50b0e2a4568ca23c4a6e2e5c9be9140ae6591a22a2151a60d45c9e901cbd2",
+        "old": "37fe02a39e58f594ee28a6a9793b2d3ca6e05b59f25f21c9e0b54a491fb395f5"
+      },
+      "packageId": {
+        "new": "ff9ab5e5187bf53012107a9a788c29574b2719de5fd496ba8a47d3470a6ddbdd",
+        "old": "5167db5f48678f79ed836b76070c021988af64874ed72c4f64faef362902d2bc"
+      }
+    },
+    "recipeHashUnchanged": "d1851753a05a0d2b560ccd8d47b82318fd69261b66aa0e9274f259e67a0e93a3",
+    "recipeHashUnchangedReason": "The governed recipe already declared float32. Only the builder that consumed it was wrong, so the immutable contract identity did not move."
+  },
+  "authority": "Human authorization to repair the dtype contract at source, rebuild the governed artifacts, validate locally, and push a corrected EXP-002 pilot kernel without stopping for further approval.",
+  "baselineCommit": "bb163fb48257a94fa8a803d3c91777b751111d4e",
+  "decision": "Record GHARIBO-exp-002-pilot Kaggle Version 1 as a REAL PRE-TRAINING CONTRACT FAILURE caused by a dtype mismatch: the generated package declared dtype=fp16 while the governed recipe and the notebook both declared float32, so the run aborted on its own assertion before any training began. Correct the SOURCE OF TRUTH in four places rather than patching the generated notebook, rebuild every governed artifact, add a fail-closed preflight gate that compares the dtype the notebook actually receives against the governed recipe, and push corrected Version 2. No training result, optimizer step or completion evidence is claimed for Version 1, because none exists.",
+  "decisionHash": "7e0b2631a9466db32bc0f4c1129a2403c0b76758969ef28c2a0b9a5057d65f6b",
+  "decisionId": "DEC-0054",
+  "kaggleDataset": {
+    "bytes": 572915,
+    "id": "vokaigharibo/gharibo-exp-002-pilot-train",
+    "reasonNotRecreated": "The remote payload was downloaded and its sha256 recomputed: 0de7275c492f4e3234ee808ba127c41e4bb094a37c4f1e7bf8ba4a5856126151 at 572915 bytes, identical to the governed local pilot payload. No objective evidence justified recreation.",
+    "recreated": false,
+    "remoteSha256Verified": "0de7275c492f4e3234ee808ba127c41e4bb094a37c4f1e7bf8ba4a5856126151",
+    "soleTrainingSource": true
+  },
+  "next": "MONITOR_VERSION_2_AND_VERIFY_ARTIFACTS",
+  "notAuthorizedByThisDecision": [
+    "EXP-002 production 560-row training",
+    "V1 promotion",
+    "evaluation on the sealed qualification split",
+    "TEST reuse",
+    "paid compute",
+    "destructive repository operations",
+    "claiming a training result for Version 1"
+  ],
+  "preservedContract": {
+    "checkpointPolicy": "save_steps=25, save_total_limit=1, terminal checkpoint only",
+    "contextLength": 3072,
+    "dtype": "float32",
+    "ignoreIndex": -100,
+    "lossContract": "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK",
+    "maxAssistantEnd": 2689,
+    "optimizerSteps": 25,
+    "roleSequence": "system -> user -> assistant",
+    "statement": "No context, row count, supervision, model, masking quality or target coverage was reduced. The only change is the honesty of the dtype declaration, which the recipe already required.",
+    "terminator": "<|return|>",
+    "trainRows": 100,
+    "zeroSupervisionRows": 0,
+    "zeroTruncatedAssistantSpans": true
+  },
+  "recordDate": "2026-09-17",
+  "recordKind": "EXP002_PILOT_V1_PRETRAINING_DTYPE_FAILURE_AND_V2_RELAUNCH",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0053-kaggle-authorized-compute-host.json",
+    "governance/DEC-0052-exp002-runtime-projection-and-pilot.json",
+    "governance/DEC-0048-exp001-training-objective-defect.json",
+    "data/derived/exp002/preflight.json",
+    "data/derived/exp002/package-pilot/launch-summary.json",
+    "data/derived/exp002/package-pilot/package-manifest.json",
+    "data/derived/exp002/kaggle-pilot/kernel-metadata.json",
+    "scripts/exp002/build_kaggle_pilot_bundle.py",
+    "scripts/exp002/build-exp002-package.ts",
+    "apps/web/lib/training/validate.ts",
+    "packages/shared/src/types/training-package.ts"
+  ],
+  "rootCause": {
+    "defectiveSites": [
+      {
+        "path": "scripts/exp002/build-exp002-package.ts",
+        "role": "THE INJECTION POINT - the value the notebook actually received",
+        "was": "dtype: \"fp16\""
+      },
+      {
+        "path": "packages/shared/src/types/training-package.ts",
+        "role": "type literal that made the wrong value the only compilable one",
+        "was": "dtype: \"fp16\""
+      },
+      {
+        "path": "packages/shared/src/types/training-worker.ts",
+        "role": "worker capability declaration",
+        "was": "dtype: \"fp16\""
+      },
+      {
+        "path": "apps/web/lib/workers/kaggle/index.ts",
+        "role": "Kaggle worker capability value",
+        "was": "dtype: \"fp16\""
+      },
+      {
+        "path": "apps/web/lib/training/validate.ts",
+        "role": "validator that would have rejected the correct value",
+        "was": "rule 8: dtype must be \"fp16\""
+      },
+      {
+        "path": "apps/web/lib/workers/kaggle/notebook.template.ipynb",
+        "role": "notebook advertised fp16 on a T4, contradicting its own assertion",
+        "was": "selected_dtype = 'fp16' if cap_major < 8 else 'bf16'"
+      }
+    ],
+    "summary": "A hardcoded dtype literal in the package builder contradicted the governed recipe.",
+    "whyTheRecipeWasRight": "DEC-0030 recorded a MATERIAL_RUNTIME_DEVIATION for EXP-001: declaredDtype fp16, effectiveDtype float32, engineImposed true, with engine stdout 'Using float16 precision for gpt_oss won't work! Using float32' and 'Switching to float32 training since model cannot work with float16'. The stored adapter is F32 (safetensors header, 96 tensors). float32 is therefore the only honest declaration for this stack."
+  },
+  "sourceFix": {
+    "changes": [
+      "package builder now reads dtype from the governed recipe instead of hardcoding it",
+      "TrainingPackage.dtype widened to fp16 | bf16 | float32; loaderModelRevision added and pinned",
+      "WorkerCapabilities.dtype widened; Kaggle capability set to float32 with the DEC-0030 rationale",
+      "validate.ts rule 8 admits fp16 and float32 and still rejects bf16 (Turing has no bf16 units)",
+      "validate.ts rule 9 admits sequence_length 3072 as a measured, allow-listed governed value",
+      "notebook hardware cell now reads the dtype from the package and asserts it agrees with the recipe, instead of guessing from compute capability",
+      "notebook model-load cell passes the declared dtype explicitly and asserts the engine honoured it",
+      "exp002 recipe gains declaredDtype, surfaced as exp002.declared_dtype in the manifest"
+    ],
+    "newGate": {
+      "failClosed": true,
+      "id": "packageDtypeAgreesAcrossArtifacts",
+      "mechanism": "The preflight PARSES the manifest embedded in the rendered notebook (the exact payload the notebook will receive) and requires it to equal the governed recipe dtype and the manifest dtype, and requires the notebook's executable code to assert the governed dtype and to contain no silent sequence-length downgrade. Comments are stripped before the code checks, so documentation cannot mask a defect.",
+      "wouldHaveCaughtVersion1": true
+    },
+    "principle": "Fix the source of truth and regenerate. The generated notebook was never hand-edited as the primary fix."
+  },
+  "status": "V1_RECORDED_AS_PRETRAINING_CONTRACT_FAILURE_V2_PUSHED",
+  "version1Failure": {
+    "assertedDtype": "float32",
+    "classification": "PRE_TRAINING_CONTRACT_FAILURE",
+    "error": "AssertionError: This recipe declares dtype=float32 because the Unsloth gpt-oss path on Turing refuses fp16. Got: 'fp16'",
+    "failedBefore": "training started",
+    "hardware": "NVIDIA Tesla T4, sm_75, ~14.6 GB VRAM",
+    "kernelRef": "vokaigharibo/gharibo-exp-002-pilot",
+    "kernelVersion": 1,
+    "notAClassificationOf": [
+      "a failed optimization run",
+      "a failed training run",
+      "a model-quality result"
+    ],
+    "observedDtype": "fp16",
+    "optimizerStepsCompleted": 0,
+    "terminalStatus": "KernelWorkerStatus.ERROR",
+    "trainingEvidenceProduced": false
+  },
+  "version2Launch": {
+    "bundleContents": [
+      "GHARIBO-exp-002-pilot.ipynb",
+      "kernel-metadata.json"
+    ],
+    "kernelRef": "vokaigharibo/gharibo-exp-002-pilot",
+    "kernelVersion": 2,
+    "metadata": {
+      "datasetSources": [
+        "vokaigharibo/gharibo-exp-002-pilot-train"
+      ],
+      "enableGpu": true,
+      "enableInternet": true,
+      "enableTpu": false,
+      "encoding": "UTF-8 without BOM, LF newlines",
+      "isPrivate": true,
+      "kernelType": "notebook",
+      "language": "python"
+    },
+    "observedStatus": "KernelWorkerStatus.RUNNING",
+    "prePushGates": {
+      "count": 37,
+      "passed": 37,
+      "verdict": "PASS"
+    },
+    "pushedAt": "2026-09-17",
+    "qualificationPayloadInBundle": false,
+    "testPayloadInBundle": false,
+    "trainPayloadInBundle": false
+  }
+}

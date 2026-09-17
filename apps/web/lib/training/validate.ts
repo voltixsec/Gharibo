@@ -182,12 +182,31 @@ export function validatePackage(
     err("lora.target_modules", "lora.target_modules is not derivable (must be non-empty)");
   }
 
-  // --- Rule 8: dtype is fp16 (T4 = Turing; bf16 unsupported) ---
-  if (pkg.dtype !== "fp16") err("dtype", 'dtype must be "fp16"');
+  // --- Rule 8: dtype is a declared, engine-honest value ---
+  //
+  // Historically this rule pinned "fp16" because T4 is Turing and bf16 is
+  // unsupported. That pin was WRONG for gpt-oss: Unsloth refuses fp16 for the
+  // gpt-oss architecture and silently switches to float32, so an fp16
+  // declaration is a lie the engine overrides (DEC-0030 runtimeDeviation). The
+  // rule now admits the two dtypes the worker can actually honour. bf16 stays
+  // rejected: Turing has no bf16 units, so it can never be honest on this worker.
+  if (pkg.dtype !== "fp16" && pkg.dtype !== "float32") {
+    err("dtype", 'dtype must be "fp16" or "float32" (bf16 is unsupported on the T4 worker)');
+  }
 
-  // --- Rule 9: sequence_length ∈ {512, 1024} ---
-  if (pkg.sequenceLength !== 512 && pkg.sequenceLength !== 1024) {
-    err("sequence_length", "sequence_length must be 512 or 1024");
+  // --- Rule 9: sequence_length is a governed, measured value ---
+  //
+  // 512 and 1024 are the historical defaults. 3072 is the governed EXP-002
+  // context, chosen as the smallest candidate with zero partially truncated and
+  // zero zero-visibility assistant spans across the measured TRAIN and DEV
+  // distributions. It is an allow-list entry, not a relaxation: an unmeasured
+  // value is still rejected.
+  const ALLOWED_SEQUENCE_LENGTHS = [512, 1024, 3072];
+  if (!ALLOWED_SEQUENCE_LENGTHS.includes(pkg.sequenceLength)) {
+    err(
+      "sequence_length",
+      `sequence_length must be one of ${ALLOWED_SEQUENCE_LENGTHS.join(", ")}`,
+    );
   }
 
   // --- Rule 10: exactly one of epochs / max_steps is non-null ---

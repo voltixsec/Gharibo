@@ -1,0 +1,52 @@
+{
+  "algorithm": "k(r) = sha256(seed + ':' + lineHash(r)); records ordered ascending by (k, lineHash); qualification = last 80 of the ordering; dev = last 80 of the remainder; train = the rest",
+  "artifactKind": "GHARIBO_EXP002_GOVERNED_SPLIT",
+  "lineHashAlgorithm": "sha256(utf-8(raw line bytes, trailing CR stripped))",
+  "lineageDisclosure": {
+    "derivedFrom": "GHARIBO-Research-Gold-v0.1 TRAIN + VALIDATION",
+    "independentOfConsumedTest": true,
+    "newIndependentSourceCorpus": false,
+    "whatThisDoesNotSupport": "A claim of an independent second benchmark corpus, or any use of the consumed Gold v0.1 TEST split as promotion evidence.",
+    "whatThisSupports": "A held-out qualification measurement over the EXP-002 development distribution, fixed before training and never inspected.",
+    "whyNoNewCorpus": "The repository has no committed deterministic generator mapping raw UCL source records to gold examples; the 800 governed examples were sampled during the M3A session. A genuinely new gold cohort therefore requires a new governed annotation process and cannot be produced by re-running code."
+  },
+  "qualificationPolicy": "qualification.jsonl is written once, hashed, and MUST NOT be read, tokenized, parsed or inspected until the V1 promotion gate. Only its hash may travel.",
+  "schemaVersion": "1.0.0",
+  "source": {
+    "dataset": "GHARIBO-Research-Gold-v0.1",
+    "note": "TEST was consumed by Evaluation Attempt #6 (DEC-0048) and is never a source here.",
+    "poolRows": 720,
+    "splitsNeverOpened": [
+      "test"
+    ],
+    "splitsUsed": [
+      "train",
+      "validation"
+    ]
+  },
+  "splitHashAlgorithm": "sha256(utf-8('\\n'.join(sorted(lineHash(r) for r in S))))",
+  "splitSeed": "20260917",
+  "splits": {
+    "dev": {
+      "file": "dev.jsonl",
+      "fileBytes": 455990,
+      "fileSha256": "569bf37a96fd171621cb7946650dcdeec53936b7c11920ddb17352b3ef6cc334",
+      "rows": 80,
+      "splitHash": "77b8040e8a85d310a6e4ad1a81a013ad9b1b6c3775cc929202a9830f1e0d49ec"
+    },
+    "qualification": {
+      "file": "qualification.jsonl",
+      "fileBytes": 463942,
+      "fileSha256": "a66fea946cffd9b6eb960543ba35f5a5a6ca954b8ce81a0d9665a43517b9a88f",
+      "rows": 80,
+      "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1"
+    },
+    "train": {
+      "file": "train.jsonl",
+      "fileBytes": 3192006,
+      "fileSha256": "491dbe363b5f7f29be7a92e968295d35915d784b58c14bf50cb6389d6db7e4c0",
+      "rows": 560,
+      "splitHash": "94da02d6cc7a99146a1bfc3084d5a99f1ab96e262a6c48f025c92cd79de53cf8"
+    }
+  }
+}
