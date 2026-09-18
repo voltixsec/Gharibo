@@ -1,6 +1,7 @@
 "use client";
 
 import { useProviders } from "@/hooks/use-providers";
+import { useRuntimeV1 } from "@/hooks/use-runtime-v1";
 import {
   Select,
   SelectContent,
@@ -9,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
 
 interface ModelSelectorProps {
   value: string | null;
@@ -17,8 +19,10 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const { providers, loading } = useProviders();
+  const { runtime, loading: runtimeLoading } = useRuntimeV1();
+  const v1Configured = !!runtime?.config?.configured;
 
-  if (loading) {
+  if (loading || runtimeLoading) {
     return (
       <div className="flex flex-col gap-1.5">
         <Label>Model</Label>
@@ -27,12 +31,15 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     );
   }
 
-  if (providers.length === 0) {
+  const activeProviders = providers.filter((p) => p.isActive);
+
+  if (activeProviders.length === 0 && !v1Configured) {
     return (
       <div className="flex flex-col gap-1.5">
         <Label>Model</Label>
         <p className="text-sm text-muted-foreground">
-          No providers configured. Add one in Settings.
+          No providers configured. Add one in Settings, or set GHARIBO_V1_BASE_URL
+          to use the GHARIBO-V1 runtime.
         </p>
       </div>
     );
@@ -46,13 +53,16 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
           <SelectValue placeholder="Select a model" />
         </SelectTrigger>
         <SelectContent>
-          {providers
-            .filter((p) => p.isActive)
-            .map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.displayName || p.modelId} ({p.provider})
-              </SelectItem>
-            ))}
+          {v1Configured && (
+            <SelectItem value={V1_RUNTIME_PROVIDER_ID}>
+              GHARIBO-V1 (runtime)
+            </SelectItem>
+          )}
+          {activeProviders.map((p) => (
+            <SelectItem key={p.id} value={p.id}>
+              {p.displayName || p.modelId} ({p.provider})
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

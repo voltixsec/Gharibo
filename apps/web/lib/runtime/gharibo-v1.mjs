@@ -38,6 +38,15 @@ export const V1_ROLE_SEQUENCE = "system -> user -> assistant";
 /** The only Harmony channel that may become an application answer. */
 export const V1_FINAL_CHANNEL = "final";
 
+/**
+ * The provider id the UI uses to address the GHARIBO V1 runtime through the
+ * environment. It is a SENTINEL, not a row in the `providers` table: the runtime
+ * is addressed purely by `GHARIBO_V1_BASE_URL`, so no DB provider, no stored
+ * base URL and no stored credential are ever required to use V1. A conversation
+ * may carry this id as `providerId`; the message route special-cases it.
+ */
+export const V1_RUNTIME_PROVIDER_ID = "gharibo-v1-runtime";
+
 /** Environment variable names. Values are never embedded here. */
 export const V1_ENV = Object.freeze({
   baseUrl: "GHARIBO_V1_BASE_URL",
@@ -334,6 +343,63 @@ export function extractV1Answer(responseBody) {
     reason: V1_ANSWER_REASONS.OK,
     analysisPresent: extracted.analysisPresent,
   };
+}
+
+// ---------------------------------------------------------------------------
+// End-to-end chat (the contract the application route drives)
+// ---------------------------------------------------------------------------
+
+/**
+ * Performs a REAL inference call against the V1 runtime and returns only the
+ * final-channel answer. This is the single function the application route calls
+ * for V1; it reuses the canonical request builder, the server-side token
+ * resolver and the final-channel guard so the inference prompt can never drift
+ * from the training prompt and `analysis` can never leave this module.
+ *
+ * It talks OpenAI-compatible HTTP to `config.baseUrl`. A non-2xx or a network
+ * failure throws — it never invents an answer. Malformed / no-final-channel
+ * responses are returned as `{ ok: false }` and are handled by the caller
+ * (which fails closed rather than surfacing raw model text).
+ *
+ * @param {{
+ *   config: ReturnType<typeof resolveV1RuntimeConfig>,
+ *   token: string | null,
+ *   messages: Array<{role: string, content: string}>,
+ *   options?: { systemPrompt?: string, temperature?: number, maxTokens?: number },
+ *   fetchImpl?: typeof fetch,
+ * }} args
+ * @returns {Promise<ReturnType<typeof extractV1Answer>>}
+ */
+export async function runV1Chat({ config, token, messages, options = {}, fetchImpl = globalThis.fetch }) {
+  if (!config?.configured || !config.baseUrl) {
+    throw new Error("GHARIBO V1 runtime is not configured");
+  }
+  if (typeof fetchImpl !== "function") {
+    throw new Error("No fetch implementation available for the V1 runtime");
+  }
+
+  const url = `${config.baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
+  // `buildV1Request` owns the prompt contract; the endpoint still requires the
+  // model id on the wire, which is identity (config.modelId), not prompt.
+  const body = { model: config.modelId, ...buildV1Request(messages, options) };
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(
+      `GHARIBO V1 runtime error HTTP ${response.status}: ${errText.slice(0, 200)}`,
+    );
+  }
+
+  const json = await response.json();
+  return extractV1Answer(json);
 }
 
 // ---------------------------------------------------------------------------

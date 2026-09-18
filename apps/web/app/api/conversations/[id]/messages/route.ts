@@ -7,7 +7,13 @@ import { conversationsRepository, providersRepository } from "@/lib/db/repositor
 import { getProvider } from "@/lib/providers";
 import type { Message, ChatChunk } from "@gharibo/shared";
 import { z } from "zod";
-import { extractV1Answer, resolveV1RuntimeConfig } from "@/lib/runtime/gharibo-v1.mjs";
+import {
+  resolveV1RuntimeConfig,
+  resolveRuntimeToken,
+  runV1Chat,
+  V1_MODEL_ID,
+  V1_RUNTIME_PROVIDER_ID,
+} from "@/lib/runtime/gharibo-v1.mjs";
 
 /**
  * True when this provider IS the GHARIBO V1 runtime.
@@ -51,16 +57,30 @@ export async function POST(
     content: parsed.data.content,
   });
 
-  // Get the provider
+  // Resolve the provider. The GHARIBO V1 runtime is addressed by a sentinel id
+  // that needs no DB provider row: it is driven entirely by the environment
+  // (GHARIBO_V1_BASE_URL / GHARIBO_V1_API_KEY_REF), so no base URL or credential
+  // is ever stored. Any other id must resolve to a real provider row.
   if (!conv.providerId) {
     return new Response("No provider configured for this conversation", { status: 400 });
   }
-  const providerConfig = providersRepository.get(conv.providerId);
-  if (!providerConfig) {
-    return new Response("Provider not found", { status: 400 });
+
+  const isV1Sentinel = conv.providerId === V1_RUNTIME_PROVIDER_ID;
+
+  let providerConfig: ReturnType<typeof providersRepository.get> = null;
+  if (!isV1Sentinel) {
+    providerConfig = providersRepository.get(conv.providerId);
+    if (!providerConfig) {
+      return new Response("Provider not found", { status: 400 });
+    }
   }
 
-  const provider = getProvider(providerConfig);
+  const provider = isV1Sentinel ? null : getProvider(providerConfig!);
+
+  // A conversation addresses V1 either via the sentinel id, or via a DB provider
+  // whose base URL matches the configured V1 runtime endpoint.
+  const v1Config = resolveV1RuntimeConfig(process.env);
+  const useV1 = isV1Sentinel || (!!providerConfig && isV1RuntimeProvider(providerConfig.baseUrl));
 
   // Build messages array from conversation history
   const messages: Message[] = conv.messages
@@ -82,36 +102,54 @@ export async function POST(
 
   // Stream the response
   const encoder = new TextEncoder();
-  const guardV1 = isV1RuntimeProvider(providerConfig.baseUrl);
   const stream = new ReadableStream({
     async start(controller) {
       let fullResponse = "";
+      let isError = false;
       try {
-        if (guardV1) {
-          // GHARIBO V1 emits Harmony. `analysis` is chain-of-thought and must never
-          // reach a client, so the raw deltas are buffered and only the extracted
-          // final channel is emitted. A response with no final channel fails closed
-          // rather than surfacing raw model text.
-          let raw = "";
-          for await (const chunk of provider.chat(messages, options)) {
-            if (chunk.delta) raw += chunk.delta;
-            if (chunk.done) break;
+        if (useV1) {
+          // GHARIBO V1 emits Harmony. `analysis` is chain-of-thought and must
+          // never reach a client. The real inference call goes through the
+          // canonical contract (buildV1Request + server-side token + final-channel
+          // guard); only the extracted final channel may become an answer.
+          if (!v1Config.configured) {
+            controller.enqueue(
+              encoder.encode(
+                JSON.stringify({
+                  delta:
+                    "GHARIBO V1 runtime is not configured. Set GHARIBO_V1_BASE_URL and GHARIBO_V1_API_KEY_REF.",
+                  done: true,
+                }) + "\n",
+              ),
+            );
+            controller.close();
+            return;
           }
 
-          const extracted = extractV1Answer({ choices: [{ message: { content: raw } }] });
+          const token = resolveRuntimeToken(v1Config, process.env);
+          const extracted = await runV1Chat({ config: v1Config, token, messages, options });
+
           if (extracted.ok) {
             fullResponse = extracted.answer ?? "";
             controller.enqueue(
-              encoder.encode(JSON.stringify({ delta: fullResponse, done: false }) + "\n"),
+              encoder.encode(JSON.stringify({ delta: fullResponse, done: true }) + "\n"),
             );
           } else {
-            const notice = `The GHARIBO V1 runtime returned no final answer (${extracted.reason}).`;
-            controller.enqueue(encoder.encode(JSON.stringify({ delta: notice, done: true }) + "\n"));
+            // Fail closed: never surface raw model text (which may contain the
+            // analysis channel) when no final answer is present.
+            controller.enqueue(
+              encoder.encode(
+                JSON.stringify({
+                  delta: `The GHARIBO V1 runtime returned no final answer (${extracted.reason}).`,
+                  done: true,
+                }) + "\n",
+              ),
+            );
             controller.close();
             return;
           }
         } else {
-          for await (const chunk of provider.chat(messages, options)) {
+          for await (const chunk of provider!.chat(messages, options)) {
             const data = JSON.stringify(chunk) + "\n";
             controller.enqueue(encoder.encode(data));
             if (chunk.delta) {
@@ -123,18 +161,20 @@ export async function POST(
           }
         }
       } catch (error) {
+        isError = true;
         const errorMsg = error instanceof Error ? error.message : "Streaming error";
         const errorChunk: ChatChunk = { delta: `Error: ${errorMsg}`, done: true };
         controller.enqueue(encoder.encode(JSON.stringify(errorChunk) + "\n"));
-        fullResponse += `Error: ${errorMsg}`;
+        fullResponse = `Error: ${errorMsg}`;
       }
 
-      // Save assistant response
-      if (fullResponse) {
+      // Save the assistant response only when it is a real model answer, never
+      // when the call failed or returned no final channel.
+      if (fullResponse && !isError) {
         conversationsRepository.addMessage(params.id, {
           role: "assistant",
           content: fullResponse,
-          modelId: conv.modelId,
+          modelId: useV1 ? V1_MODEL_ID : conv.modelId,
           providerId: conv.providerId,
         });
       }

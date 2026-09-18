@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "./message-bubble";
 import { TrainingExampleDialog } from "./training-example-dialog";
+import { RuntimeStatusBadge } from "./runtime-status-badge";
 import { Send } from "lucide-react";
 import type { ConversationMessage, ConversationWithMessages } from "@gharibo/shared";
 
@@ -18,8 +19,16 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [replyNotice, setReplyNotice] = useState<string | null>(null);
   const [dialogMessage, setDialogMessage] = useState<ConversationMessage | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Clear any transient error/notice when the active conversation changes.
+  useEffect(() => {
+    setReplyNotice(null);
+    setStreamingContent("");
+    setStreaming(false);
+  }, [conversation?.id]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -36,6 +45,7 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
     setInput("");
     setStreaming(true);
     setStreamingContent("");
+    setReplyNotice(null);
 
     try {
       const res = await fetch(`/api/conversations/${conversation.id}/messages`, {
@@ -45,7 +55,11 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
       });
 
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        const txt = await res.text().catch(() => "");
+        setReplyNotice(`Request failed (HTTP ${res.status}). ${txt}`.trim());
+        setStreaming(false);
+        onRefresh();
+        return;
       }
 
       const reader = res.body?.getReader();
@@ -67,6 +81,16 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
                 setStreamingContent((prev) => prev + chunk.delta);
               }
               if (chunk.done) {
+                // Errors and fail-closed notices are NOT persisted as assistant
+                // messages by the route, so surface them as a transient reply.
+                const text = streamingContent + (chunk.delta ?? "");
+                if (
+                  /^Error:/.test(text) ||
+                  text.includes("returned no final answer") ||
+                  text.includes("is not configured")
+                ) {
+                  setReplyNotice(text);
+                }
                 setStreaming(false);
                 onRefresh();
                 return;
@@ -78,7 +102,9 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
         }
       }
     } catch (e) {
-      console.error("Chat error:", e);
+      setReplyNotice(
+        e instanceof Error ? `Network error: ${e.message}` : "Network error",
+      );
     } finally {
       setStreaming(false);
       onRefresh();
@@ -123,8 +149,9 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="border-b px-4 py-3">
+      <div className="flex items-center justify-between border-b px-4 py-3">
         <h2 className="text-sm font-semibold">{conversation.title}</h2>
+        <RuntimeStatusBadge />
       </div>
 
       {/* Messages */}
@@ -151,6 +178,18 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground" />
               <span>Generating...</span>
+            </div>
+          )}
+
+          {replyNotice && (
+            <div
+              className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
+                /^Error:/.test(replyNotice)
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              }`}
+            >
+              <p className="whitespace-pre-wrap">{replyNotice}</p>
             </div>
           )}
         </div>
