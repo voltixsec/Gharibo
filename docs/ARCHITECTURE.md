@@ -5,8 +5,8 @@
 | **Document Owner** | Architecture (GHARIBO AI LAB) |
 | **Type** | Architecture |
 | **Status** | Frozen |
-| **Version** | 1.2.1 |
-| **Last Updated** | 2026-09-15 |
+| **Version** | 1.2.2 |
+| **Last Updated** | 2026-09-19 |
 | **Project Name** | `gharibo_ai_lab` |
 | **Based On** | `docs/PRD.md` (v1.0.0) |
 | **Extended By** | `docs/ARCHITECTURE_MILESTONE_2.md` (v1.1.0) — M2 pipeline and governed Gold preview (ADR-0011..0014, ADR-0019) |
@@ -16,6 +16,13 @@
 > From this point, changing it requires an ADR and a version bump per
 > `docs/DOCUMENTATION_GOVERNANCE.md` §5. The countable claims in §2.7 are machine-checked by
 > `npm run docs:validate` — update that block whenever the code changes.
+
+> **v1.2.2 — api_handlers moved to 55 (2026-09-19).** The Playground V2 overhaul added a
+>  handler to `apps/web/app/api/conversations/[id]/route.ts` so conversation
+> rename and generation settings can be persisted. The only change to this frozen baseline
+> is the machine-checked `api_handlers` fact in §2.7 (54 → 55); nothing else in the frozen
+> baseline changed, and no architectural decision was altered. Recorded per the same
+> procedure as v1.2.1.
 
 > **v1.2.1 — ADR count moved to 20 (2026-09-15).** ADR-0020 (truthful post-execution
 > reconciliation without promotion) was accepted after `GHARIBO-exp-001` really executed on the
@@ -337,7 +344,7 @@ change with it** — that is what keeps the frozen baseline honest.
 | Metric | Value |
 |--------|-------|
 | api_route_files | 37 |
-| api_handlers | 54 |
+| api_handlers | 55 |
 | sqlite_tables | 17 |
 | dashboard_pages | 11 |
 | adrs | 20 |
