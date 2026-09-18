@@ -179,8 +179,42 @@ describe("truthful runtime health", () => {
 
     expect(health.state).toBe(V1_HEALTH.ONLINE);
     expect(health.ok).toBe(true);
+    // The GHARIBO serving service exposes /health, which reports whether the
+    // model is actually loaded. It is probed BEFORE the OpenAI-compatible
+    // fallback so a cold-starting container is not misreported as offline.
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe("http://127.0.0.1:8000/v1/models");
+    expect(calls[0].url).toBe("http://127.0.0.1:8000/health");
+  });
+
+  it("reports WARMING (never OFFLINE) while the model is still loading", async () => {
+    const config = resolveV1RuntimeConfig({
+      [V1_ENV.baseUrl]: "http://127.0.0.1:8000",
+      [V1_ENV.apiKeyRef]: "GHARIBO_V1_TOKEN",
+    });
+    const { impl } = mockFetch(async () => jsonResponse(200, { status: "loading" }));
+
+    const health = await checkV1Health(config, { fetchImpl: impl });
+
+    expect(health.state).toBe(V1_HEALTH.WARMING);
+    expect(health.ok).toBe(false);
+  });
+
+  it("falls back to the models probe when /health is absent", async () => {
+    const config = resolveV1RuntimeConfig({
+      [V1_ENV.baseUrl]: "http://127.0.0.1:8000",
+      [V1_ENV.apiKeyRef]: "GHARIBO_V1_TOKEN",
+    });
+    const { impl, calls } = mockFetch(async (url) =>
+      String(url).endsWith("/health") ? jsonResponse(404, {}) : jsonResponse(200, { data: [] }),
+    );
+
+    const health = await checkV1Health(config, { fetchImpl: impl });
+
+    expect(health.state).toBe(V1_HEALTH.ONLINE);
+    expect(calls.map((c) => c.url)).toEqual([
+      "http://127.0.0.1:8000/health",
+      "http://127.0.0.1:8000/v1/models",
+    ]);
   });
 
   it("is OFFLINE when the endpoint is unreachable", async () => {
@@ -238,7 +272,7 @@ describe("truthful runtime health", () => {
     expect(descriptor.hostingLabel).toBe("DEVELOPMENT_EPHEMERAL_RUNTIME");
   });
 
-  it("labels an unavailable runtime as NO_RUNTIME rather than faking readiness", async () => {
+  it("never fakes readiness for an unavailable runtime", async () => {
     const config = resolveV1RuntimeConfig({
       [V1_ENV.baseUrl]: "http://127.0.0.1:9",
       [V1_ENV.apiKeyRef]: "GHARIBO_V1_TOKEN",
@@ -249,8 +283,16 @@ describe("truthful runtime health", () => {
 
     const descriptor = await describeV1Runtime(config, { fetchImpl: impl });
 
-    expect(descriptor.hostingLabel).toBe("NO_RUNTIME");
+    // The safeguard: an unreachable runtime is never reported as ready, and a
+    // self-hosted endpoint is never dressed up as production hosting.
     expect(descriptor.health.ok).toBe(false);
+    expect(descriptor.health.state).toBe(V1_HEALTH.OFFLINE);
+    expect(descriptor.isProduction).toBe(false);
+    // `hostingLabel` describes WHERE the runtime is hosted, not whether it is
+    // reachable. The endpoint IS configured and self-hosted, so the honest
+    // hosting label is the development runtime — availability is carried by
+    // `health.state`/`health.ok`, which are asserted above.
+    expect(descriptor.hostingLabel).toBe("DEVELOPMENT_EPHEMERAL_RUNTIME");
   });
 });
 

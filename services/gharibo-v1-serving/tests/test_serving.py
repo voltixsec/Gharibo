@@ -3,14 +3,18 @@ GHARIBO-V1 serving integration tests (no GPU, no torch).
 
 These exercise the full service contract using a deterministic FakeBackend and
 FastAPI's TestClient:
-  - health before ready
-  - health ready
-  - unauthorized request
-  - malformed request
-  - adapter hash mismatch
-  - provider/model load failure
-  - normal OpenAI-compatible response contract
+  - health before ready / ready / unhealthy
+  - identity reporting with no secrets
+  - adapter hash mismatch and model load failure
+  - authorization (missing / present / wrong key)
+  - malformed and non-JSON requests
+  - normal OpenAI-compatible response contract (final channel only)
   - missing final channel fails closed
+  - SSE streaming: handshake, final-channel-only content, fail-closed, OOM
+  - deployment token safety: default, clamping, oversized prompt rejection
+  - structured CUDA OOM reporting (streaming and non-streaming)
+  - OpenAI compatibility: /v1/models, text content parts, unsupported content,
+    harmless extra fields, real usage estimates
 
 The real TransformersBackend is never imported here, so the suite runs in any
 environment. The real backend path is covered structurally by import and by the
@@ -254,7 +258,31 @@ def test_missing_final_channel_fails_closed():
     assert "leaked thought" not in res.text
 
 
-def test_stream_true_is_rejected():
+# ---------------------------------------------------------------- streaming
+#
+# The service deliberately does NOT stream raw generation tokens: the hidden
+# Harmony `analysis` channel is chain-of-thought and streaming it would leak it.
+# It sends an OpenAI-compatible SSE handshake immediately, then emits only the
+# validated final answer. These tests pin that contract.
+
+def _sse_payloads(res) -> list[dict]:
+    """Parses an SSE response body into its JSON payloads (ignoring [DONE])."""
+    import json as _json
+
+    payloads = []
+    for line in res.text.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        data = line[len("data:"):].strip()
+        if data == "[DONE]":
+            payloads.append({"__done__": True})
+            continue
+        payloads.append(_json.loads(data))
+    return payloads
+
+
+def test_stream_true_returns_openai_sse_with_final_answer_only():
     client, _ = make_ready_app(responses=[NORMAL_HARMONY])
     res = client.post(
         "/v1/chat/completions",
@@ -264,4 +292,281 @@ def test_stream_true_is_rejected():
             "stream": True,
         },
     )
-    assert res.status_code == 400
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/event-stream")
+
+    payloads = _sse_payloads(res)
+    assert payloads[-1] == {"__done__": True}
+
+    content = "".join(
+        p["choices"][0]["delta"].get("content", "")
+        for p in payloads
+        if "choices" in p
+    )
+    assert content == '{"records":[{"name":"ACME"}]}'
+    # The handshake must arrive before generation completes.
+    assert payloads[0]["choices"][0]["delta"].get("role") == "assistant"
+
+
+def test_stream_never_leaks_analysis_channel():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+        },
+    )
+    assert res.status_code == 200
+    assert "thinking" not in res.text
+    assert "analysis" not in res.text
+    assert "<|channel|>" not in res.text
+
+
+def test_stream_fails_closed_without_final_channel():
+    client, _ = make_ready_app(responses=[ANALYSIS_ONLY_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+        },
+    )
+    assert res.status_code == 200  # the stream itself was established
+    assert "leaked thought" not in res.text
+    payloads = _sse_payloads(res)
+    errors = [p for p in payloads if "error" in p]
+    assert errors, "expected an error event when no final channel is present"
+    assert errors[0]["error"]["type"] == "model_output_error"
+
+
+# ---------------------------------------------------------------- token safety
+
+
+class _RecordingBackend(FakeBackend):
+    """FakeBackend that records the max_tokens it was asked to generate."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.seen_max_tokens = []
+
+    def generate(self, messages, temperature, max_tokens):
+        self.seen_max_tokens.append(max_tokens)
+        return super().generate(messages, temperature, max_tokens)
+
+
+def _ready_app_with_backend(backend):
+    adapter_path, expected_sha = _dummy_adapter_dir()
+    engine = ServingEngine(
+        make_config(adapter_path=adapter_path, expected_sha=expected_sha),
+        backend=backend,
+    )
+    engine.load()
+    return TestClient(create_app(engine=engine)), engine
+
+
+def test_max_tokens_is_clamped_to_deployment_ceiling():
+    backend = _RecordingBackend(responses=[NORMAL_HARMONY])
+    client, _ = _ready_app_with_backend(backend)
+
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 4096,
+        },
+    )
+    assert res.status_code == 200
+    # A client asking for 4096 must NOT be able to OOM the development GPU.
+    from app.main import MAX_OUTPUT_TOKENS_CEILING
+
+    assert backend.seen_max_tokens == [MAX_OUTPUT_TOKENS_CEILING]
+
+
+def test_default_max_tokens_is_the_safe_default():
+    backend = _RecordingBackend(responses=[NORMAL_HARMONY])
+    client, _ = _ready_app_with_backend(backend)
+
+    res = client.post(
+        "/v1/chat/completions",
+        json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert res.status_code == 200
+    from app.main import DEFAULT_MAX_OUTPUT_TOKENS
+
+    assert backend.seen_max_tokens == [DEFAULT_MAX_OUTPUT_TOKENS]
+
+
+def test_oversized_prompt_is_rejected_before_generation():
+    backend = _RecordingBackend(responses=[NORMAL_HARMONY])
+    client, _ = _ready_app_with_backend(backend)
+
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "x" * 20000}],
+        },
+    )
+    assert res.status_code == 413
+    assert res.json()["detail"]["type"] == "context_too_large"
+    # Critically: the GPU was never asked to generate.
+    assert backend.seen_max_tokens == []
+
+
+def test_output_budget_exceeding_context_is_rejected():
+    backend = _RecordingBackend(responses=[NORMAL_HARMONY])
+    client, _ = _ready_app_with_backend(backend)
+
+    # A prompt close to the whole window cannot also afford any output.
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "y" * 9300}],
+            "max_tokens": 512,
+        },
+    )
+    assert res.status_code == 413
+    assert res.json()["detail"]["type"] in ("budget_exceeded", "context_too_large")
+    assert backend.seen_max_tokens == []
+
+
+# ---------------------------------------------------------------- OOM handling
+
+
+class _OomBackend(FakeBackend):
+    def generate(self, messages, temperature, max_tokens):
+        # Shaped exactly like torch.cuda.OutOfMemoryError (a RuntimeError).
+        raise RuntimeError(
+            "CUDA out of memory. Tried to allocate 11.00 GiB "
+            "(GPU 0; 14.56 GiB total capacity)"
+        )
+
+
+def test_cuda_oom_is_reported_as_a_structured_error():
+    client, _ = _ready_app_with_backend(_OomBackend())
+    res = client.post(
+        "/v1/chat/completions",
+        json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert res.status_code == 503
+    detail = res.json()["detail"]
+    assert detail["type"] == "gpu_out_of_memory"
+    assert "max_tokens" in detail
+
+
+def test_cuda_oom_in_stream_is_reported_as_a_structured_error():
+    client, _ = _ready_app_with_backend(_OomBackend())
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+        },
+    )
+    assert res.status_code == 200
+    payloads = _sse_payloads(res)
+    errors = [p for p in payloads if "error" in p]
+    assert errors and errors[0]["error"]["type"] == "gpu_out_of_memory"
+
+
+# ---------------------------------------------------------------- OpenAI compatibility
+
+
+def test_models_endpoint_lists_the_served_model():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.get("/v1/models")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["object"] == "list"
+    entry = body["data"][0]
+    assert entry["id"] == "GHARIBO-V1"
+    # Capability declaration must be truthful: text only.
+    assert entry["capabilities"]["text"] is True
+    assert entry["capabilities"]["vision"] is False
+    assert entry["capabilities"]["tools"] is False
+
+
+def test_text_content_parts_are_normalised():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "hello "},
+                        {"type": "text", "text": "world"},
+                    ],
+                }
+            ],
+        },
+    )
+    assert res.status_code == 200
+
+
+def test_image_content_is_rejected_as_unsupported_not_silently_dropped():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "what is this"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "https://example.com/x.png"},
+                        },
+                    ],
+                }
+            ],
+        },
+    )
+    # Accepting the request while dropping the image would misrepresent the
+    # model's abilities, so this must fail loudly.
+    assert res.status_code == 415
+    assert res.json()["detail"]["type"] == "unsupported_content"
+
+
+def test_harmless_extra_openai_fields_are_ignored():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            # Real clients send these; rejecting them would be a compatibility bug.
+            "top_p": 0.9,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
+            "n": 1,
+            "user": "workbuddy",
+            "seed": 42,
+            "stop": ["\n\n"],
+            "stream_options": {"include_usage": True},
+        },
+    )
+    assert res.status_code == 200
+
+
+def test_usage_reports_real_estimates_not_zeros():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert res.status_code == 200
+    usage = res.json()["usage"]
+    assert usage["prompt_tokens"] > 0
+    assert usage["completion_tokens"] > 0
+    assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
