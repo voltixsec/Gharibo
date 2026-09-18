@@ -1,7 +1,7 @@
 # PLAYGROUND_V2_REPORT
 
 **GHARIBO AI LAB — Playground V2 overhaul**
-Branch: `workbuddy/playground-v2` · Base commit: `b62e859` · Date: 2026-09-19
+Branch: `playground-v2` · Base commit: `b62e859` · Date: 2026-09-19
 
 ---
 
@@ -414,7 +414,7 @@ No horizontal overflow at any tested width (`scrollWidth === clientWidth`).
 
 ## 20. Exact git status
 
-Branch **`workbuddy/playground-v2`**, base commit `b62e859`, **nothing pushed, nothing merged.**
+Branch **`playground-v2`**, base commit `b62e859`, **nothing pushed, nothing merged.**
 
 ```
  M .gitignore
@@ -474,20 +474,52 @@ safe to delete once the branch is reviewed.
 
 ### Commits
 
-See §21 — commits are created on `workbuddy/playground-v2` only.
+See §21 — commits are created on `playground-v2` only.
 
 ---
 
 ## 21. Commit plan
 
-Commits are made on `workbuddy/playground-v2` with the separation below. **No push, no merge,
-no PR.**
+Commits created on `playground-v2`. **No push, no merge, no PR.**
 
-1. `fix(playground): repair runtime routing and conversation isolation`
-2. `feat(playground): redesign the GHARIBO AI workspace`
-3. `fix(serving): harden streaming, content handling and request memory safety`
-4. `test(playground): add end-to-end runtime regression coverage`
-5. `docs(architecture): record the api_handlers counter bump (v1.2.2)`
+| Commit | Subject |
+|---|---|
+| `c317d11` | `fix(playground): repair runtime routing and conversation isolation` |
+| `6b51674` | `feat(playground): redesign the GHARIBO AI workspace` |
+| `6e7e2f0` | `fix(serving): harden streaming, content handling and request memory safety` |
+| `aec3fa8` | `test(playground): add end-to-end runtime regression coverage` |
+| `cc8003c` | `docs(architecture): record the api_handlers counter bump (v1.2.2)` |
+
+The working tree is clean relative to `HEAD`. The only untracked files are the owner's
+pre-existing `*.before-*` scratch backups, which were deliberately **not** committed (they are
+superseded snapshots, and they remain on disk and in the recovery checkpoint).
+
+### Note - `main` advanced during this session (not by this work)
+
+At session start, local `main` was at `b62e859`. It is now at `2b34e46`
+(`fix(web): connect playground to GHARIBO-V1 runtime`), authored by the owner on 2026-09-18 and
+already present in `origin/main`. The reflog records the change as `pull: fast-forward`.
+**This work did not run `git pull`, `git fetch`, `git push`, or any merge** - the fast-forward
+came from outside this session. It is reported because it changes the branch's merge base.
+
+It is benign, and worth understanding before review:
+
+- `2b34e46` is the **committed form of the same local work** that was sitting uncommitted in the
+  working tree when this session began. That working tree was treated as the source of truth and
+  was carried forward, so no owner work was lost.
+- `2b34e46` already changed the health probe to `/health` - the same defect D2. This branch
+  **extends** it: `/health` first, `/v1/models` as a fallback, plus the new `WARMING` state and
+  real GPU diagnostics.
+- `2b34e46` forced `providerId: null` for every conversation ("Runtime GHARIBO-V1 is not a
+  persisted M2 provider"). That is exactly the workaround that made model selection cosmetic
+  (D1). This branch keeps the foreign-key-safe representation but lets `modelId` carry identity,
+  so selecting another provider actually routes there.
+- Everything else in `2b34e46` is preserved: the `.gitignore` additions, the optional
+  `runtimeProviderId` request field, and the sentinel on the chat request (now sent only for
+  legacy conversations).
+
+Merging `playground-v2` into `main` is therefore a normal review. For the overlapping files it
+should resolve in favour of this branch, which is a strict evolution of `2b34e46`.
 
 ---
 
