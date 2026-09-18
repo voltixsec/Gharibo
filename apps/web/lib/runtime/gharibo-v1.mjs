@@ -226,7 +226,7 @@ export async function checkV1Health(config, deps = {}) {
     };
   }
 
-  const url = `${config.baseUrl.replace(/\/$/, "")}/v1/models`;
+  const url = `${config.baseUrl.replace(/\/$/, "")}/health`;
   const headers = {};
   if (deps.token) headers.Authorization = `Bearer ${deps.token}`;
 

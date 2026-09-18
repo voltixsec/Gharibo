@@ -34,6 +34,7 @@ function isV1RuntimeProvider(baseUrl: string): boolean {
 
 const messageSchema = z.object({
   content: z.string().min(1),
+  runtimeProviderId: z.literal(V1_RUNTIME_PROVIDER_ID).optional(),
 });
 
 export async function POST(
@@ -61,15 +62,18 @@ export async function POST(
   // that needs no DB provider row: it is driven entirely by the environment
   // (GHARIBO_V1_BASE_URL / GHARIBO_V1_API_KEY_REF), so no base URL or credential
   // is ever stored. Any other id must resolve to a real provider row.
-  if (!conv.providerId) {
+  const effectiveProviderId =
+    conv.providerId ?? parsed.data.runtimeProviderId ?? null;
+
+  if (!effectiveProviderId) {
     return new Response("No provider configured for this conversation", { status: 400 });
   }
 
-  const isV1Sentinel = conv.providerId === V1_RUNTIME_PROVIDER_ID;
+  const isV1Sentinel = effectiveProviderId === V1_RUNTIME_PROVIDER_ID;
 
   let providerConfig: ReturnType<typeof providersRepository.get> = null;
   if (!isV1Sentinel) {
-    providerConfig = providersRepository.get(conv.providerId);
+    providerConfig = providersRepository.get(effectiveProviderId);
     if (!providerConfig) {
       return new Response("Provider not found", { status: 400 });
     }

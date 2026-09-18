@@ -32,7 +32,9 @@ export default function PlaygroundPage() {
     try {
       const conv = await createConversation({
         title: data.title,
-        providerId: data.providerId,
+        // Runtime GHARIBO-V1 is not a persisted M2 provider.
+        // Keep provider/model FKs null for runtime conversations.
+        providerId: null,
         modelId: null,
         systemPrompt: data.systemPrompt,
         temperature: data.temperature,

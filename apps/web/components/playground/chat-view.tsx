@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "./message-bubble";
 import { TrainingExampleDialog } from "./training-example-dialog";
 import { RuntimeStatusBadge } from "./runtime-status-badge";
+import { V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
 import { Send } from "lucide-react";
 import type { ConversationMessage, ConversationWithMessages } from "@gharibo/shared";
 
@@ -51,7 +52,10 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
       const res = await fetch(`/api/conversations/${conversation.id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          runtimeProviderId: V1_RUNTIME_PROVIDER_ID,
+        }),
       });
 
       if (!res.ok) {
