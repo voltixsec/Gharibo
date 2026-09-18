@@ -1,19 +1,21 @@
-"""
-Model backends for GHARIBO-V1.
+﻿"""
+GHARIBO-V1 model backends.
 
-A backend turns a list of chat messages into a raw model continuation (which may
-contain Harmony channels). It does NOT perform final-channel extraction — that is
-the Harmony contract's job, applied uniformly by the engine.
+Production backend:
+  exact local gpt-oss-20b 4-bit snapshot
+  -> Unsloth FastLanguageModel
+  -> existing verified PEFT LoRA
+  -> inference mode
 
-The real backend (TransformersBackend) loads the base model + the exact PEFT LoRA
-adapter WITHOUT merging it. transformers/torch/peft are imported lazily inside
-the load path so the rest of the package (and the test-suite) runs without a GPU
-or those heavy dependencies installed.
+The adapter is NEVER recreated or merged.
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+
+
+CONTEXT_LENGTH = 3072
 
 
 @dataclass
@@ -29,11 +31,13 @@ class BackendDiagnostics:
 
 
 class ModelBackend(ABC):
-    diagnostics: BackendDiagnostics = field(default_factory=BackendDiagnostics)  # type: ignore[assignment]
+    diagnostics: BackendDiagnostics = field(
+        default_factory=BackendDiagnostics
+    )  # type: ignore[assignment]
 
     @abstractmethod
     def load(self) -> None:
-        """Load the base model and adapter. Raise on failure."""
+        pass
 
     @abstractmethod
     def generate(
@@ -42,12 +46,10 @@ class ModelBackend(ABC):
         temperature: float,
         max_tokens: int,
     ) -> str:
-        """Return the raw model continuation (may contain Harmony channels)."""
+        pass
 
 
 class FakeBackend(ModelBackend):
-    """Deterministic backend for tests. No GPU, no torch."""
-
     def __init__(
         self,
         responses: Optional[List[str]] = None,
@@ -65,6 +67,7 @@ class FakeBackend(ModelBackend):
     def load(self) -> None:
         if self._load_should_fail:
             raise RuntimeError("simulated model load failure")
+
         self.diagnostics = BackendDiagnostics(
             cuda_available=False,
             gpu_name="fake-gpu",
@@ -86,7 +89,12 @@ class FakeBackend(ModelBackend):
 
 
 class TransformersBackend(ModelBackend):
-    """Real backend: transformers + PEFT, loads base + LoRA without merging."""
+    """
+    Name retained for compatibility with the existing ServingEngine.
+
+    Actual production loader is Unsloth FastLanguageModel, matching the
+    successful GHARIBO T4 inference path.
+    """
 
     def __init__(
         self,
@@ -106,57 +114,85 @@ class TransformersBackend(ModelBackend):
         self._tokenizer = None
 
     def load(self) -> None:
-        # Lazy imports: heavy deps only required for the real serving path.
-        import torch  # noqa: F401
-        from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore
-        from peft import PeftModel  # type: ignore
+        # IMPORTANT: Unsloth must be imported before transformers / PEFT.
+        import unsloth  # noqa: F401
+        import torch
+        from unsloth import FastLanguageModel
+        from peft import PeftModel
 
-        if torch.cuda.is_available():
-            gpu_name = torch.cuda.get_device_name(0)
-            vram_total = torch.cuda.get_device_properties(0).total_memory
-            vram_allocated = torch.cuda.memory_allocated(0)
-        else:
-            gpu_name = None
-            vram_total = None
-            vram_allocated = None
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA is not available")
 
-        quant_kwargs: Dict = {}
-        if self._load_in_4bit:
-            from transformers import BitsAndBytesConfig  # type: ignore
+        gpu_name = torch.cuda.get_device_name(0)
+        vram_total = torch.cuda.get_device_properties(0).total_memory
 
-            quant_kwargs = {
-                "quantization_config": BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_compute_dtype="bfloat16",
-                    bnb_4bit_use_double_quant=True,
-                )
-            }
+        print("GHARIBO_LOAD_STAGE: UNSLOTH_READY", flush=True)
+        print(f"GHARIBO_GPU: {gpu_name}", flush=True)
+        print(f"GHARIBO_BASE: {self._base_model}", flush=True)
+        print(f"GHARIBO_ADAPTER: {self._adapter_dir}", flush=True)
 
-        tokenizer = AutoTokenizer.from_pretrained(
-            self._base_model, token=self._hf_token
+        # Exact successful architecture:
+        # local snapshot + 4-bit + single visible T4.
+        base, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=self._base_model,
+            max_seq_length=CONTEXT_LENGTH,
+            dtype=None,
+            load_in_4bit=True,
+            local_files_only=True,
+            device_map={"": 0},
         )
-        base = AutoModelForCausalLM.from_pretrained(
-            self._base_model,
-            token=self._hf_token,
-            device_map=self._device,
-            torch_dtype="auto",
-            **quant_kwargs,
+
+        print("GHARIBO_LOAD_STAGE: BASE_LOADED", flush=True)
+
+        FastLanguageModel.for_inference(base)
+        base.eval()
+
+        # Load the EXISTING accepted adapter. Never recreate or merge it.
+        model = PeftModel.from_pretrained(
+            base,
+            self._adapter_dir,
+            is_trainable=False,
         )
-        model = PeftModel.from_pretrained(base, self._adapter_dir)
+
+        FastLanguageModel.for_inference(model)
         model.eval()
+
+        print("GHARIBO_LOAD_STAGE: ADAPTER_LOADED", flush=True)
+
+        # Fail closed if any trainable parameter somehow exists.
+        if any(p.requires_grad for p in model.parameters()):
+            raise RuntimeError(
+                "Refusing to serve: trainable parameters detected."
+            )
+
+        lm_head_device = None
+        if hasattr(model, "lm_head"):
+            try:
+                lm_head_device = str(next(model.lm_head.parameters()).device)
+            except Exception:
+                pass
+
+        print(
+            f"GHARIBO_DEVICE_MAP: {getattr(model, 'hf_device_map', None)}",
+            flush=True,
+        )
+        print(f"GHARIBO_LM_HEAD_DEVICE: {lm_head_device}", flush=True)
 
         self._model = model
         self._tokenizer = tokenizer
+
         self.diagnostics = BackendDiagnostics(
-            cuda_available=torch.cuda.is_available(),
+            cuda_available=True,
             gpu_name=gpu_name,
             vram_total_bytes=vram_total,
-            vram_allocated_bytes=vram_allocated,
+            vram_allocated_bytes=torch.cuda.memory_allocated(0),
             base_model=self._base_model,
             adapter_loaded=True,
             adapter_sha256_verified=True,
             ready=True,
         )
+
+        print("GHARIBO_LOAD_STAGE: READY", flush=True)
 
     def generate(
         self,
@@ -165,19 +201,80 @@ class TransformersBackend(ModelBackend):
         max_tokens: int,
     ) -> str:
         if self._model is None or self._tokenizer is None:
-            raise RuntimeError("Backend is not loaded; call load() first.")
+            raise RuntimeError(
+                "Backend is not loaded; call load() first."
+            )
 
-        prompt = self._tokenizer.apply_chat_template(
+        import torch
+
+        rendered = self._tokenizer.apply_chat_template(
             messages,
             tokenize=False,
             add_generation_prompt=True,
+            reasoning_effort="medium",
         )
-        inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
-        output_ids = self._model.generate(
-            **inputs,
-            max_new_tokens=max_tokens,
-            temperature=max(temperature, 1e-3),
-            do_sample=temperature > 0,
+
+        inputs = self._tokenizer(
+            rendered,
+            add_special_tokens=False,
+            return_tensors="pt",
         )
-        generated = output_ids[0][inputs["input_ids"].shape[1]:]
-        return self._tokenizer.decode(generated, skip_special_tokens=False)
+
+        inputs = {
+            key: value.to("cuda")
+            for key, value in inputs.items()
+        }
+
+        prompt_len = inputs["input_ids"].shape[1]
+
+        # Preflight: refuse a prompt that cannot fit the model's context rather
+        # than letting the attention stack allocate and fail opaquely.
+        if prompt_len + max_tokens > CONTEXT_LENGTH:
+            raise RuntimeError(
+                f"Prompt ({prompt_len} tokens) plus max_new_tokens ({max_tokens}) "
+                f"exceeds the {CONTEXT_LENGTH}-token context."
+            )
+
+        generation_kwargs = {
+            "max_new_tokens": max_tokens,
+            "use_cache": True,
+        }
+
+        if temperature > 0:
+            generation_kwargs.update(
+                {
+                    "do_sample": True,
+                    "temperature": temperature,
+                }
+            )
+        else:
+            generation_kwargs.update(
+                {
+                    "do_sample": False,
+                    "temperature": None,
+                }
+            )
+
+        output_ids = None
+        try:
+            # No gradients, no autograd graph, eval mode: the whole generation
+            # runs inside inference_mode so no activation memory is retained.
+            with torch.inference_mode():
+                output_ids = self._model.generate(
+                    **inputs,
+                    **generation_kwargs,
+                )
+
+            generated = output_ids[0][prompt_len:]
+
+            return self._tokenizer.decode(
+                generated,
+                skip_special_tokens=False,
+            )
+        finally:
+            # Release request-local tensors so a long-lived worker does not
+            # accumulate memory across requests. This is NOT a substitute for
+            # having enough VRAM; it only stops per-request leakage.
+            del inputs
+            if output_ids is not None:
+                del output_ids

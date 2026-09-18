@@ -3,6 +3,7 @@ GHARIBO-V1 inference service.
 
 Endpoints:
   GET  /health                 -> loading | ready | unhealthy + identity + diagnostics
+  GET  /v1/models              -> OpenAI-compatible model listing
   POST /v1/chat/completions    -> OpenAI-compatible response (final channel only)
 
 The service reuses the canonical Harmony final-channel contract (harmony_final)
@@ -11,19 +12,82 @@ model load failure, or a response with no final channel never yields raw model
 text to the client.
 """
 
+import json
 import os
+import re
 import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional, Union
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 from .config import ServingConfig, load_config
 from .engine import EngineState, ServingEngine
+from . import identity
+
+
+def identity_context_length() -> int:
+    """
+    The accepted model's context identity (3072).
+
+    This is a MODEL property and is never reduced by deployment configuration.
+    The T4's smaller headroom is expressed as output-token and prompt-budget
+    limits, not by shrinking the model's declared context.
+    """
+    return int(identity.CONTEXT_LENGTH)
+
+
+class GpuOutOfMemoryError(Exception):
+    """A CUDA allocation failure, surfaced as a structured client error."""
+
+
+def is_cuda_oom(exc: BaseException) -> bool:
+    """
+    True when an exception is a CUDA out-of-memory failure.
+
+    `torch.cuda.OutOfMemoryError` subclasses `RuntimeError`, so name/code
+    inspection is used rather than a bare `isinstance` check (torch may not be
+    importable on a CPU-only test host).
+    """
+    name = type(exc).__name__
+    if name == "OutOfMemoryError" and "cuda" in type(exc).__module__.lower():
+        return True
+    message = str(exc).lower()
+    return "cuda out of memory" in message or "cublas" in message and "alloc" in message
+
+
+# ---------------------------------------------------------------------------
+# Deployment safety limits (mirrors apps/web/lib/runtime/deployment-limits.mjs)
+# ---------------------------------------------------------------------------
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+#: Hard ceiling for output tokens on the development GPU. Applied regardless of
+#: what the client asks for, so a single request cannot OOM the worker.
+MAX_OUTPUT_TOKENS_CEILING = _env_int("GHARIBO_MAX_OUTPUT_TOKENS_CEILING", 512)
+
+#: Applied when the client omits max_tokens.
+DEFAULT_MAX_OUTPUT_TOKENS = _env_int("GHARIBO_DEFAULT_MAX_OUTPUT_TOKENS", 256)
+
+#: Reserved prompt headroom inside the model's context window.
+RESERVED_PROMPT_TOKENS = _env_int("GHARIBO_RESERVED_PROMPT_TOKENS", 128)
+
+#: Conservative characters-per-token estimate for the preflight budget.
+CHARS_PER_TOKEN = 3.2
 
 
 # ---------------------------------------------------------------------------
@@ -31,19 +95,119 @@ from .engine import EngineState, ServingEngine
 # ---------------------------------------------------------------------------
 
 class ChatMessage(BaseModel):
+    """
+    A chat message.
+
+    `content` accepts either a plain string or a list of content parts. Only
+    TEXT parts are honoured; this is NOT multimodal support. A request carrying
+    image/audio/video parts is rejected explicitly rather than silently ignored,
+    because silently dropping an image would misrepresent the model's abilities.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
     role: str
-    content: str
+    content: Union[str, List[Any], None] = None
 
 
 class ChatCompletionRequest(BaseModel):
+    """
+    OpenAI-compatible request subset.
+
+    Unknown fields are IGNORED rather than rejected: real clients (WorkBuddy,
+    Open WebUI, the OpenAI SDK) routinely send fields this service does not use,
+    and a 422 for a harmless extra field is a compatibility defect, not safety.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
     model: Optional[str] = None
     messages: List[ChatMessage]
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    max_completion_tokens: Optional[int] = None
     stream: Optional[bool] = False
+    # Accepted and ignored: sampling/penalty/format controls this runtime does
+    # not implement. They are listed so the intent is explicit rather than
+    # accidental.
+    top_p: Optional[float] = None
+    n: Optional[int] = None
+    stop: Optional[Union[str, List[str]]] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    user: Optional[str] = None
+    seed: Optional[int] = None
+    response_format: Optional[dict] = None
+    stream_options: Optional[dict] = None
+    tools: Optional[List[Any]] = None
+    tool_choice: Optional[Any] = None
 
 
-def _openai_response(model_id: str, content: str) -> dict:
+class UnsupportedContentError(Exception):
+    """Raised when a request asks for a modality this model does not serve."""
+
+
+def normalize_message_content(message: ChatMessage) -> str:
+    """
+    Flattens a message's content into the text the model is trained on.
+
+    Accepted:
+      "hello"
+      [{"type": "text", "text": "hello"}, ...]
+
+    Rejected (explicitly, never silently dropped):
+      parts of any non-text type (image_url, input_audio, video_url, ...)
+    """
+    content = message.content
+
+    if content is None:
+        return ""
+
+    if isinstance(content, str):
+        return content
+
+    if not isinstance(content, list):
+        raise UnsupportedContentError(
+            f"Unsupported content type for role '{message.role}': "
+            f"{type(content).__name__}. Expected a string or a list of text parts."
+        )
+
+    parts: List[str] = []
+    for part in content:
+        if isinstance(part, str):
+            parts.append(part)
+            continue
+        if isinstance(part, dict):
+            part_type = part.get("type")
+            if part_type in (None, "text", "input_text"):
+                text = part.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+                    continue
+            raise UnsupportedContentError(
+                f"Unsupported content part type '{part_type}' for role "
+                f"'{message.role}'. GHARIBO-V1 serves text only."
+            )
+        raise UnsupportedContentError(
+            f"Unsupported content part for role '{message.role}'."
+        )
+
+    return "".join(parts)
+
+
+def estimate_tokens(text: str) -> int:
+    """Conservative token estimate (rounds up). No tokenizer on this host."""
+    if not text:
+        return 0
+    return int(len(text) / CHARS_PER_TOKEN) + 1
+
+
+def _openai_response(
+    model_id: str,
+    content: str,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+) -> dict:
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex}",
         "object": "chat.completion",
@@ -56,8 +220,63 @@ def _openai_response(model_id: str, content: str) -> dict:
                 "finish_reason": "stop",
             }
         ],
-        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
     }
+
+
+def _model_listing(model_id: str, context_length: int) -> dict:
+    """OpenAI-compatible model listing for this single-model server."""
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": model_id,
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "gharibo",
+                "context_length": context_length,
+                # Explicit capability declaration. Text only: no vision, no tools.
+                "capabilities": {
+                    "text": True,
+                    "vision": False,
+                    "tools": False,
+                    "streaming": True,
+                },
+            }
+        ],
+    }
+
+
+
+
+# ---------------------------------------------------------------------------
+# Final client-surface guard
+# ---------------------------------------------------------------------------
+
+_TRAILING_PROTOCOL_FRAGMENT = re.compile(
+    r'(?:\s*</assistant>?\s*)?<\|channel\|>\s*$'
+)
+
+def _client_safe_answer(answer: str) -> str:
+    """
+    Remove only a malformed trailing assistant/channel protocol fragment.
+
+    This is deliberately narrow: it does not rewrite semantic content and
+    does not expose raw Harmony analysis. Any recognised junk is accepted
+    only when it occurs at the very end of the already-governed answer.
+    """
+    value = answer if isinstance(answer, str) else ""
+
+    previous = None
+    while value != previous:
+        previous = value
+        value = _TRAILING_PROTOCOL_FRAGMENT.sub("", value)
+
+    return value.rstrip()
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +305,35 @@ def create_app(
     app = FastAPI(title="GHARIBO-V1 Inference", version="1.0.0", lifespan=lifespan)
     app.state.engine = engine
     app.state.config = config
+
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+        safe_errors = []
+
+        for error in exc.errors():
+            safe_errors.append({
+                "loc": list(error.get("loc", [])),
+                "type": error.get("type"),
+                "msg": error.get("msg"),
+            })
+
+        print(
+            "GHARIBO_REQUEST_VALIDATION_ERROR:",
+            json.dumps(safe_errors, ensure_ascii=False),
+            flush=True,
+        )
+
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "message": "Request validation failed",
+                    "type": "request_validation_error",
+                    "details": safe_errors,
+                }
+            },
+        )
+
 
     def get_engine() -> ServingEngine:
         return app.state.engine
@@ -125,6 +373,19 @@ def create_app(
             "error": report.error,
         }
 
+    @app.get("/v1/models")
+    def list_models(_=Depends(require_auth)):
+        """
+        OpenAI-compatible model listing.
+
+        The application's health probe uses this as a fallback when /health is
+        unavailable, so its absence would make a healthy runtime look offline.
+        """
+        return _model_listing(
+            engine.config.model_id,
+            identity_context_length(),
+        )
+
     @app.post("/v1/chat/completions")
     def chat_completions(req: ChatCompletionRequest, _=Depends(require_auth)):
         if engine.state != EngineState.READY:
@@ -133,38 +394,240 @@ def create_app(
                 detail=f"Engine not ready (status={engine.state})",
             )
 
-        if req.stream:
-            raise HTTPException(
-                status_code=400,
-                detail="stream=true is not supported; use stream=false.",
-            )
-
         if not req.messages:
             raise HTTPException(status_code=422, detail="messages must not be empty.")
 
-        messages = [m.model_dump() for m in req.messages]
-        temperature = req.temperature if req.temperature is not None else 0.2
-        max_tokens = req.max_tokens if req.max_tokens is not None else 3072
-
+        # Normalise content parts -> text. Non-text parts are rejected loudly.
         try:
-            result = engine.chat(messages, float(temperature), int(max_tokens))
-        except RuntimeError as exc:
-            raise HTTPException(status_code=503, detail=str(exc))
+            messages = [
+                {"role": m.role, "content": normalize_message_content(m)}
+                for m in req.messages
+            ]
+        except UnsupportedContentError as exc:
+            raise HTTPException(
+                status_code=415,
+                detail={
+                    "message": str(exc),
+                    "type": "unsupported_content",
+                    "supported": ["text"],
+                },
+            )
+
+        temperature = req.temperature if req.temperature is not None else 0.2
+
+        # ------------------------------------------------------------------
+        # Deployment token guard.
+        #
+        # The model already occupies most of the T4's 16 GB, so an
+        # OpenAI-compatible client requesting thousands of output tokens can
+        # trigger a very large KV/generation allocation and CUDA OOM. Two
+        # independent guards apply:
+        #   1. clamp the requested output size into the safe range;
+        #   2. reject a prompt that cannot fit the context at all, BEFORE any
+        #      GPU allocation happens.
+        # ------------------------------------------------------------------
+        requested_max_tokens = (
+            req.max_tokens
+            if req.max_tokens is not None
+            else req.max_completion_tokens
+        )
+        requested_max_tokens = (
+            int(requested_max_tokens)
+            if requested_max_tokens is not None
+            else DEFAULT_MAX_OUTPUT_TOKENS
+        )
+        max_tokens = max(1, min(requested_max_tokens, MAX_OUTPUT_TOKENS_CEILING))
+
+        context_length = identity_context_length()
+        prompt_tokens = sum(
+            estimate_tokens(m["content"]) + 4 for m in messages
+        )
+        prompt_budget = context_length - RESERVED_PROMPT_TOKENS
+
+        if prompt_tokens > prompt_budget:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "message": (
+                        f"Estimated prompt size (~{prompt_tokens} tokens) exceeds the "
+                        f"development runtime's prompt budget (~{prompt_budget} tokens of a "
+                        f"{context_length}-token context). Shorten the conversation or "
+                        f"start a new one."
+                    ),
+                    "type": "context_too_large",
+                    "estimated_prompt_tokens": prompt_tokens,
+                    "context_length": context_length,
+                },
+            )
+
+        if prompt_tokens + max_tokens > context_length:
+            affordable = max(1, context_length - prompt_tokens)
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "message": (
+                        f"Prompt (~{prompt_tokens} tokens) plus requested output "
+                        f"({max_tokens} tokens) exceeds the {context_length}-token "
+                        f"context. Reduce max_tokens to ~{affordable} or shorten the prompt."
+                    ),
+                    "type": "budget_exceeded",
+                    "estimated_prompt_tokens": prompt_tokens,
+                    "requested_max_tokens": max_tokens,
+                    "context_length": context_length,
+                },
+            )
+
+        # ------------------------------------------------------------
+        # OpenAI-compatible SSE streaming.
+        #
+        # GHARIBO does NOT expose raw generation / analysis tokens.
+        # The hidden Harmony `analysis` channel is chain-of-thought and
+        # streaming it token-by-token would leak it. We therefore send an
+        # immediate empty assistant chunk so clients such as WorkBuddy
+        # establish the stream immediately, run the governed inference, and
+        # emit ONLY the accepted final answer.
+        #
+        # This is deliberately NOT token-by-token streaming: correctness of the
+        # privacy contract outranks a prettier stream.
+        # ------------------------------------------------------------
+        if req.stream:
+            def event_stream():
+                request_id = f"chatcmpl-{uuid.uuid4().hex}"
+                created = int(time.time())
+
+                def chunk(delta: dict, finish_reason=None) -> str:
+                    payload = {
+                        "id": request_id,
+                        "object": "chat.completion.chunk",
+                        "created": created,
+                        "model": engine.config.model_id,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": delta,
+                                "finish_reason": finish_reason,
+                            }
+                        ],
+                    }
+                    return "data: " + json.dumps(
+                        payload,
+                        ensure_ascii=False,
+                    ) + "\n\n"
+
+                def error_event(message: str, error_type: str, **extra) -> str:
+                    payload = {
+                        "error": {"message": message, "type": error_type, **extra}
+                    }
+                    return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
+
+                # Immediate first byte / OpenAI stream handshake.
+                yield chunk({
+                    "role": "assistant",
+                    "content": "",
+                })
+
+                try:
+                    result = engine.chat(
+                        messages,
+                        float(temperature),
+                        int(max_tokens),
+                    )
+                except BaseException as exc:  # noqa: BLE001 - classify then report
+                    if is_cuda_oom(exc):
+                        # Do not retry: the request cannot fit, and retrying an
+                        # impossible allocation would only destabilise the worker.
+                        yield error_event(
+                            (
+                                "The development GPU ran out of memory for this request. "
+                                f"Reduce max output tokens (currently {max_tokens}) or "
+                                "shorten the conversation, then try again."
+                            ),
+                            "gpu_out_of_memory",
+                            max_tokens=max_tokens,
+                        )
+                    else:
+                        yield error_event(str(exc), "runtime_error")
+                    yield "data: [DONE]\n\n"
+                    return
+
+                if not result["ok"]:
+                    # Fail closed. Never expose raw Harmony / analysis.
+                    yield error_event(
+                        "model returned no final answer "
+                        f"({result['reason']})",
+                        "model_output_error",
+                    )
+                    yield "data: [DONE]\n\n"
+                    return
+
+                answer = _client_safe_answer(result["answer"] or "")
+
+                if answer:
+                    yield chunk({"content": answer})
+
+                yield chunk({}, "stop")
+                yield "data: [DONE]\n\n"
+
+            return StreamingResponse(
+                event_stream(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+
+        # ------------------------------------------------------------
+        # Non-streaming OpenAI-compatible path
+        # ------------------------------------------------------------
+        try:
+            result = engine.chat(
+                messages,
+                float(temperature),
+                int(max_tokens),
+            )
+        except BaseException as exc:  # noqa: BLE001 - classify then report
+            if is_cuda_oom(exc):
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "message": (
+                            "The development GPU ran out of memory for this request. "
+                            f"Reduce max_tokens (currently {max_tokens}) or shorten the prompt."
+                        ),
+                        "type": "gpu_out_of_memory",
+                        "max_tokens": max_tokens,
+                    },
+                )
+            raise HTTPException(
+                status_code=503,
+                detail={"message": str(exc), "type": "runtime_error"},
+            )
 
         if not result["ok"]:
-            # Fail closed: never surface raw model text (which may contain the
-            # analysis channel). Report the structured reason instead.
             return JSONResponse(
                 status_code=502,
                 content={
                     "error": {
-                        "message": f"model returned no final answer ({result['reason']})",
+                        "message": (
+                            "model returned no final answer "
+                            f"({result['reason']})"
+                        ),
                         "type": "model_output_error",
                     }
                 },
             )
 
-        return _openai_response(engine.config.model_id, result["answer"])
+        answer = _client_safe_answer(result["answer"] or "")
+
+        return _openai_response(
+            engine.config.model_id,
+            answer,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=estimate_tokens(answer),
+        )
+
 
     return app
 
