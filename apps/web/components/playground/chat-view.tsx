@@ -1,118 +1,253 @@
-"use client";
+﻿"use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { MessageBubble } from "./message-bubble";
 import { TrainingExampleDialog } from "./training-example-dialog";
 import { RuntimeStatusBadge } from "./runtime-status-badge";
-import { Send } from "lucide-react";
+import { EmptyState } from "./empty-state";
+import { Composer } from "./composer";
+import { GhariboOrbit } from "@/components/brand/gharibo-brand";
+import { V1_MODEL_ID, V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
+import { NdjsonStreamParser, STREAM_EVENT } from "@/lib/runtime/stream-parser.mjs";
+import { resolveDeploymentLimits } from "@/lib/runtime/deployment-limits.mjs";
+import { cn } from "@/lib/utils";
+import { AlertCircle, Check, Pencil, PanelRight } from "lucide-react";
 import type { ConversationMessage, ConversationWithMessages } from "@gharibo/shared";
+import type { RequestMetrics } from "./inspector";
 
 interface ChatViewProps {
   conversation: ConversationWithMessages | null;
   onRefresh: () => void;
+  onRename: (title: string) => void;
+  onCompare: (message: ConversationMessage) => void;
+  onMetrics: (metrics: RequestMetrics) => void;
+  onToggleInspector: () => void;
+  inspectorOpen: boolean;
+  /** Model label shown as a chip in the composer. */
+  modelLabel: string;
+  /** True when the routed target declares tool support. */
+  toolsSupported: boolean;
+  /**
+   * A prompt to send automatically once the current conversation is ready.
+   * Used by the Compare flow, which branches a conversation to another model.
+   */
+  pendingPrompt?: string | null;
+  onPendingPromptConsumed?: () => void;
 }
 
-export function ChatView({ conversation, onRefresh }: ChatViewProps) {
+/** A structured failure surfaced to the user. */
+interface Notice {
+  tone: "error" | "warning";
+  message: string;
+}
+
+export function ChatView({
+  conversation,
+  onRefresh,
+  onRename,
+  onCompare,
+  onMetrics,
+  onToggleInspector,
+  inspectorOpen,
+  modelLabel,
+  toolsSupported,
+  pendingPrompt,
+  onPendingPromptConsumed,
+}: ChatViewProps) {
   const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
-  const [replyNotice, setReplyNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [dialogMessage, setDialogMessage] = useState<ConversationMessage | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const limits = resolveDeploymentLimits({});
 
-  // Clear any transient error/notice when the active conversation changes.
+  const conversationId = conversation?.id ?? null;
+
+  /**
+   * Reset all transient state when the active conversation changes.
+   *
+   * This is what prevents a previous conversation's in-flight response, error
+   * notice or partial content from leaking into the newly selected one.
+   */
   useEffect(() => {
-    setReplyNotice(null);
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false);
     setStreamingContent("");
-    setStreaming(false);
-  }, [conversation?.id]);
-
-  // Auto-scroll on new messages
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [conversation?.messages, streamingContent]);
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || !conversation || streaming) return;
-
-    const content = input;
+    setNotice(null);
     setInput("");
-    setStreaming(true);
-    setStreamingContent("");
-    setReplyNotice(null);
+    setDialogMessage(null);
+    setEditingTitle(false);
+  }, [conversationId]);
 
-    try {
-      const res = await fetch(`/api/conversations/${conversation.id}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
+  // Abort any in-flight request when the component unmounts.
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        setReplyNotice(`Request failed (HTTP ${res.status}). ${txt}`.trim());
-        setStreaming(false);
-        onRefresh();
-        return;
-      }
+  // Keep the newest content in view.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [conversation?.messages, streamingContent, busy]);
 
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
+  const send = useCallback(
+    async (rawPrompt: string) => {
+      const prompt = rawPrompt.trim();
+      if (!prompt || !conversationId || busy) return;
 
-      if (reader) {
+      setInput("");
+      setBusy(true);
+      setStreamingContent("");
+      setNotice(null);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      const startedAt = performance.now();
+      let ttfbMs: number | null = null;
+      let accumulated = "";
+      let terminal = false;
+
+      try {
+        const body: Record<string, unknown> = { content: prompt };
+
+        /*
+         * Legacy fallback.
+         *
+         * Conversations created before the routing contract existed have
+         * NEITHER routing column set. They were always served by GHARIBO-V1
+         * (the old client sent the sentinel unconditionally), so the sentinel is
+         * sent for them and only them. Conversations created by the current UI
+         * carry `modelId: "GHARIBO-V1"` or a real `providerId`, so they resolve
+         * on their own and no sentinel is needed.
+         *
+         * This keeps existing conversations working without rewriting any data.
+         */
+        if (!conversation?.providerId && !conversation?.modelId) {
+          body.runtimeProviderId = V1_RUNTIME_PROVIDER_ID;
+        }
+
+        const res = await fetch(`/api/conversations/${conversationId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          // The route validates routing and the token budget BEFORE persisting,
+          // so a rejected request leaves the conversation untouched.
+          const payload = await res.json().catch(() => null);
+          const message =
+            payload?.error?.message ??
+            `The request was rejected (HTTP ${res.status}).`;
+          setNotice({ tone: "error", message });
+          return;
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) {
+          setNotice({ tone: "error", message: "The response stream was unavailable." });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        const parser = new NdjsonStreamParser();
+
+        const handleEvents = (events: ReturnType<NdjsonStreamParser["push"]>) => {
+          for (const event of events) {
+            if (event.type === STREAM_EVENT.DELTA) {
+              if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
+              accumulated += event.delta ?? "";
+              setStreamingContent(accumulated);
+              if (event.done) terminal = true;
+            } else if (event.type === STREAM_EVENT.STATUS) {
+              if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
+            } else if (event.type === STREAM_EVENT.ERROR) {
+              setNotice({
+                tone: event.error?.code === "NO_FINAL_ANSWER" ? "warning" : "error",
+                message: event.error?.message ?? "The runtime reported an error.",
+              });
+              terminal = true;
+            } else if (event.type === STREAM_EVENT.DONE) {
+              terminal = true;
+            }
+          }
+        };
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
-          const text = decoder.decode(value, { stream: true });
-          const lines = text.split("\n");
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const chunk = JSON.parse(line);
-              if (chunk.delta) {
-                setStreamingContent((prev) => prev + chunk.delta);
-              }
-              if (chunk.done) {
-                // Errors and fail-closed notices are NOT persisted as assistant
-                // messages by the route, so surface them as a transient reply.
-                const text = streamingContent + (chunk.delta ?? "");
-                if (
-                  /^Error:/.test(text) ||
-                  text.includes("returned no final answer") ||
-                  text.includes("is not configured")
-                ) {
-                  setReplyNotice(text);
-                }
-                setStreaming(false);
-                onRefresh();
-                return;
-              }
-            } catch {
-              // Skip malformed lines
-            }
-          }
+          handleEvents(parser.push(decoder.decode(value, { stream: true })));
         }
+        // Surface a truncated final record rather than dropping it.
+        handleEvents(parser.flush());
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          setNotice({
+            tone: "warning",
+            message: "Request cancelled. The response was not saved.",
+          });
+        } else {
+          setNotice({
+            tone: "error",
+            message:
+              error instanceof Error ? `Network error: ${error.message}` : "Network error.",
+          });
+        }
+      } finally {
+        abortRef.current = null;
+        setBusy(false);
+        setStreamingContent("");
+        onMetrics({
+          ttfbMs,
+          totalMs: Math.round(performance.now() - startedAt),
+          at: new Date().toISOString(),
+        });
+        onRefresh();
       }
-    } catch (e) {
-      setReplyNotice(
-        e instanceof Error ? `Network error: ${e.message}` : "Network error",
-      );
-    } finally {
-      setStreaming(false);
-      onRefresh();
-    }
-  };
+    },
+    [
+      conversationId,
+      busy,
+      onMetrics,
+      onRefresh,
+      // Routing identity of the active conversation (used by the legacy fallback).
+      conversation?.providerId,
+      conversation?.modelId,
+    ],
+  );
+
+  /**
+   * Auto-send a prompt handed over by the Compare flow.
+   *
+   * Guarded by a ref so the same prompt is never sent twice, even if the parent
+   * re-renders before the callback clears it.
+   */
+  const consumedPromptRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingPrompt || !conversationId || busy) return;
+    if (consumedPromptRef.current === pendingPrompt) return;
+    consumedPromptRef.current = pendingPrompt;
+    onPendingPromptConsumed?.();
+    send(pendingPrompt);
+  }, [pendingPrompt, conversationId, busy, send, onPendingPromptConsumed]);
 
   const handleQualitySignal = async (messageId: string, signal: "good" | "bad") => {
-    await fetch(`/api/conversations/${conversation?.id}/messages/${messageId}`, {
+    await fetch(`/api/conversations/${conversationId}/messages/${messageId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ qualitySignal: signal }),
@@ -120,105 +255,162 @@ export function ChatView({ conversation, onRefresh }: ChatViewProps) {
     onRefresh();
   };
 
-  const handleAddToDataset = (message: ConversationMessage) => {
-    setDialogMessage(message);
+  const commitTitle = () => {
+    const next = titleDraft.trim();
+    if (next && next !== conversation?.title) onRename(next);
+    setEditingTitle(false);
   };
 
-  const handleEditApprove = (message: ConversationMessage) => {
-    setDialogMessage(message);
-  };
-
-  const handleCompare = (message: ConversationMessage) => {
-    // Compare opens the same dialog for editing
-    setDialogMessage(message);
-  };
-
-  if (!conversation) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <h3 className="text-lg font-medium">No conversation selected</h3>
-          <p className="text-sm text-muted-foreground">
-            Create a new conversation to start chatting.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const messages = conversation?.messages ?? [];
+  const showEmpty = !conversation || messages.length === 0;
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <h2 className="text-sm font-semibold">{conversation.title}</h2>
-        <RuntimeStatusBadge />
+    <div className="flex h-full min-h-0 flex-col bg-[color:var(--gharibo-surface)]">
+      {/* ---------------------------------------------------------- header */}
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          {conversation ? (
+            editingTitle ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitTitle();
+                    if (e.key === "Escape") setEditingTitle(false);
+                  }}
+                  className="h-7 w-56 text-sm"
+                  autoFocus
+                  aria-label="Conversation title"
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={commitTitle}
+                  aria-label="Save title"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <button
+                className="group flex min-w-0 items-center gap-1.5"
+                onClick={() => {
+                  setTitleDraft(conversation.title);
+                  setEditingTitle(true);
+                }}
+                aria-label="Rename conversation"
+              >
+                <span className="truncate text-sm font-medium text-foreground">
+                  {conversation.title}
+                </span>
+                <Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+            )
+          ) : (
+            <span className="text-sm font-medium text-muted-foreground">GHARIBO-V1</span>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <RuntimeStatusBadge />
+          {!inspectorOpen && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-muted-foreground"
+                  onClick={onToggleInspector}
+                  aria-label="Show inspector"
+                >
+                  <PanelRight className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Show inspector</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1" ref={scrollRef as any}>
-        <div className="flex flex-col gap-4 p-4">
-          {conversation.messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              onAddToDataset={handleAddToDataset}
-              onQualitySignal={handleQualitySignal}
-              onEditApprove={handleEditApprove}
-              onCompare={handleCompare}
-            />
-          ))}
-          {streaming && streamingContent && (
-            <div className="flex flex-col items-start gap-1">
-              <div className="max-w-[80%] rounded-lg bg-muted px-4 py-3 text-sm">
-                <p className="whitespace-pre-wrap">{streamingContent}</p>
+      {/* -------------------------------------------------------- messages */}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        {showEmpty ? (
+          <EmptyState onPickPrompt={(prompt) => setInput(prompt)} />
+        ) : (
+          <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
+            {messages.map((msg, index) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                promptForRetry={
+                  msg.role === "assistant"
+                    ? (messages[index - 1]?.role === "user"
+                        ? messages[index - 1].content
+                        : null)
+                    : null
+                }
+                onAddToDataset={setDialogMessage}
+                onQualitySignal={handleQualitySignal}
+                onEditApprove={setDialogMessage}
+                onCompare={onCompare}
+                onRetry={(prompt) => send(prompt)}
+              />
+            ))}
+
+            {busy && (
+              <div className="flex gap-3">
+                <div className="min-w-0 flex-1">
+                  {streamingContent ? (
+                    <p className="whitespace-pre-wrap text-sm text-foreground">
+                      {streamingContent}
+                    </p>
+                  ) : (
+                    <GhariboOrbit label="Generating with GHARIBO-V1…" />
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-          {streaming && !streamingContent && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground" />
-              <span>Generating...</span>
-            </div>
-          )}
+            )}
 
-          {replyNotice && (
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
-                /^Error:/.test(replyNotice)
-                  ? "bg-destructive/10 text-destructive"
-                  : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-              }`}
-            >
-              <p className="whitespace-pre-wrap">{replyNotice}</p>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+            {notice && (
+              <div
+                className={cn(
+                  "flex gap-2.5 rounded-lg border p-3 text-xs",
+                  notice.tone === "error"
+                    ? "border-destructive/30 bg-destructive/8 text-destructive"
+                    : "border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-300",
+                )}
+                role="alert"
+              >
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <p className="leading-relaxed">{notice.message}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Input */}
-      <form onSubmit={handleSend} className="border-t p-4">
-        <div className="flex items-center gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type a message..."
-            disabled={streaming}
-          />
-          <Button type="submit" size="icon" disabled={streaming || !input.trim()}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </form>
+      {/* -------------------------------------------------------- composer */}
+      <Composer
+        value={input}
+        onChange={setInput}
+        onSend={() => send(input)}
+        onStop={() => abortRef.current?.abort()}
+        busy={busy}
+        canStop={busy}
+        disabled={!conversation}
+        disabledReason="Create or select a conversation to start."
+        modelLabel={modelLabel}
+        tokenBudget={conversation?.maxTokens ?? limits.defaultMaxOutputTokens}
+      />
 
-      {/* Training Example Dialog */}
-      {dialogMessage && (
+      {dialogMessage && conversation && (
         <TrainingExampleDialog
           message={dialogMessage}
           conversation={conversation}
           onClose={() => setDialogMessage(null)}
-          onSaved={() => {
-            setDialogMessage(null);
-          }}
+          onSaved={() => setDialogMessage(null)}
         />
       )}
     </div>

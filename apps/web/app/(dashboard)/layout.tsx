@@ -1,4 +1,7 @@
 import { Sidebar } from "@/components/sidebar";
+import { MobileNav } from "@/components/mobile-nav";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { RuntimeStatusProvider } from "@/components/providers/runtime-status-provider";
 
 export default function DashboardLayout({
   children,
@@ -6,11 +9,32 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-background">
-        {children}
-      </main>
-    </div>
+    <TooltipProvider delayDuration={300}>
+      {/*
+        One runtime probe for the whole dashboard. Without this, each consumer
+        (status badge, model selector, inspector, page) would fire its own live
+        probe, and each probe can wake a scaled-to-zero GPU container.
+      */}
+      <RuntimeStatusProvider>
+        {/*
+          Column on small screens (app bar above content), row at `lg` and above
+          (fixed navigation column beside content).
+        */}
+        <div className="flex h-screen flex-col overflow-hidden lg:flex-row">
+          {/* App bar + navigation drawer below `lg`. Contributes nothing at `lg`. */}
+          <MobileNav />
+
+          {/* Fixed navigation column at `lg` and above. */}
+          <Sidebar className="hidden lg:flex" />
+
+          {/*
+            Content pages scroll here. The Playground fills this box exactly
+            (`h-full`) and owns its own internal scroll areas, so there is no
+            double scrollbar.
+          */}
+          <main className="min-h-0 flex-1 overflow-y-auto bg-background">{children}</main>
+        </div>
+      </RuntimeStatusProvider>
+    </TooltipProvider>
   );
 }
