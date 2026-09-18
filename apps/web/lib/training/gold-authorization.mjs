@@ -3716,6 +3716,38 @@ function isV1QualificationFailedGoldState(state) {
   return isFrozen20QualificationGoldState(b);
 }
 
+/** DEC-0059 GHARIBO V1 PROMOTED from the 560-row production adapter after the frozen 10-item gate PASS. */
+function isV1PromotedGoldState(state) {
+  if (state?.masterStateVersion !== "1.37.0" || state?.updatedAt !== "2026-09-18") return false;
+  const d=(state?.decisions||[]).find(x=>x?.id==="DEC-0059");
+  const v=state?.v1, e=state?.experiments?.["GHARIBO-exp-002"];
+  if (!d || d.status!=="ACCEPTED" || d.supersedes!==null || d.supersededBy!==null || d.architectureChanging!==false ||
+    v?.modelId!=="GHARIBO-V1" ||
+    v?.adapterSha256!=="5d192d843af72298f5080f4ebe9fd77e3b47fa6c1abf46064706d091b80f7c22" ||
+    v?.qualificationVerdict!=="PASS" || v?.qualificationItems!==10 || v?.promotable!==true ||
+    v?.decisionId!=="DEC-0059" ||
+    v?.servingState!=="DEVELOPMENT_EPHEMERAL" ||
+    e?.promotable!==true || e?.evaluationStatus!=="NOT_RUN" ||
+    (state?.blockers||[]).find(b=>b?.id==="BLK-0005")?.status!=="OPEN" ||
+    (state?.blockers||[]).find(b=>b?.id==="BLK-0006")?.status!=="RE_SCOPED_NOT_BLOCKING") return false;
+  const b=structuredClone(state);
+  b.masterStateVersion="1.36.0";
+  b.decisions=b.decisions.filter(x=>x?.id!=="DEC-0059");
+  b.history=(b.history||[]).filter(h=>h?.revision!=="1.37.0");
+  b.validation.results=(b.validation.results||[]).filter(r=>r?.gate!=="exp002:v1-release-qualification");
+  b.models.derivedModels=b.models.derivedModels.filter(m=>m?.id!=="GHARIBO-V1");
+  delete b.v1;
+  const bt=b.training.exp002;
+  bt.status="PILOT_COMPLETE_INTEGRITY_PASS";
+  bt.qualification.status="FAILED"; bt.qualification.verdict="FAIL";
+  bt.qualification.evaluationStatus="NOT_RUN";
+  delete bt.qualification.resultArtifact; delete bt.qualification.decisionRecord;
+  delete bt.qualification.outcomeRecorded; delete bt.qualification.masterStateIntegration;
+  b.experiments["GHARIBO-exp-002"].readinessStatus="QUALIFICATION_20_RUNNING";
+  b.experiments["GHARIBO-exp-002"].promotable=false;
+  return isV1QualificationFailedGoldState(b);
+}
+
 export function isAcceptedGoldGovernanceState(state) {
   return (
     isAcceptedGoldPreviewState(state) ||
@@ -3745,6 +3777,7 @@ export function isAcceptedGoldGovernanceState(state) {
     isQualificationGateEntryGoldState(state) ||
     isFrozen20QualificationGoldState(state) ||
     isV1QualificationFailedGoldState(state) ||
+    isV1PromotedGoldState(state) ||
     isKaggleExecutionCompletedGoldState(state)
   );
 }

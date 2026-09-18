@@ -1,0 +1,80 @@
+{
+  "authority": "Final V1 release policy: 10-item frozen qualification is the final gate; promote on PASS.",
+  "decision": "Promote the exact trained EXP-002 PRODUCTION adapter (sha256 5d192d843af72298f5080f4ebe9fd77e3b47fa6c1abf46064706d091b80f7c22) as GHARIBO V1. It PASSED the frozen 10-item final release qualification under the unmodified governed scorer with unchanged thresholds. GHARIBO V1 is a LoRA adapter over gpt-oss-20b, NOT a merged model. Promotion is bound to immutable hashes only; no weights are copied or altered.",
+  "decisionHash": "46e6d54c6dc29580cf9b01db49cb343234fe094db0981d5d441b783b6b80c52b",
+  "decisionId": "DEC-0059",
+  "next": "UI_ACCEPTANCE_AND_VALIDATION",
+  "notClaimed": [
+    "a merged full model",
+    "an 80-item qualification",
+    "production-grade persistent serving"
+  ],
+  "promotedArtifact": {
+    "adapterBytes": 31876192,
+    "adapterSha256": "5d192d843af72298f5080f4ebe9fd77e3b47fa6c1abf46064706d091b80f7c22",
+    "baseModel": "openai/gpt-oss-20b",
+    "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+    "form": "LoRA adapter over gpt-oss-20b (explicitly NOT a merged/full model)",
+    "loader": "unsloth/gpt-oss-20b",
+    "loaderRevision": "e220476dc09936adfed96d0451acfa3601c23bd7",
+    "modelId": "GHARIBO-V1",
+    "packageId": "139a53c4111c58ce2dcc9e8d80ed2a40c791afd7f08196f90a1b3efd1e3e38bc",
+    "recipeHash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee"
+  },
+  "qualification": {
+    "evidenceStrength": "10 items is the final release gate by explicit policy; it is not equivalent to an 80-item evaluation.",
+    "freshUntouched": true,
+    "furtherRounds": false,
+    "items": 10,
+    "itemsReplaced": false,
+    "population": 80,
+    "previouslyUsed": 20,
+    "rawCounts": {
+      "classification_accuracy": "10/10",
+      "duplicate_rate": "0/10",
+      "empty_output_rate": "0/10",
+      "extraction_accuracy": "10/10",
+      "instruction_following": "10/10",
+      "record_precision": "10/10",
+      "schema_validity": "10/10",
+      "source_coverage": "10/10",
+      "source_fidelity": "11/11 citations",
+      "structured_output_reliability": "10/10",
+      "unsupported_claim_rate": "0/16 claims",
+      "valid_records": "10/10"
+    },
+    "scoreArtifactSha256": "cc672dd05f042f5d804e0a6f35807d7dd00b5920d93d02ecc1d8231206a65bfd",
+    "scorer": "scripts/eval/score-arm.mjs (gharibo-eval-harness-1.0.0)",
+    "scoringLocation": "LOCAL",
+    "subsetHash": "afc4a697e29c37d470d905114f4ac7c31c451be1baa2f938dd84dbb0402b92b1",
+    "thresholdsChanged": false,
+    "verdict": "PASS"
+  },
+  "recordDate": "2026-09-18",
+  "recordKind": "GHARIBO_V1_PROMOTION",
+  "recordRevision": 1,
+  "references": [
+    "governance/DEC-0058-v1-qualification-failed-not-promoted.json",
+    "data/derived/exp002/production-integrity.json",
+    "data/derived/exp002/qualification/v1-release-score.json",
+    "data/derived/exp002/qualification/frozen-10-release.json"
+  ],
+  "runtimeBinding": {
+    "contract": "apps/web/lib/runtime/gharibo-v1.mjs (provider-neutral, env-only credentials)",
+    "finalChannelGuard": "enforced; hidden analysis never surfaced",
+    "servingHost": "Kaggle Notebook execution is not a persistent production API, so the serving state is declared DEVELOPMENT/EPHEMERAL, not ONLINE/PRODUCTION. No fake production availability."
+  },
+  "status": "V1_PROMOTED",
+  "trainingProvenance": {
+    "context": 3072,
+    "dtype": "float32",
+    "epochs": 1,
+    "experiment": "GHARIBO-exp-002",
+    "lossContract": "ASSISTANT_ONLY_EXPLICIT_LABEL_MASK",
+    "note": "Trained on the governed 560-row EXP-002 production split. DEC-0052/0053 pilot history preserved; the pilot adapter was NOT promoted (DEC-0058) because it failed qualification.",
+    "optimizerSteps": 140,
+    "trainLoss": 0.036044296949902285,
+    "trainRuntimeSeconds": 8142.2594,
+    "trainingExamples": 560
+  }
+}
