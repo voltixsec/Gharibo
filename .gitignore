@@ -119,3 +119,4 @@ data/derived/exp002/splits/*.jsonl
 data/derived/exp002/qualification/
 data/derived/exp002/qualification-recovered/
 data/derived/exp002/production-recovered/
+data/derived/exp002/v1qual-recovered/

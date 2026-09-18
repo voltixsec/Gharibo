@@ -185,7 +185,6 @@ Notes:
 | GHARIBO-exp-002 | EXPERIMENT | Corrected training contract prepared and gated locally. No training has been authorized, no run exists and no evaluation has occurred. |
 | GHARIBO-V0.1 | NOT_CREATED | Reserved name. Cannot be created without evaluation and promotion (ADR-0008). Training completion alone does not create it. |
 | GHARIBO-V1 | NOT_CREATED | Reserved name for the first accepted, production-ready model. Cannot be created without evaluation and explicit promotion (ADR-0008). No evaluation result exists, so it stays NOT_CREATED. |
-| GHARIBO-V1 | PROMOTED | LoRA adapter over gpt-oss-20b (NOT merged). Promoted under DEC-0059 after the frozen 10-item final release gate PASS. |
 
 ## Approved Roadmap
 
@@ -452,7 +451,6 @@ The public knowledge graph answers who COULD or SHOULD be asked. The private int
 | exp002:pilot-integrity | recover + verify pilot artifact | PASS | 0 | 29/29 integrity checks PASS on 121 recovered files. Adapter sha256 8d80d7caac5936042462ee14ed5a2335bc0fc40649befc9abb88400363b3773e (31,876,192 bytes). 25/25 optimizer steps, 1 epoch, train_loss 0.19649010464549066, train_runtime 1419.1747 s. Sealed qualification split not present in the recovered output. | 2026-09-17 | — |
 | exp002:qualification-seal-open | python scripts/exp002/build_qualification_items.py | PASS | 0 | Sealed qualification split opened exactly once under DEC-0056. 80 rows, split hash 1c5648cb...a9b1 verified. prompts.jsonl (model-visible) and gold.jsonl (scorer-only, local) separated. Consumed EXP-001 TEST split never read. | 2026-09-17 | — |
 | exp002:frozen-20-subset | python - (deterministic seeded selection over item_id) | PASS | 0 | 20 items frozen from the 80-item sealed population using sha256(seed:item_id) ascending. subsetHash c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45. Gold never read during selection. 60 items remain sealed. | 2026-09-17 | — |
-| exp002:v1-release-qualification | node scripts/eval/score-arm.mjs (frozen 10-item final gate) | PASS | 0 | 10/10 schema_validity, extraction, classification, source_coverage, record_precision, structured_output_reliability, instruction_following; 11/11 valid citations; 0/16 unsupported claims; 0/10 empty; 0 duplicates; 10/10 valid_records. Thresholds unchanged. | 2026-09-18 | — |
 
 ## Blockers
 

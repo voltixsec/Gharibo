@@ -2987,7 +2987,7 @@
         "kernelPushesPerformed": 0
       },
       "qualification": {
-        "status": "PASSED",
+        "status": "FAILED",
         "decisionId": "DEC-0057",
         "rows": 80,
         "splitHash": "1c5648cbcaa292357017abb8bc9a6775205f4a6f2abde688079ff7ed0aa9a9b1",
@@ -3003,8 +3003,8 @@
         "benchmarkVerdict": "GREEN",
         "medianItemSeconds": 141.865,
         "meanTokensPerSecond": 4.25,
-        "verdict": "PASS",
-        "resultArtifact": "data/derived/exp002/qualification/v1-release-score.json",
+        "verdict": "FAIL",
+        "resultArtifact": "data/derived/exp002/v1-qualification-result.json",
         "decisionRecord": "governance/DEC-0058-v1-qualification-failed-not-promoted.json",
         "outcomeRecorded": true,
         "masterStateIntegration": "PENDING - DEC-0058 needs a 1.37.0 gate layer whose strip chain is unfinished"
@@ -3206,11 +3206,6 @@
         "id": "GHARIBO-V1",
         "status": "NOT_CREATED",
         "note": "Reserved name for the first accepted, production-ready model. Cannot be created without evaluation and explicit promotion (ADR-0008). No evaluation result exists, so it stays NOT_CREATED."
-      },
-      {
-        "id": "GHARIBO-V1",
-        "status": "PROMOTED",
-        "note": "LoRA adapter over gpt-oss-20b (NOT merged). Promoted under DEC-0059 after the frozen 10-item final release gate PASS."
       }
     ]
   },
@@ -3739,14 +3734,6 @@
         "exitCode": 0,
         "evidence": "20 items frozen from the 80-item sealed population using sha256(seed:item_id) ascending. subsetHash c4bcad869ba38bcd361c1b499429a5f57cdb0f8bec85b164f6b28f9e3cc8af45. Gold never read during selection. 60 items remain sealed.",
         "verifiedAt": "2026-09-17"
-      },
-      {
-        "gate": "exp002:v1-release-qualification",
-        "command": "node scripts/eval/score-arm.mjs (frozen 10-item final gate)",
-        "status": "PASS",
-        "exitCode": 0,
-        "evidence": "10/10 schema_validity, extraction, classification, source_coverage, record_precision, structured_output_reliability, instruction_following; 11/11 valid citations; 0/16 unsupported claims; 0/10 empty; 0 duplicates; 10/10 valid_records. Thresholds unchanged.",
-        "verifiedAt": "2026-09-18"
       }
     ],
     "note": "results are recorded by QA after a full gate run; this section must never claim a gate that was not actually executed."
@@ -4414,24 +4401,5 @@
         "recorded truthfully that 20 items are NOT evidentially equivalent to 80"
       ]
     }
-  ],
-  "v1": {
-    "modelId": "GHARIBO-V1",
-    "adapterSha256": "5d192d843af72298f5080f4ebe9fd77e3b47fa6c1abf46064706d091b80f7c22",
-    "form": "LoRA adapter (NOT merged)",
-    "baseModel": "openai/gpt-oss-20b",
-    "baseModelRevision": "6cee5e81ee83917806bbde320786a8fb61efebee",
-    "loaderRevision": "e220476dc09936adfed96d0451acfa3601c23bd7",
-    "packageId": "139a53c4111c58ce2dcc9e8d80ed2a40c791afd7f08196f90a1b3efd1e3e38bc",
-    "recipeHash": "2021489e3bc2e18af12157ad09947cb2218acf2ccf0601a20214440941572bee",
-    "qualificationSubsetHash": "afc4a697e29c37d470d905114f4ac7c31c451be1baa2f938dd84dbb0402b92b1",
-    "qualificationItems": 10,
-    "qualificationVerdict": "PASS",
-    "scoreArtifactSha256": "cc672dd05f042f5d804e0a6f35807d7dd00b5920d93d02ecc1d8231206a65bfd",
-    "decisionId": "DEC-0059",
-    "decisionHash": "46e6d54c6dc29580cf9b01db49cb343234fe094db0981d5d441b783b6b80c52b",
-    "servingState": "DEVELOPMENT_EPHEMERAL",
-    "promotable": true,
-    "masterStateIntegration": "PENDING - the 1.37.0 strip-and-delegate layer is unfinished; recorded here so validation stays green"
-  }
+  ]
 }
