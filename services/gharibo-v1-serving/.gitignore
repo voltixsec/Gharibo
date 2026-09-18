@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.pyc
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+adapter/
+*.safetensors
+*.bin
+.pytest_cache/
+*.egg-info/

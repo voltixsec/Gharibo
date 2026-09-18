@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.safetensors
+adapter/
+tests/
+.git/
+.gitignore
+README.md
+requirements-dev.txt

@@ -1,0 +1,16 @@
+# GHARIBO-V1 serving - production runtime dependencies.
+# A single command:  pip install -r requirements.txt
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+python-dotenv==1.0.1
+
+# Inference engine (gpt-oss-20b + PEFT LoRA). Simplest stable path for this
+# model family: HuggingFace transformers + peft + 4-bit bitsandbytes base.
+# NOTE: these are GPU-only and large; they are imported lazily, so the test
+# suite and health endpoints run without them installed.
+torch==2.4.1
+transformers==4.46.3
+peft==0.20.0
+bitsandbytes==0.43.3
+huggingface_hub==0.26.2

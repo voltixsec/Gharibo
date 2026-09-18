@@ -1,0 +1,267 @@
+"""
+GHARIBO-V1 serving integration tests (no GPU, no torch).
+
+These exercise the full service contract using a deterministic FakeBackend and
+FastAPI's TestClient:
+  - health before ready
+  - health ready
+  - unauthorized request
+  - malformed request
+  - adapter hash mismatch
+  - provider/model load failure
+  - normal OpenAI-compatible response contract
+  - missing final channel fails closed
+
+The real TransformersBackend is never imported here, so the suite runs in any
+environment. The real backend path is covered structurally by import and by the
+Docker image.
+"""
+
+import os
+import sys
+import tempfile
+import hashlib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.config import ServingConfig  # noqa: E402
+from app.engine import EngineState, ServingEngine  # noqa: E402
+from app.main import create_app  # noqa: E402
+from app.model_backend import FakeBackend  # noqa: E402
+from app.identity import ACCEPTED_ADAPTER_SHA256  # noqa: E402
+from app.adapter_verify import sha256_of_file  # noqa: E402
+
+ACCEPTED_SHA = ACCEPTED_ADAPTER_SHA256
+FAKE_BASE = "openai/gpt-oss-20b"
+
+REAL_ADAPTER_DIR = Path(
+    "C:/Dev/GHARIBO/data/derived/exp002/production-recovered/adapter"
+)
+
+
+def _dummy_adapter_dir() -> tuple[str, str]:
+    d = tempfile.mkdtemp(prefix="gharibo-v1-dummy-")
+    p = Path(d) / "adapter_model.safetensors"
+    p.write_bytes(b"placeholder adapter not the real weights")
+    return d, sha256_of_file(str(p))
+
+
+def make_config(adapter_path=None, api_key=None, expected_sha=ACCEPTED_SHA):
+    return ServingConfig(
+        model_id="GHARIBO-V1",
+        adapter_path=adapter_path,
+        adapter_url=None,
+        expected_adapter_sha256=expected_sha,
+        base_model_override=None,
+        api_key=api_key,
+        device="auto",
+        load_in_4bit=True,
+        port=8000,
+        hf_token=None,
+    )
+
+
+def make_ready_app(
+    responses=None,
+    api_key=None,
+    load_should_fail=False,
+    adapter_path=None,
+    expected_sha=ACCEPTED_SHA,
+):
+    if adapter_path is None:
+        adapter_path, expected_sha = _dummy_adapter_dir()
+    backend = FakeBackend(
+        responses=responses, load_should_fail=load_should_fail, base_model=FAKE_BASE
+    )
+    engine = ServingEngine(
+        make_config(adapter_path=adapter_path, api_key=api_key, expected_sha=expected_sha),
+        backend=backend,
+    )
+    engine.load()
+    app = create_app(engine=engine)
+    return TestClient(app), engine
+
+NORMAL_HARMONY = (
+    "<|start|>assistant<|channel|>analysis<|message|>thinking<|end|>"
+    "<|start|>assistant<|channel|>final<|message|>"
+    '{"records":[{"name":"ACME"}]}'
+    "<|return|>"
+)
+ANALYSIS_ONLY_HARMONY = (
+    "<|start|>assistant<|channel|>analysis<|message|>leaked thought<|end|>"
+)
+
+
+# ---------------------------------------------------------------- health
+
+def test_health_before_ready_is_loading():
+    backend = FakeBackend()
+    engine = ServingEngine(make_config(), backend=backend)
+    assert engine.state == EngineState.LOADING
+    report = engine.health()
+    assert report.status == "loading"
+    assert report.error is None
+
+
+def test_health_ready_reports_identity_and_no_secrets():
+    client, engine = make_ready_app(responses=[NORMAL_HARMONY])
+    assert engine.state == EngineState.READY
+    res = client.get("/health")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "ready"
+    assert body["model_id"] == "GHARIBO-V1"
+    assert body["secrets_present"] is False
+    # The adapter was verified by SHA256 before load (a hash, not a secret).
+    assert body["adapter"]["sha256_verified"]
+    assert "GHARIBO_V" not in str(body)  # no secret-shaped strings
+
+
+def test_real_adapter_sha256_verifies_when_artifact_present():
+    # Only meaningful when the verified production artifact is on disk.
+    if not (REAL_ADAPTER_DIR / "adapter_model.safetensors").is_file():
+        import pytest
+
+        pytest.skip("real adapter artifact not present on disk")
+    client, engine = make_ready_app(
+        responses=[NORMAL_HARMONY],
+        adapter_path=str(REAL_ADAPTER_DIR),
+        expected_sha=ACCEPTED_SHA,
+    )
+    assert engine.state == EngineState.READY
+    assert engine.adapter_sha256 == ACCEPTED_SHA
+    assert client.get("/health").json()["adapter"]["sha256_verified"] == ACCEPTED_SHA
+
+
+# ---------------------------------------------------------------- auth
+
+def test_unauthorized_request_without_key():
+    client, _ = make_ready_app(api_key="secret-key")
+    res = client.post(
+        "/v1/chat/completions",
+        json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert res.status_code == 401
+
+
+def test_authorized_request_with_key():
+    client, _ = make_ready_app(api_key="secret-key", responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": "Bearer secret-key"},
+        json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert res.status_code == 200
+
+
+# ---------------------------------------------------------------- malformed
+
+def test_malformed_request_missing_messages():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post("/v1/chat/completions", json={"model": "GHARIBO-V1"})
+    assert res.status_code == 422
+
+
+def test_malformed_request_non_json():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        content=b"{not valid json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert res.status_code in (422, 400)
+
+
+# ---------------------------------------------------------------- adapter hash mismatch
+
+def test_adapter_hash_mismatch_is_unhealthy():
+    with tempfile.TemporaryDirectory() as d:
+        bad = Path(d) / "adapter_model.safetensors"
+        bad.write_bytes(b"this is not the real adapter")
+        engine = ServingEngine(make_config(adapter_path=str(d)), backend=FakeBackend())
+        engine.load()  # verification fails before backend load
+        assert engine.state == EngineState.UNHEALTHY
+        assert "SHA256" in (engine.error or "")
+        # No final answer can ever be produced from an unverified adapter.
+        app = create_app(engine=engine)
+        client = TestClient(app)
+        assert client.get("/health").json()["status"] == "unhealthy"
+        res = client.post(
+            "/v1/chat/completions",
+            json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+        )
+        assert res.status_code == 503
+
+
+# ---------------------------------------------------------------- model load failure
+
+def test_model_load_failure_is_unhealthy():
+    d, sha = _dummy_adapter_dir()
+    engine = ServingEngine(
+        make_config(adapter_path=d, expected_sha=sha),
+        backend=FakeBackend(load_should_fail=True),
+    )
+    engine.load()
+    assert engine.state == EngineState.UNHEALTHY
+    assert engine.error is not None
+    app = create_app(engine=engine)
+    client = TestClient(app)
+    assert client.get("/health").json()["status"] == "unhealthy"
+    res = client.post(
+        "/v1/chat/completions",
+        json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert res.status_code == 503
+
+
+# ---------------------------------------------------------------- normal contract
+
+def test_normal_openai_compatible_response_contract():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "extract the entity"}],
+            "temperature": 0.2,
+            "max_tokens": 3072,
+        },
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["object"] == "chat.completion"
+    choice = body["choices"][0]
+    assert choice["message"]["role"] == "assistant"
+    # Final channel only - the analysis channel must never appear.
+    assert choice["message"]["content"] == '{"records":[{"name":"ACME"}]}'
+    assert "thinking" not in choice["message"]["content"]
+
+
+# ---------------------------------------------------------------- missing final channel
+
+def test_missing_final_channel_fails_closed():
+    client, _ = make_ready_app(responses=[ANALYSIS_ONLY_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    # Fail closed: 502, no raw model text (analysis is never surfaced).
+    assert res.status_code == 502
+    assert "model_output_error" in res.json()["error"]["type"]
+    assert "leaked thought" not in res.text
+
+
+def test_stream_true_is_rejected():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+        },
+    )
+    assert res.status_code == 400
