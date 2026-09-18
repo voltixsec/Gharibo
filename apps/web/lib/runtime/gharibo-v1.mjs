@@ -60,7 +60,17 @@ export const V1_DEFAULTS = Object.freeze({
   temperature: 0.2,
   maxTokens: 3072,
   timeoutMs: 120_000,
-  healthTimeoutMs: 5_000,
+  /**
+   * Health probe timeout.
+   *
+   * Deliberately longer than the old 5 s (which reported a cold-starting GPU
+   * container as OFFLINE) but short enough that the UI gets an answer quickly.
+   * The key point is not the duration but the CLASSIFICATION: a probe that does
+   * not answer in time is reported as WARMING (unknown, possibly starting),
+   * never as a definitive failure. Aborting early costs nothing extra — the
+   * container boots whether or not this socket stays open.
+   */
+  healthTimeoutMs: 8_000,
 });
 
 // ---------------------------------------------------------------------------
@@ -186,6 +196,8 @@ export function buildV1Request(messages, options = {}) {
 /** Truthful health states. There is no "probably fine". */
 export const V1_HEALTH = Object.freeze({
   UNCONFIGURED: "UNCONFIGURED",
+  /** The endpoint answered, but the model is still loading. Not a failure. */
+  WARMING: "WARMING",
   ONLINE: "ONLINE",
   OFFLINE: "OFFLINE",
   UNAUTHORIZED: "UNAUTHORIZED",
@@ -195,8 +207,17 @@ export const V1_HEALTH = Object.freeze({
 /**
  * Performs a REAL probe against the runtime.
  *
- * ONLINE is returned only when the endpoint answers 2xx to a models listing.
- * Configuration alone is never reported as ready.
+ * Probe order:
+ *   1. `GET {base}/health` — the GHARIBO serving service's own endpoint. It
+ *      reports `loading | ready | unhealthy` plus GPU/adapter diagnostics, which
+ *      lets a cold-starting container be reported as WARMING rather than OFFLINE.
+ *   2. `GET {base}/v1/models` — the OpenAI-compatible fallback, used when the
+ *      endpoint is a generic OpenAI-compatible server with no `/health`.
+ *
+ * ONLINE is returned only when the endpoint actually answered. Configuration
+ * alone is never reported as ready, and an unanswered probe is reported as
+ * WARMING (unknown / possibly starting) rather than as a definitive failure —
+ * a GPU container that is still booting is not "offline".
  *
  * @param {ReturnType<typeof resolveV1RuntimeConfig>} config
  * @param {{fetchImpl?: typeof fetch, token?: string | null, timeoutMs?: number}} [deps]
@@ -226,19 +247,34 @@ export async function checkV1Health(config, deps = {}) {
     };
   }
 
-  const url = `${config.baseUrl.replace(/\/$/, "")}/v1/models`;
+  const base = config.baseUrl.replace(/\/+$/, "");
   const headers = {};
   if (deps.token) headers.Authorization = `Bearer ${deps.token}`;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  /** Single timed GET. Distinguishes "no answer in time" from "refused". */
+  async function probe(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetchImpl(url, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
+      return { response, timedOut: false, error: null };
+    } catch (error) {
+      const timedOut = error?.name === "AbortError" || error?.code === "ABORT_ERR";
+      return { response: null, timedOut, error };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
-  try {
-    const response = await fetchImpl(url, {
-      method: "GET",
-      headers,
-      signal: controller.signal,
-    });
+  // ---- 1. Rich health endpoint -------------------------------------------
+  const healthProbe = await probe(`${base}/health`);
+
+  if (healthProbe.response) {
+    const { response } = healthProbe;
 
     if (response.status === 401 || response.status === 403) {
       return {
@@ -251,37 +287,166 @@ export async function checkV1Health(config, deps = {}) {
       };
     }
 
-    if (!response.ok) {
+    if (response.status === 404) {
+      // Not a GHARIBO serving instance; fall through to the OpenAI-compatible probe.
+    } else if (response.ok) {
+      const body = await response.json().catch(() => null);
+      const status = typeof body?.status === "string" ? body.status : null;
+      const diagnostics = summarizeDiagnostics(body);
+
+      if (status === "ready") {
+        return {
+          state: V1_HEALTH.ONLINE,
+          ok: true,
+          detail: "Runtime reported ready.",
+          checkedAt,
+          modelId: body?.model_id ?? config.modelId,
+          statusCode: response.status,
+          diagnostics,
+        };
+      }
+
+      if (status === "loading") {
+        return {
+          state: V1_HEALTH.WARMING,
+          ok: false,
+          detail: "Runtime is up and still loading the model.",
+          checkedAt,
+          modelId: body?.model_id ?? config.modelId,
+          statusCode: response.status,
+          diagnostics,
+        };
+      }
+
+      if (status === "unhealthy") {
+        return {
+          state: V1_HEALTH.ERROR,
+          ok: false,
+          detail: body?.error
+            ? `Runtime reported unhealthy: ${String(body.error).slice(0, 200)}`
+            : "Runtime reported unhealthy.",
+          checkedAt,
+          modelId: body?.model_id ?? config.modelId,
+          statusCode: response.status,
+          diagnostics,
+        };
+      }
+
+      // A 2xx /health with an unrecognised shape: treat as reachable.
+      return {
+        state: V1_HEALTH.ONLINE,
+        ok: true,
+        detail: "Runtime answered the health probe.",
+        checkedAt,
+        modelId: body?.model_id ?? config.modelId,
+        statusCode: response.status,
+        diagnostics,
+      };
+    } else if (response.status >= 500) {
+      // A 5xx from /health can mean the container is up but the engine failed.
       return {
         state: V1_HEALTH.OFFLINE,
         ok: false,
-        detail: `Runtime probe failed with HTTP ${response.status}.`,
+        detail: `Runtime health probe failed with HTTP ${response.status}.`,
         checkedAt,
         modelId: config.modelId,
         statusCode: response.status,
       };
     }
-
+  } else if (healthProbe.timedOut) {
+    // No answer in time. A GPU container may still be cold-starting, so this is
+    // reported honestly as "unknown / possibly warming", never as "offline".
     return {
-      state: V1_HEALTH.ONLINE,
-      ok: true,
-      detail: "Runtime answered the models probe.",
+      state: V1_HEALTH.WARMING,
+      ok: false,
+      detail:
+        `No response within ${Math.round(timeoutMs / 1000)}s. The runtime may be ` +
+        "cold-starting, which can take several minutes on a scaled-to-zero GPU.",
+      checkedAt,
+      modelId: config.modelId,
+    };
+  }
+
+  // ---- 2. OpenAI-compatible fallback -------------------------------------
+  const modelsProbe = await probe(`${base}/v1/models`);
+
+  if (!modelsProbe.response) {
+    if (modelsProbe.timedOut) {
+      return {
+        state: V1_HEALTH.WARMING,
+        ok: false,
+        detail: `No response within ${Math.round(timeoutMs / 1000)}s; the runtime may be starting.`,
+        checkedAt,
+        modelId: config.modelId,
+      };
+    }
+    return {
+      state: V1_HEALTH.OFFLINE,
+      ok: false,
+      detail: `Runtime unreachable: ${
+        modelsProbe.error instanceof Error ? modelsProbe.error.message : String(modelsProbe.error)
+      }`,
+      checkedAt,
+      modelId: config.modelId,
+    };
+  }
+
+  const response = modelsProbe.response;
+
+  if (response.status === 401 || response.status === 403) {
+    return {
+      state: V1_HEALTH.UNAUTHORIZED,
+      ok: false,
+      detail: `Runtime reachable but rejected the credential (HTTP ${response.status}).`,
       checkedAt,
       modelId: config.modelId,
       statusCode: response.status,
     };
-  } catch (error) {
+  }
+
+  if (!response.ok) {
     return {
       state: V1_HEALTH.OFFLINE,
       ok: false,
-      detail: `Runtime unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      detail: `Runtime probe failed with HTTP ${response.status}.`,
       checkedAt,
       modelId: config.modelId,
+      statusCode: response.status,
     };
-  } finally {
-    clearTimeout(timer);
   }
+
+  return {
+    state: V1_HEALTH.ONLINE,
+    ok: true,
+    detail: "Runtime answered the models probe.",
+    checkedAt,
+    modelId: config.modelId,
+    statusCode: response.status,
+  };
 }
+
+/**
+ * Extracts the client-safe diagnostic subset of a `/health` body.
+ *
+ * Only real reported values are kept; anything absent stays null so the UI can
+ * say "unavailable" instead of inventing a number.
+ *
+ * @param {any} body
+ */
+function summarizeDiagnostics(body) {
+  const d = body?.diagnostics;
+  if (!d || typeof d !== "object") return null;
+  return {
+    cudaAvailable: d.cuda_available === true,
+    gpuName: typeof d.gpu_name === "string" ? d.gpu_name : null,
+    vramTotalBytes: typeof d.vram_total_bytes === "number" ? d.vram_total_bytes : null,
+    vramAllocatedBytes: typeof d.vram_allocated_bytes === "number" ? d.vram_allocated_bytes : null,
+    adapterLoaded: d.adapter_loaded === true,
+    adapterSha256Verified: d.adapter_sha256_verified === true,
+    baseModelLoaded: d.base_model_loaded === true,
+  };
+}
+
 
 // ---------------------------------------------------------------------------
 // Answer extraction
@@ -421,17 +586,22 @@ export async function describeV1Runtime(config, deps = {}) {
     modelId: config?.modelId ?? V1_MODEL_ID,
     roleSequence: V1_ROLE_SEQUENCE,
     finalChannel: V1_FINAL_CHANNEL,
-    // Never claim production hosting. A self-hosted endpoint reached over plain
-    // HTTP from a dev machine is a development runtime.
-    hostingLabel: health.ok ? "DEVELOPMENT_EPHEMERAL_RUNTIME" : "NO_RUNTIME",
+    // `hostingLabel` describes WHERE the runtime is hosted, not whether it is
+    // healthy. A configured, self-hosted endpoint is a development runtime even
+    // while it is still warming up; reporting NO_RUNTIME next to a WARMING
+    // status would contradict itself.
+    hostingLabel: config?.configured ? "DEVELOPMENT_EPHEMERAL_RUNTIME" : "NO_RUNTIME",
     isProduction: false,
     health: {
       state: health.state,
       ok: health.ok,
       detail: health.detail,
       checkedAt: health.checkedAt,
+      statusCode: health.statusCode ?? null,
     },
     endpointHost: host,
     config: redactRuntimeConfig(config),
+    // Real values reported by the serving process, or null. Never invented.
+    diagnostics: health.diagnostics ?? null,
   };
 }

@@ -3,6 +3,17 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Conversation, ConversationWithMessages } from "@gharibo/shared";
 
+/** Fields that can be patched on a conversation. */
+export interface ConversationPatch {
+  title?: string;
+  providerId?: string | null;
+  modelId?: string | null;
+  systemPrompt?: string | null;
+  temperature?: number;
+  maxTokens?: number;
+  toolsEnabled?: boolean;
+}
+
 /** Client-side hook for conversation list management. */
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -27,37 +38,75 @@ export function useConversations() {
     }
   }, []);
 
-  const createConversation = useCallback(async (data: {
-    title: string;
-    providerId?: string | null;
-    modelId?: string | null;
-    systemPrompt?: string | null;
-    temperature?: number;
-    maxTokens?: number;
-  }) => {
-    const res = await fetch("/api/conversations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    const json = await res.json();
-    if (json.code === 0) {
-      await refresh();
-      return json.data as Conversation;
-    }
-    throw new Error(json.message);
-  }, [refresh]);
+  const createConversation = useCallback(
+    async (data: {
+      title: string;
+      providerId?: string | null;
+      modelId?: string | null;
+      systemPrompt?: string | null;
+      temperature?: number;
+      maxTokens?: number;
+      toolsEnabled?: boolean;
+    }) => {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (json.code === 0) {
+        await refresh();
+        return json.data as Conversation;
+      }
+      throw new Error(json.message);
+    },
+    [refresh],
+  );
 
-  const deleteConversation = useCallback(async (id: string) => {
-    await fetch(`/api/conversations/${id}`, { method: "DELETE" });
-    await refresh();
-  }, [refresh]);
+  const patchConversation = useCallback(
+    async (id: string, patch: ConversationPatch) => {
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const json = await res.json();
+      if (json.code === 0) {
+        await refresh();
+        return json.data as Conversation;
+      }
+      throw new Error(json.message);
+    },
+    [refresh],
+  );
+
+  const renameConversation = useCallback(
+    (id: string, title: string) => patchConversation(id, { title }),
+    [patchConversation],
+  );
+
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      await refresh();
+    },
+    [refresh],
+  );
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  return { conversations, loading, error, refresh, createConversation, deleteConversation };
+  return {
+    conversations,
+    loading,
+    error,
+    refresh,
+    createConversation,
+    patchConversation,
+    renameConversation,
+    deleteConversation,
+  };
 }
 
 /** Client-side hook for fetching a single conversation with messages. */
