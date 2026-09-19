@@ -181,6 +181,26 @@ def test_malformed_request_non_json():
     assert res.status_code in (422, 400)
 
 
+def test_generation_bounds_are_validated_before_runtime():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    for payload in (
+        {"temperature": -0.1},
+        {"temperature": 2.1},
+        {"max_tokens": 0},
+        {"max_completion_tokens": -1},
+    ):
+        res = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "GHARIBO-V1",
+                "messages": [{"role": "user", "content": "hi"}],
+                **payload,
+            },
+        )
+        assert res.status_code == 422
+        assert res.json()["error"]["type"] == "request_validation_error"
+
+
 # ---------------------------------------------------------------- adapter hash mismatch
 
 def test_adapter_hash_mismatch_is_unhealthy():
