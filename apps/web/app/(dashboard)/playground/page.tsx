@@ -203,8 +203,16 @@ function PlaygroundContent() {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteConversation(id);
-    if (activeId === id) setActiveId(null);
+    try {
+      await deleteConversation(id);
+      if (activeId === id) setActiveId(null);
+    } catch (e) {
+      toast({
+        title: "Failed to delete conversation",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSelectionChange = async (key: string) => {
@@ -237,17 +245,19 @@ function PlaygroundContent() {
     systemPrompt?: string | null;
     temperature?: number;
     maxTokens?: number;
-  }) => {
-    if (!conversation) return;
+  }): Promise<boolean> => {
+    if (!conversation) return false;
     try {
       await patchConversation(conversation.id, patch);
       refresh();
+      return true;
     } catch (e) {
       toast({
         title: "Failed to save settings",
         description: e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
+      return false;
     }
   };
 
