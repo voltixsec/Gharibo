@@ -24,7 +24,7 @@ from typing import Any, List, Literal, Optional, Union
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .config import ServingConfig, load_config
 from .engine import EngineState, ServingEngine
@@ -123,9 +123,9 @@ class ChatCompletionRequest(BaseModel):
 
     model: Optional[str] = None
     messages: List[ChatMessage]
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    max_completion_tokens: Optional[int] = None
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = Field(default=None, ge=1)
+    max_completion_tokens: Optional[int] = Field(default=None, ge=1)
     stream: Optional[bool] = False
     # Compatibility fields. Safe no-op values are tolerated; semantics the
     # runtime cannot truthfully provide (multiple completions, tool calls,
