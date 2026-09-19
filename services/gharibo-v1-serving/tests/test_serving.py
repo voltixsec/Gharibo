@@ -121,6 +121,8 @@ def test_health_ready_reports_identity_and_no_secrets():
     assert body["secrets_present"] is False
     # The adapter was verified by SHA256 before load (a hash, not a secret).
     assert body["adapter"]["sha256_verified"]
+    assert body["diagnostics"]["base_model_loaded"] is True
+    assert isinstance(body["diagnostics"]["base_model_loaded"], bool)
     assert "GHARIBO_V" not in str(body)  # no secret-shaped strings
 
 
@@ -213,7 +215,10 @@ def test_model_load_failure_is_unhealthy():
     assert engine.error is not None
     app = create_app(engine=engine)
     client = TestClient(app)
-    assert client.get("/health").json()["status"] == "unhealthy"
+    health = client.get("/health").json()
+    assert health["status"] == "unhealthy"
+    assert health["error"] == "Runtime initialization failed."
+    assert "simulated model load failure" not in str(health)
     res = client.post(
         "/v1/chat/completions",
         json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
