@@ -9,38 +9,48 @@ Branch: `playground-v2` · Base commit: `b62e859` · Date: 2026-09-19
 
 The Playground was rebuilt end-to-end and the GHARIBO-V1 serving contract was hardened.
 
-Eight defects were **correctness** bugs, not cosmetics. Four were found by reading the code:
-model selection was cosmetic (every conversation silently routed to GHARIBO-V1), the health
-probe targeted an endpoint the serving service never implemented, the default output budget
-could OOM the development GPU, and the client's stream parser silently dropped tokens split
-across network chunk boundaries. Four more were found by an **automated browser E2E** built
-during this work, which the unit suites could not have caught: failure notices were invisible
-in an empty conversation, switching conversations briefly displayed the previous one's
-messages, a superseded request could write state into the wrong conversation, and a client
-disconnect discarded an already-generated answer.
+**Seventeen defects (D1-D17) were found and fixed.** The first eight were correctness bugs,
+identified by reading the code and by an **automated browser E2E** built during this work.
+The most consequential:
+- model selection was cosmetic (every conversation silently routed to GHARIBO-V1);
+- the health probe targeted an endpoint the serving service never implemented;
+- the default output budget could OOM the development GPU;
+- the client's stream parser silently dropped tokens split across network chunk boundaries;
+- failure notices were invisible in an empty conversation;
+- switching conversations briefly displayed the previous one's messages;
+- a superseded request could write state into the wrong conversation;
+- a client disconnect discarded an already-generated answer.
 
-All eight are fixed and covered by tests. The Playground is now a three-pane GHARIBO-branded
-workspace with a real conversation sidebar, a document-style chat view, a settings/telemetry
-inspector, and working drawers on small screens.
+The remaining nine (D9-D17) came from broadening verification beyond the Playground: a
+pre-existing badge-contrast failure on four other routes, a light-mode primary regression this
+branch introduced, missing keyboard bypass links, an unnamed temperature slider, drawers that
+ignored Escape, conversation search and delete left untested, a dead `terminal` variable, and
+unused imports plus a latent ENOENT in the benchmark tooling.
+
+The Playground is now a three-pane GHARIBO-branded workspace with a real conversation sidebar,
+a document-style chat view, a settings/telemetry inspector, and working drawers on small
+screens.
 
 The model smoke suite (§13) additionally surfaced **two model-level findings** that are NOT
-application defects and are reported rather than patched: the model reproducibly fails one
-decimal-multiplication step (correct on only 1 of 6 samples), and it claims tool capabilities it does not
-have — root-caused to a default `model_identity` of "You are ChatGPT" injected by the
-accepted chat template. Fixing the latter is a one-line change that would alter the served
-prompt contract, so it is deferred to the owner.
+application defects and are reported rather than patched:
+- **F1** — the model is *unreliable* on one decimal-multiplication step (correct on only 1 of
+  6 samples; a sixth run produced the right answer, so it is not deterministic).
+- **F2** — it claims tool capabilities it does not have, root-caused to a default
+  `model_identity` of "You are ChatGPT" injected by the accepted chat template. Fixing this is
+  a one-line change that would alter the served prompt contract, so it is deferred to the owner.
 
-Because this work changed shared code — the dashboard layout, the navigation
-sidebar and the whole colour token system — every dashboard route was regression-checked,
-not just the Playground. That found and fixed a pre-existing WCAG failure on four other
-pages, and a keyboard/assistive-technology audit added the missing bypass links, labelled the
-temperature slider and made the drawers Escape-closable.
+Because this work changed shared code — the dashboard layout, the navigation sidebar and the
+whole colour token system — every dashboard route was regression-checked, not just the
+Playground. That is what found the other-page failures, and a keyboard/assistive-technology
+audit added the missing bypass links, labelled the temperature slider and made the drawers
+Escape-closable.
 
-**Validation: typecheck PASS · 381/381 unit tests PASS · production build PASS ·
-`docs:validate` PASS · `verify:m2` PASS · 53/53 serving tests PASS · 13/13 API checks PASS ·
-14/14 live runtime checks PASS · 47/47 browser E2E checks PASS · 90/90 cross-page checks PASS ·
-15/15 accessibility checks PASS · 10/11 smoke checks PASS (1 model-level finding, F1) ·
-WCAG AA contrast PASS in both themes.**
+**Validation: typecheck PASS · lint PASS (no warnings) · 381/381 unit tests PASS · production
+build PASS · `docs:validate` PASS · `verify:m2` PASS · 53/53 serving tests PASS · 13/13 API
+checks PASS · 14/14 live runtime checks PASS · 30/30 browser E2E PASS · 90/90 cross-page PASS
+(dark and light) · 15/15 accessibility PASS (dark and light) · 14/14 matrix-gaps PASS · 11/11
+sidebar PASS · 10/10 provider-routing PASS · 10/11 smoke PASS (1 finding, F1) · WCAG AA
+contrast PASS in both themes.**
 
 No model identity, adapter, weights, or governance safeguard was changed. Nothing was pushed or
 merged.
