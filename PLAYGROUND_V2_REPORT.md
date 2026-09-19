@@ -495,6 +495,14 @@ not a code regression:
 4. **`next dev` returned 404 for its own chunks** (`main-app.js`) in this sandbox, so hydration
    never ran. Visual QA used `next build` + `next start` on a separate port.
 
+5. **A validation harness bug nearly hid a real failure.** An early version of the
+   final-validation script piped each command into `tail` and then read `\$?`, which
+   reports **tail's** status (always 0) rather than the command's. It reported
+   `typecheck EXIT=0` while `tsc` was in fact failing. Re-run with correct exit-code
+   capture, the failure was real and is fixed (`ca79e9f`). Every result in §14 was
+   therefore re-confirmed with unpiped exit codes; `tools/final-validate.sh` records
+   the corrected harness.
+
 **Visual QA method:** headless Chrome over the DevTools Protocol, driving
 `prefers-color-scheme` and device metrics. Two deliberate passes were performed:
 *Pass 1* (structure/hierarchy/usability) found the tablet three-pane squeeze and the mobile
