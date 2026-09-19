@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { conversationsRepository, providersRepository } from "@/lib/db/repositories";
 import { toApiResponse, HttpError, ok } from "@gharibo/shared";
 import { z } from "zod";
-import { V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
+import { V1_MODEL_ID, V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
 import { resolveDeploymentLimits, clampMaxOutputTokens } from "@/lib/runtime/deployment-limits.mjs";
 
 const patchSchema = z
@@ -64,9 +64,59 @@ export async function PATCH(
       );
     }
 
-    if (patch.providerId !== undefined && patch.providerId !== null) {
-      if (!providersRepository.get(patch.providerId)) {
-        throw new HttpError(400, `Provider not found: ${patch.providerId}`);
+    const routingTouched =
+      patch.providerId !== undefined || patch.modelId !== undefined;
+
+    if (routingTouched) {
+      if (patch.providerId !== undefined) {
+        if (patch.providerId === null) {
+          // Clearing a provider must also clear its model identity unless the
+          // caller explicitly switches to the environment-backed V1 runtime.
+          const requestedModel = patch.modelId ?? null;
+          if (requestedModel !== null && requestedModel !== V1_MODEL_ID) {
+            throw new HttpError(
+              400,
+              `Model ${requestedModel} has no provider. Only ${V1_MODEL_ID} may be stored without provider_id.`,
+            );
+          }
+          patch.modelId = requestedModel;
+        } else {
+          const provider = providersRepository.get(patch.providerId);
+          if (!provider) {
+            throw new HttpError(400, `Provider not found: ${patch.providerId}`);
+          }
+          if (
+            patch.modelId !== undefined &&
+            patch.modelId !== null &&
+            patch.modelId !== provider.modelId
+          ) {
+            throw new HttpError(
+              400,
+              `Model/provider mismatch: provider ${patch.providerId} serves ${provider.modelId}, not ${patch.modelId}`,
+            );
+          }
+          patch.modelId = provider.modelId;
+        }
+      } else if (patch.modelId !== undefined) {
+        // Changing only modelId must still remain coherent with the persisted
+        // provider target.
+        if (existing.providerId) {
+          const provider = providersRepository.get(existing.providerId);
+          if (!provider) {
+            throw new HttpError(400, `Provider not found: ${existing.providerId}`);
+          }
+          if (patch.modelId !== provider.modelId) {
+            throw new HttpError(
+              400,
+              `Model/provider mismatch: provider ${existing.providerId} serves ${provider.modelId}, not ${patch.modelId}`,
+            );
+          }
+        } else if (patch.modelId !== null && patch.modelId !== V1_MODEL_ID) {
+          throw new HttpError(
+            400,
+            `Model ${patch.modelId} has no provider. Only ${V1_MODEL_ID} may be stored without provider_id.`,
+          );
+        }
       }
     }
 
