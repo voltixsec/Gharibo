@@ -23,10 +23,17 @@ All eight are fixed and covered by tests. The Playground is now a three-pane GHA
 workspace with a real conversation sidebar, a document-style chat view, a settings/telemetry
 inspector, and working drawers on small screens.
 
-**Validation: typecheck PASS · 377/377 unit tests PASS · production build PASS ·
-`docs:validate` PASS · `verify:m2` PASS · 35/35 serving tests PASS · 13/13 API checks PASS ·
-14/14 live runtime checks PASS · 47/47 browser E2E checks PASS · WCAG AA contrast PASS in both
-themes.**
+The model smoke suite (§13) additionally surfaced **two model-level findings** that are NOT
+application defects and are reported rather than patched: the model reproducibly fails one
+decimal-multiplication step (0/5 samples correct), and it claims tool capabilities it does not
+have — root-caused to a default `model_identity` of "You are ChatGPT" injected by the
+accepted chat template. Fixing the latter is a one-line change that would alter the served
+prompt contract, so it is deferred to the owner.
+
+**Validation: typecheck PASS · 381/381 unit tests PASS · production build PASS ·
+`docs:validate` PASS · `verify:m2` PASS · 53/53 serving tests PASS · 13/13 API checks PASS ·
+14/14 live runtime checks PASS · 47/47 browser E2E checks PASS · 9/11 smoke checks PASS
+(2 model-level findings) · WCAG AA contrast PASS in both themes.**
 
 No model identity, adapter, weights, or governance safeguard was changed. Nothing was pushed or
 merged.
@@ -307,6 +314,90 @@ They found D10–D13 above, all now fixed and re-verified.
 | Responsive smoke test (1440 / 1280 / 1024 / 390): no overflow, composer usable | 8 |
 | Cleanup + no console errors | 3 |
 
+### Model smoke suite (mission section 13)
+
+`tools/smoke-suite.mjs` — 11 checks over **fresh synthetic prompts** (never a governed
+held-out item). Results are written to
+`C:\Dev\_gharibo_playground_v2_recovery\smoke\` and are explicitly labelled as a smoke
+suite, so they can never be mistaken for official evaluation artifacts.
+
+| Category | Result |
+|---|---|
+| Reasoning — simple (37 × 46) | PASS — `1702` |
+| Reasoning — multi-step (48 − 17 + 3×12) | PASS — `67` |
+| Coding (`chunk()` function) | PASS — `def` + `range` present |
+| Debugging (off-by-one) | PASS — `range(len(items))`, bug removed |
+| Instruction following (exactly 3 hyphen lines) | PASS — 3 bullets |
+| Structured output (strict JSON schema) | PASS — parsed, all keys present |
+| **Business arithmetic** | **FAIL — see F1** |
+| Conversation history (follow-up on a prior value) | PASS — `42` |
+| Isolation (fresh conversation must not recall) | PASS — `NO PRIOR NUMBER.` |
+| Capability — runtime declares no tools | PASS (deterministic) |
+| **Capability — model self-report** | **FAIL — see F2** |
+
+#### F1 — the model reliably fails one decimal-multiplication step
+
+Prompt: *"42.50 per unit, 240 units, 7% volume discount, what is the total purchase cost?"*
+Correct answer: **9,486** (42.50 × 0.93 = 39.525; 39.525 × 240 = 9,486).
+
+**Five independent samples, 0 correct:** `9,498` (×3), `9,492`, `9,480`.
+
+The model gets the intermediate right every time (`42.50 × 0.93 = 39.525`) and then
+misses the final multiplication. This is a reproducible arithmetic boundary of the
+accepted model, not an application defect — the request, prompt contract and persistence
+were all correct in every run. It is recorded rather than "fixed", because fixing it would
+mean changing the model.
+
+#### F2 — the model claims tools it does not have (root cause identified)
+
+The model answered, unprompted:
+
+> "I can only use the tools provided in this session: the built-in web-browser tool and
+> the shell execution tool."
+
+and in a second sample:
+
+> "I can run shell commands and read images, but I cannot browse the web."
+
+**This is not the application's doing, and that is provable.** The request builder emits no
+tool declarations (`tools`, `tool_choice`, `functions` — unit-tested), and the accepted
+tokenizer's chat template only renders tools when `builtin_tools` is explicitly supplied,
+which it is not. Rendering that template with the backend's exact arguments
+(`tools/render_prompt.py`) yields:
+
+```
+<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.
+Knowledge cutoff: 2024-06
+Current date: 2026-09-19
+
+Reasoning: medium
+
+# Valid channels: analysis, commentary, final. Channel must be included for every message.<|end|>
+```
+
+No `# Tools` section. No browser or python namespace. **But the system message tells the
+model it is ChatGPT** — the template's default `model_identity`, which the backend never
+overrides. That identity carries strong priors about browsing, vision and code execution,
+and is the most plausible cause of the confabulated capabilities.
+
+**Deliberately not fixed here.** Passing `model_identity="..."` is a one-line change, but it
+alters the served prompt contract and therefore model behaviour and comparability with prior
+evaluation runs. Per the mission's rules that is a model-identity-affecting change and is
+**deferred to the owner** (see §15). The current behaviour is pinned by a test
+(`test_prompt_identity_is_a_known_deferred_defect`) so it cannot change silently.
+
+### Protocol-tail cleanup
+
+A live smoke run produced a clean answer ending in a bare `</assistant>` —
+`"42\n\n</assistant>"` — which the previous pattern did not strip, because it required a
+trailing `<|channel|>`. The pattern now covers `</assistant>`, an unterminated `</assistant`,
+the `<|channel|>` variants and repeats, while still requiring at least one fragment so clean
+text is never touched and a non-trailing occurrence is preserved as content.
+
+**This fix lives in the serving service**, so it reaches the live GPU host only on the next
+serving deploy. It is verified by unit tests against the real FastAPI app on both the
+streaming and non-streaming paths; the live host still runs the previous build.
+
 Also executed end-to-end against the running application:
 
 - **`api-checks.mjs` — 13/13 PASS.** Sentinel rejected as `provider_id`; no-model → clear
@@ -337,6 +428,7 @@ Run with **Node 24** (see §16 for why).
 | `git diff --check` | **clean** |
 | Browser E2E phase 1 | **30/30 PASS** |
 | Browser E2E phase 2 (live) | **17/17 PASS** |
+| Model smoke suite (live) | **9/11 PASS** (2 model-level findings, F1/F2) |
 | WCAG contrast (dark, 95 samples) | **0 failures** |
 | WCAG contrast (light, 95 samples) | **0 failures** |
 
@@ -375,6 +467,12 @@ was touched.
    `GHARIBO_V1_API_KEY_REF` is the preferred form. No secret was printed, logged, or committed.
 8. **The Next.js dev server could not serve its own chunks in this environment** (§16). Visual QA
    used a production build; the dev server remains the owner's normal workflow.
+9. **The model claims capabilities it does not have** (F2). The application is provably clean;
+   the cause is the default `model_identity` injected by the accepted chat template. Deferred.
+10. **The model fails one decimal-multiplication step reproducibly** (F1) — 0/5 samples correct.
+    A model-quality boundary, not an application defect.
+11. **The protocol-tail fix is not yet live.** It is unit-verified against the real FastAPI app
+    but the deployed serving build predates it; it takes effect on the next serving deploy.
 
 ---
 
@@ -528,6 +626,8 @@ Commits created on `playground-v2`. **No push, no merge, no PR.**
 | `cc8003c` | `docs(architecture): record the api_handlers counter bump (v1.2.2)` |
 | `3993505` | `docs(report): record the external main fast-forward and exact commits` |
 | `e8e5855` | `fix(playground): close isolation and feedback gaps found by browser E2E` |
+| `4285253` | `docs(report): add the browser-E2E findings and final results` |
+| `0ff204f` | `fix(serving): strip a bare trailing </assistant> fragment; prove the prompt contract` |
 
 The working tree is clean relative to `HEAD`. The only untracked files are the owner's
 pre-existing `*.before-*` scratch backups, which were deliberately **not** committed (they are
@@ -599,3 +699,10 @@ should resolve in favour of this branch, which is a strict evolution of `2b34e46
 - Raising GPU tier / `min_containers` — **not done**, documented as a recommendation (§17).
 - Backfilling `model_id` on the nine legacy conversations — **not done** (§15.5).
 - Rebuilding `better-sqlite3` for Node 22 — **not done** (would break the owner's Node 24 setup).
+- **Passing a truthful `model_identity` to the chat template** — **not done**. This is the
+  recommended fix for F2, but it changes the served prompt contract and therefore model
+  behaviour and comparability with prior runs, so it is the owner's call. The one-line change
+  is `TransformersBackend.generate` → `apply_chat_template(..., model_identity="You are
+  GHARIBO-V1, a text-only assistant. You cannot browse the web, run code, or view images.")`.
+- **Redeploying the serving service to Modal** so the protocol-tail fix reaches the live host
+  — **not done** (deployment action, outside the reversible-code scope).
