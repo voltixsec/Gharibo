@@ -19,7 +19,7 @@ import { conversationsRepository, providersRepository } from "@/lib/db/repositor
 import { toApiResponse, HttpError } from "@gharibo/shared";
 import { z } from "zod";
 import { V1_MODEL_ID, V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
-import { resolveDeploymentLimits, clampMaxOutputTokens } from "@/lib/runtime/deployment-limits.mjs";
+import { resolveDeploymentLimits, resolveProviderLimits, clampMaxOutputTokens } from "@/lib/runtime/deployment-limits.mjs";
 
 const createSchema = z.object({
   title: z.string().min(1),
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
 
     const { providerId } = parsed.data;
     let modelId = parsed.data.modelId;
+    let providerConfig: ReturnType<typeof providersRepository.get> = null;
 
     if (providerId === V1_RUNTIME_PROVIDER_ID) {
       throw new HttpError(
@@ -55,19 +56,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (providerId !== null) {
-      const provider = providersRepository.get(providerId);
-      if (!provider) {
+      providerConfig = providersRepository.get(providerId);
+      if (!providerConfig) {
         throw new HttpError(400, `Provider not found: ${providerId}`);
       }
-      if (modelId !== null && modelId !== provider.modelId) {
+      if (modelId !== null && modelId !== providerConfig.modelId) {
         throw new HttpError(
           400,
-          `Model/provider mismatch: provider ${providerId} serves ${provider.modelId}, not ${modelId}`,
+          `Model/provider mismatch: provider ${providerId} serves ${providerConfig.modelId}, not ${modelId}`,
         );
       }
       // Provider rows own their model identity. Persist the canonical value even
       // when an API client omitted modelId.
-      modelId = provider.modelId;
+      modelId = providerConfig.modelId;
     } else if (modelId !== null && modelId !== V1_MODEL_ID) {
       throw new HttpError(
         400,
@@ -75,7 +76,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const limits = resolveDeploymentLimits(process.env);
+    const limits = providerConfig
+      ? resolveProviderLimits(providerConfig.contextWindow)
+      : resolveDeploymentLimits(process.env);
     const { value: maxTokens } = clampMaxOutputTokens(parsed.data.maxTokens, limits);
 
     return conversationsRepository.create({ ...parsed.data, modelId, maxTokens });
