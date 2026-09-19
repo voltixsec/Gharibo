@@ -68,7 +68,7 @@ app = modal.App(APP_NAME)
 @modal.asgi_app()
 def api():
     from app.config import load_config
-    from app.engine import EngineState, ServingEngine
+    from app.engine import ServingEngine
     from app.main import create_app
 
     config = load_config()
