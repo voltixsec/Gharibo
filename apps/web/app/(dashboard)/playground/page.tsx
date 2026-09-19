@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useConversations, useConversation } from "@/hooks/use-conversations";
 import { useProviders } from "@/hooks/use-providers";
-import { useRuntimeV1 } from "@/components/providers/runtime-status-provider";
+import { RuntimeStatusProvider, useRuntimeV1 } from "@/components/providers/runtime-status-provider";
 import { ConversationSidebar } from "@/components/playground/conversation-sidebar";
 import { ChatView, COMPOSER_ID } from "@/components/playground/chat-view";
 import { SkipLink } from "@/components/skip-link";
@@ -37,6 +37,14 @@ import { Menu, X } from "lucide-react";
 import type { ConversationMessage } from "@gharibo/shared";
 
 export default function PlaygroundPage() {
+  return (
+    <RuntimeStatusProvider>
+      <PlaygroundContent />
+    </RuntimeStatusProvider>
+  );
+}
+
+function PlaygroundContent() {
   const { toast } = useToast();
   const {
     conversations,
