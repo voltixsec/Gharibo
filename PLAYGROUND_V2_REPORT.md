@@ -68,6 +68,7 @@ Verified against the **local** working tree (not GitHub `main`).
 | D13 | **A client disconnect discarded a valid answer.** Next.js propagates the request's abort signal to `fetch`, so navigating away aborted the upstream inference and the already-generated answer was thrown away. | High | found by browser E2E |
 | D14 | **Badge contrast failed WCAG AA on four other pages** (3.3:1 and ~2.2:1 vs 4.5:1 required for 12px text). **Pre-existing** — `badge.tsx` was untouched by this branch — but surfaced because this work changed the shared layout and the whole colour token system. | Medium | found by cross-page check |
 | D15 | **No keyboard bypass past the navigation** (WCAG 2.4.1), **an unnamed temperature slider**, and **drawers that ignored Escape**. | Medium | found by accessibility audit |
+| D16 | **Light-mode primary failed WCAG AA on four routes** (3.57:1 vs 4.5:1). A regression from this branch's own theme work, invisible in dark mode. | Medium | found by running the cross-page check in light mode |
 
 ---
 
@@ -562,6 +563,38 @@ recorded because they cost real time:
    `Event('input')` is not equivalent to typing. Replaced with a real click,
    `Input.insertText`, and a real Tab.
 
+### Both themes, and the dynamic route (D16)
+
+Every cross-page and accessibility run up to this point used the **dark** theme.
+Running the same cross-page suite in **light** mode exposed a regression this
+branch had introduced itself: the light theme set `--primary: 202 88% 45%` with
+white text, and white on that cyan measures **3.57:1** — below the 4.5:1 needed
+for the small text on primary buttons. Four routes failed:
+
+| Route | Failing control |
+|---|---|
+| `/research-gym` | "Run Task" |
+| `/datasets` | "New Dataset" |
+| `/training` | "Generate Training Package" (+2 more) |
+| `/settings` | "Add Provider" |
+
+**Why dark never caught it:** the dark theme pairs a *bright* primary with *dark*
+text (`--primary-foreground: 220 71% 8%`), so the same token change passed
+comfortably there. The two themes are not symmetric, and checking one was not
+evidence about the other. Fixed by moving lightness 45% → 38% (~4.8:1).
+
+After the fix:
+
+| Suite | Light | Dark |
+|---|---|---|
+| Cross-page (10 routes × 2 widths) | **90/90** | **90/90** |
+| Cross-page incl. dynamic `/training/[runId]` | **99/99** | — |
+| Accessibility (keyboard / focus / ARIA) | **15/15** | **15/15** |
+
+The dynamic training route was also verified (it is the one route the static
+walk could not reach): HTTP 200, hydrates, renders 2162 chars, 11 nav links, no
+overflow at 1440 or 390, WCAG AA on 95 samples, no console errors.
+
 ## 14. Validation command results
 
 Run with **Node 24** (see §16 for why).
@@ -583,6 +616,10 @@ Run with **Node 24** (see §16 for why).
 | Accessibility (keyboard / focus / ARIA) | **15/15 PASS** |
 | Frontend performance A/B (measured) | **improved, no regression — kept** (re-render script 49 ms -> 30 ms) |
 | Test-matrix gaps (items G / H) + 768px viewport | **14/14 PASS** |
+| Cross-page, light theme | **90/90 PASS** (99/99 incl. dynamic route) |
+| Cross-page, dark theme | **90/90 PASS** |
+| Accessibility, light theme | **15/15 PASS** |
+| Accessibility, dark theme | **15/15 PASS** |
 | WCAG contrast (dark, 95 samples) | **0 failures** |
 | WCAG contrast (light, 95 samples) | **0 failures** |
 
@@ -731,13 +768,13 @@ errors. **90/90 passed.**
 
 ## 20. Exact git status
 
-Branch **`playground-v2`**, base commit `b62e859` (**17 commits**), **nothing pushed, nothing merged.**
+Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pushed, nothing merged.**
 
 ```
 branch : playground-v2
-head   : ed4496f
+head   : 863c670
 main   : 2b34e46  (not modified by this work)
-commits: 17 ahead of base
+commits: 20 ahead of base
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
@@ -819,6 +856,9 @@ Commits created on `playground-v2`. **No push, no merge, no PR.**
 | `a964aa8` | `fix(ui): darken success and warning badges to meet WCAG AA` |
 | `4aecd40` | `feat(a11y): keyboard bypass links, a labelled slider, Escape-closable drawers` |
 | `ed4496f` | `perf(playground): memoise markdown parsing and message re-render` |
+| `945c007` | `docs(report): finalise performance numbers, git status and limitations` |
+| `0810a15` | `docs(report): record the last test-matrix gaps and the 768px viewport` |
+| `863c670` | `fix(ui): darken the light-mode primary so button text meets WCAG AA` |
 
 The working tree is clean relative to `HEAD`. The only untracked files are the owner's
 pre-existing `*.before-*` scratch backups, which were deliberately **not** committed (they are
@@ -879,6 +919,8 @@ should resolve in favour of this branch, which is a strict evolution of `2b34e46
 | System prompt is sent and isolated per conversation | ✅ (proven behaviourally: `Hello! ZEPHYR` vs `Hello!`) |
 | Temperature changes persist across reload | ✅ (0.4 -> 0.55, survives reload) |
 | Layout verified at 1440 / 1280 / 1024 / 768 / 390 | ✅ |
+| Both themes verified, not just the default | ✅ (D16 found this way) |
+| The dynamic `/training/[runId]` route verified | ✅ |
 | Desktop and mobile layouts usable | ✅ (4 viewports) |
 | Message actions still work | ✅ |
 | Data/training actions still work | ✅ (Add to Dataset, Edit & Approve) |
