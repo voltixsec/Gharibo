@@ -11,7 +11,6 @@
  * Usage: node bench.mjs <baseUrl> [label]
  */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { setTimeout as sleep } from "node:timers/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -22,6 +21,8 @@ const OUT_ROOT = process.env.VERIFY_OUT ?? path.join(os.tmpdir(), "gharibo-verif
 const base = process.argv[2] ?? "http://localhost:3100";
 const label = process.argv[3] ?? "run";
 const outDir = process.env.BENCH_OUT ?? path.join(OUT_ROOT, "bench");
+// Must exist before writing: with the temp-dir default it does not on a first run.
+mkdirSync(outDir, { recursive: true });
 
 const PROMPTS = [
   {

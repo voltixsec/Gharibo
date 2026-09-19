@@ -4,7 +4,6 @@
  *
  * Usage: node repeat-arithmetic.mjs <baseUrl> [runs]
  */
-import { setTimeout as sleep } from "node:timers/promises";
 
 const base = (process.argv[2] ?? "http://localhost:3100").replace(/\/$/, "");
 const runs = Number(process.argv[3] ?? 3);

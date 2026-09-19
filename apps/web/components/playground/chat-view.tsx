@@ -14,7 +14,7 @@ import { RuntimeStatusBadge } from "./runtime-status-badge";
 import { EmptyState } from "./empty-state";
 import { Composer } from "./composer";
 import { GhariboOrbit } from "@/components/brand/gharibo-brand";
-import { V1_MODEL_ID, V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
+import { V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
 import { NdjsonStreamParser, STREAM_EVENT } from "@/lib/runtime/stream-parser.mjs";
 import { resolveDeploymentLimits } from "@/lib/runtime/deployment-limits.mjs";
 import { cn } from "@/lib/utils";

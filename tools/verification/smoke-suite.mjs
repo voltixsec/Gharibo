@@ -12,7 +12,6 @@
  * Usage: node smoke-suite.mjs <baseUrl>
  */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { setTimeout as sleep } from "node:timers/promises";
 import os from "node:os";
 import path from "node:path";
 
