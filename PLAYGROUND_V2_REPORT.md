@@ -496,7 +496,7 @@ not a code regression:
    never ran. Visual QA used `next build` + `next start` on a separate port.
 
 5. **A validation harness bug nearly hid a real failure.** An early version of the
-   final-validation script piped each command into `tail` and then read `\$?`, which
+   final-validation script piped each command into `tail` and then read `$?`, which
    reports **tail's** status (always 0) rather than the command's. It reported
    `typecheck EXIT=0` while `tsc` was in fact failing. Re-run with correct exit-code
    capture, the failure was real and is fixed (`ca79e9f`). Every result in §14 was
