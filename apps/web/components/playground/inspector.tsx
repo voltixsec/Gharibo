@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,7 @@ interface InspectorProps {
     systemPrompt?: string | null;
     temperature?: number;
     maxTokens?: number;
-  }) => void;
+  }) => Promise<boolean>;
   /** True when the selected target declares tool support. */
   toolsSupported: boolean;
   metrics: RequestMetrics | null;
@@ -59,6 +59,11 @@ export function Inspector({
   const [systemPrompt, setSystemPrompt] = useState("");
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(limits.defaultMaxOutputTokens);
+  const activeConversationIdRef = useRef<string | null>(conversation?.id ?? null);
+
+  useEffect(() => {
+    activeConversationIdRef.current = conversation?.id ?? null;
+  }, [conversation?.id]);
 
   /*
    * Re-sync local controls when the active conversation changes.
@@ -116,9 +121,13 @@ export function Inspector({
                 id="system-prompt"
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                onBlur={() => {
+                onBlur={async () => {
                   if (conversation && systemPrompt !== (conversation.systemPrompt ?? "")) {
-                    onPatch({ systemPrompt: systemPrompt || null });
+                    const owningId = conversation.id;
+                    const saved = await onPatch({ systemPrompt: systemPrompt || null });
+                    if (!saved && activeConversationIdRef.current === owningId) {
+                      setSystemPrompt(conversation.systemPrompt ?? "");
+                    }
                   }
                 }}
                 placeholder="You are a precise, helpful assistant."
@@ -130,9 +139,15 @@ export function Inspector({
                   variant="ghost"
                   size="sm"
                   className="h-6 self-start px-1.5 text-[0.6875rem] text-muted-foreground"
-                  onClick={() => {
+                  onClick={async () => {
+                    if (!conversation) return;
+                    const owningId = conversation.id;
+                    const previous = conversation.systemPrompt ?? "";
                     setSystemPrompt("");
-                    onPatch({ systemPrompt: null });
+                    const saved = await onPatch({ systemPrompt: null });
+                    if (!saved && activeConversationIdRef.current === owningId) {
+                      setSystemPrompt(previous);
+                    }
                   }}
                 >
                   <RotateCcw className="mr-1 h-3 w-3" />
@@ -154,7 +169,14 @@ export function Inspector({
                 step={0.05}
                 value={[temperature]}
                 onValueChange={(v) => setTemperature(v[0])}
-                onValueCommit={(v) => onPatch({ temperature: v[0] })}
+                onValueCommit={async (v) => {
+                  if (!conversation) return;
+                  const owningId = conversation.id;
+                  const saved = await onPatch({ temperature: v[0] });
+                  if (!saved && activeConversationIdRef.current === owningId) {
+                    setTemperature(conversation.temperature);
+                  }
+                }}
                 disabled={disabled}
                 /* Radix renders the thumb as role="slider"; without a name it is
                    announced as an unlabelled slider. */
@@ -175,9 +197,14 @@ export function Inspector({
                     key={preset}
                     type="button"
                     disabled={disabled}
-                    onClick={() => {
+                    onClick={async () => {
+                      if (!conversation) return;
+                      const owningId = conversation.id;
                       setMaxTokens(preset);
-                      onPatch({ maxTokens: preset });
+                      const saved = await onPatch({ maxTokens: preset });
+                      if (!saved && activeConversationIdRef.current === owningId) {
+                        setMaxTokens(conversation.maxTokens);
+                      }
                     }}
                     className={cn(
                       "rounded-md border px-2.5 py-1 text-xs transition-colors",
@@ -201,7 +228,14 @@ export function Inspector({
                     const next = Number.parseInt(e.target.value, 10);
                     if (Number.isFinite(next) && next > 0) setMaxTokens(next);
                   }}
-                  onBlur={() => onPatch({ maxTokens })}
+                  onBlur={async () => {
+                    if (!conversation) return;
+                    const owningId = conversation.id;
+                    const saved = await onPatch({ maxTokens });
+                    if (!saved && activeConversationIdRef.current === owningId) {
+                      setMaxTokens(conversation.maxTokens);
+                    }
+                  }}
                   className="h-7 w-20 text-xs"
                 />
               </div>
