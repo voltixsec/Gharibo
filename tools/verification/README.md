@@ -77,6 +77,7 @@ node tools/verification/perf-ab.mjs http://localhost:3100 after
 | `shot.mjs` | Screenshot at a given theme/viewport |
 | `eval.mjs` | Ad-hoc expression against the live page |
 | `bench.mjs` | Serving latency benchmark across prompts × token budgets |
+| `perf-check.mjs` | Frontend page metrics (FCP / TTFB / hydration / long tasks) over N runs |
 | `repeat-arithmetic.mjs` | Repeat one arithmetic case N times (variance, not one sample) |
 | `render_prompt.py` | Render the accepted tokenizer chat template to see what the model is told |
 | `analyze_logo.py` / `derive_brand_assets.py` | Measure / re-derive the official brand assets |
