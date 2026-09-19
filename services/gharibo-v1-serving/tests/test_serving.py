@@ -570,3 +570,197 @@ def test_usage_reports_real_estimates_not_zeros():
     assert usage["prompt_tokens"] > 0
     assert usage["completion_tokens"] > 0
     assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
+
+
+# ---------------------------------------------------------------- protocol tail
+#
+# The model occasionally emits a malformed trailing protocol fragment after a
+# complete final answer. `_client_safe_answer` removes ONLY that trailing junk:
+# it never rewrites semantic content, and it can never expose hidden-channel
+# text (that is the extractor's job, and it fails closed).
+
+from app.main import _client_safe_answer  # noqa: E402
+
+
+def test_client_safe_answer_removes_a_trailing_channel_marker():
+    assert _client_safe_answer('{"ok":true}<|channel|>') == '{"ok":true}'
+
+
+def test_client_safe_answer_removes_a_trailing_assistant_channel_fragment():
+    assert _client_safe_answer("answer</assistant><|channel|>") == "answer"
+
+
+def test_client_safe_answer_removes_repeated_trailing_fragments():
+    assert _client_safe_answer("answer<|channel|><|channel|>") == "answer"
+
+
+def test_client_safe_answer_leaves_clean_text_untouched():
+    for text in ["{\"records\":[]}", "Line one\nLine two", "a plain sentence."]:
+        assert _client_safe_answer(text) == text
+
+
+def test_client_safe_answer_never_rewrites_mid_string_content():
+    # Only a TRAILING fragment is protocol junk. A marker in the middle of real
+    # content is content, and must survive verbatim.
+    text = "before<|channel|>after"
+    assert _client_safe_answer(text) == text
+
+
+def test_client_safe_answer_handles_empty_and_non_string_input():
+    assert _client_safe_answer("") == ""
+    assert _client_safe_answer(None) == ""
+    assert _client_safe_answer(123) == ""
+    assert _client_safe_answer({}) == ""
+
+
+def test_client_safe_answer_is_idempotent():
+    once = _client_safe_answer("answer<|channel|>")
+    assert _client_safe_answer(once) == once
+
+
+def test_client_safe_answer_rstrips_trailing_whitespace():
+    assert _client_safe_answer("answer\n\n  ") == "answer"
+
+
+def test_protocol_tail_is_cleaned_on_the_non_streaming_path():
+    # A final channel whose content carries a malformed trailing fragment.
+    client, _ = make_ready_app(
+        responses=["<|start|>assistant<|channel|>final<|message|>hello<|channel|>"]
+    )
+    res = client.post(
+        "/v1/chat/completions",
+        json={"model": "GHARIBO-V1", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert res.status_code == 200
+    assert res.json()["choices"][0]["message"]["content"] == "hello"
+
+
+def test_protocol_tail_is_cleaned_on_the_streaming_path():
+    client, _ = make_ready_app(
+        responses=["<|start|>assistant<|channel|>final<|message|>hello<|channel|>"]
+    )
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stream": True,
+        },
+    )
+    assert res.status_code == 200
+    assert "<|channel|>" not in res.text
+    payloads = _sse_payloads(res)
+    content = "".join(
+        p["choices"][0]["delta"].get("content", "")
+        for p in payloads
+        if "choices" in p
+    )
+    assert content == "hello"
+
+
+
+def test_client_safe_answer_removes_a_bare_trailing_assistant_close():
+    # Observed in a live smoke run: the model ended a clean answer with
+    # "</assistant>" and no channel marker. The original regex required
+    # "<|channel|>" and therefore left the fragment visible to the user.
+    assert _client_safe_answer("42\n\n</assistant>") == "42"
+
+
+def test_client_safe_answer_removes_an_unterminated_assistant_close():
+    assert _client_safe_answer("42\n\n</assistant") == "42"
+
+
+def test_client_safe_answer_removes_mixed_trailing_fragments():
+    assert _client_safe_answer("answer</assistant></assistant>") == "answer"
+    assert _client_safe_answer("answer<|channel|></assistant>") == "answer"
+
+
+def test_client_safe_answer_still_preserves_inline_assistant_text():
+    # A non-trailing occurrence is content, not protocol junk.
+    text = "Use the </assistant> tag to close the turn."
+    assert _client_safe_answer(text) == text
+
+
+# ---------------------------------------------------------------- prompt contract
+#
+# What the model is actually TOLD, rendered from the accepted tokenizer's chat
+# template with the same arguments `TransformersBackend.generate` passes.
+#
+# This exists because the served prompt is not the same thing as the request the
+# application sends: the template injects a system message of its own. Asserting
+# on the RENDERED text is the only way to know what the model sees.
+
+TEMPLATE_PATH = Path("C:/Dev/GHARIBO/models/weights/exp002-tokenizer-unsloth/chat_template.jinja")
+
+
+def _render_prompt(messages=None, **overrides):
+    """Renders the accepted chat template exactly as the backend does."""
+    pytest = __import__("pytest")
+    if not TEMPLATE_PATH.is_file():
+        pytest.skip("accepted tokenizer chat template not present on disk")
+
+    # Imported lazily so a missing jinja2 skips these tests instead of breaking
+    # collection of the whole module.
+    from datetime import datetime, timezone
+
+    from jinja2.sandbox import ImmutableSandboxedEnvironment
+
+    env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True)
+    template = env.from_string(TEMPLATE_PATH.read_text(encoding="utf-8"))
+
+    kwargs = {
+        "messages": messages or [{"role": "user", "content": "Hello"}],
+        "add_generation_prompt": True,
+        "reasoning_effort": "medium",
+        "strftime_now": lambda fmt: datetime.now(timezone.utc).strftime(fmt),
+    }
+    kwargs.update(overrides)
+    return template.render(**kwargs)
+
+
+def test_prompt_declares_no_tools_to_the_model():
+    # The application never sends tool declarations, and the template only
+    # renders built-in tools when `builtin_tools` is explicitly supplied. This
+    # is the guarantee behind the product's "text only, no tools" claim.
+    rendered = _render_prompt()
+    assert "# Tools" not in rendered
+    assert "namespace browser" not in rendered
+    assert "namespace python" not in rendered
+    assert "builtin_tools" not in rendered
+
+
+def test_prompt_requests_the_governed_final_channel():
+    rendered = _render_prompt()
+    assert "# Valid channels: analysis, commentary, final." in rendered
+    assert "<|start|>assistant" in rendered
+
+
+def test_prompt_puts_a_user_system_message_where_the_template_expects_it():
+    rendered = _render_prompt(
+        messages=[
+            {"role": "system", "content": "You are GHARIBO."},
+            {"role": "user", "content": "hi"},
+        ]
+    )
+    assert "You are GHARIBO." in rendered
+
+
+def test_prompt_identity_is_a_known_deferred_defect():
+    """DOCUMENTS A KNOWN DEFECT - deliberately not fixed here.
+
+    The accepted tokenizer's chat template injects a DEFAULT model identity of
+    "You are ChatGPT, a large language model trained by OpenAI." because the
+    backend does not pass `model_identity`. That false identity carries strong
+    capability priors, and a live smoke run showed the model answering
+    "I can run shell commands and read images, but I cannot browse the web."
+
+    Changing it would alter the served prompt contract (and therefore model
+    behaviour and comparability with prior runs), so it is DEFERRED to the owner
+    rather than changed silently. The one-line fix is to pass
+    `model_identity="..."` in `TransformersBackend.generate`.
+
+    If this test starts failing, the identity has changed - update this test and
+    the report together.
+    """
+    rendered = _render_prompt()
+    assert "ChatGPT" in rendered

@@ -257,8 +257,15 @@ def _model_listing(model_id: str, context_length: int) -> dict:
 # Final client-surface guard
 # ---------------------------------------------------------------------------
 
+#: A malformed trailing protocol fragment left over after a complete answer.
+#:
+#: Two shapes are observed in practice, so both are covered:
+#:   - a bare ``</assistant>`` / ``</assistant`` (no channel marker), and
+#:   - the ``</assistant><|channel|>`` / ``<|channel|>`` variants,
+#: including repeats. At least one fragment must be present, so clean text is
+#: never touched.
 _TRAILING_PROTOCOL_FRAGMENT = re.compile(
-    r'(?:\s*</assistant>?\s*)?<\|channel\|>\s*$'
+    r'(?:\s*</assistant>?|\s*<\|channel\|>)+\s*$'
 )
 
 def _client_safe_answer(answer: str) -> str:

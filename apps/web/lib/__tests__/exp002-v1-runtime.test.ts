@@ -377,3 +377,57 @@ describe("final-channel-only answers", () => {
     expect(extractV1Answer("not json").ok).toBe(false);
   });
 });
+
+// ------------------------------------------------- capability truthfulness
+//
+// The application must never TELL the model it has abilities it does not have.
+// The request builder is the only place a capability could be declared, so it is
+// asserted directly here: no tool declarations, no tool choice, no modality
+// hints — ever, including when the conversation has toolsEnabled set.
+
+describe("the canonical request never declares unsupported capabilities", () => {
+  it("emits no tool declarations even when toolsEnabled is true", () => {
+    const body = buildV1Request([{ role: "user", content: "hello" }], {
+      toolsEnabled: true,
+    }) as Record<string, unknown>;
+
+    expect(body).not.toHaveProperty("tools");
+    expect(body).not.toHaveProperty("tool_choice");
+    expect(body).not.toHaveProperty("functions");
+    expect(body).not.toHaveProperty("function_call");
+  });
+
+  it("emits no vision or audio modality fields", () => {
+    const body = buildV1Request([{ role: "user", content: "hello" }]) as Record<string, unknown>;
+    for (const field of ["modalities", "image_url", "audio", "input_audio"]) {
+      expect(body).not.toHaveProperty(field);
+    }
+    // Content is always a plain string, never a part array.
+    const messages = body.messages as Array<{ role: string; content: unknown }>;
+    for (const message of messages) {
+      expect(typeof message.content).toBe("string");
+    }
+  });
+
+  it("requests a non-streaming completion so the final channel can be validated", () => {
+    const body = buildV1Request([{ role: "user", content: "hello" }]) as Record<string, unknown>;
+    // The application streams its OWN protocol; the runtime call is buffered so
+    // that hidden analysis can never be relayed token-by-token.
+    expect(body.stream).toBe(false);
+  });
+
+  it("only ever sends the three governed roles", () => {
+    const body = buildV1Request(
+      [
+        { role: "user", content: "a" },
+        { role: "assistant", content: "b" },
+      ],
+      { systemPrompt: "You are GHARIBO." },
+    ) as Record<string, unknown>;
+    const roles = (body.messages as Array<{ role: string }>).map((m) => m.role);
+    expect(roles).toEqual(["system", "user", "assistant"]);
+    for (const role of roles) {
+      expect(["system", "user", "assistant"]).toContain(role);
+    }
+  });
+});
