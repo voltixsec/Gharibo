@@ -38,7 +38,7 @@ layout at real viewport sizes.
 | `provider-routing.mjs` | Selecting another provider actually routes to it (proven via the server's own status event) | 10/10 |
 | `probe-scope.mjs` | The runtime health probe is scoped to the Playground; other routes must not wake the GPU | 8/8 |
 | `mutation-failure.mjs` | Failed rename / settings writes surface an error and do not pretend to succeed | 7/7 |
-| `history-titles-acceptance.mjs` | Conversation history from message #1, automatic titles (Arabic/English), manual rename authority, switch isolation, rename-failure UX | 14/14 |
+| `history-titles-acceptance.mjs` | History from message #1, automatic titles (Arabic/English), manual rename authority, switch isolation, rename-failure UX, rejected-message safety, generation-failure retention | 20/20 |
 | `rename-ux-acceptance.mjs` | Escape cancels rename, blank title rejected, search by persisted title, long titles clip visually without losing data | 12/12 |
 
 ## Database isolation (IMPORTANT)

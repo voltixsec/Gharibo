@@ -299,6 +299,88 @@ try {
   check("E: the UI does not show the unpersisted title", uiShowsNew === false, `uiShowsNew=${uiShowsNew}`);
 
   failWrites = false;
+
+  // --------------------------------- F: a REJECTED first message cannot rename
+  await send("Page.navigate", { url: `${base}/playground` });
+  await sleep(7000);
+
+  const f = await api("/api/conversations", {
+    method: "POST",
+    body: JSON.stringify({ title: "New conversation", providerId: null, modelId: "GHARIBO-V1", maxTokens: 64 }),
+  });
+  const fId = f.json?.data?.id;
+  ids.push(fId);
+
+  // A prompt far beyond the T4 context budget is rejected BEFORE persistence.
+  const oversized = "x".repeat(40000);
+  const rejected = await fetch(`${base}/api/conversations/${fId}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: oversized }),
+  });
+  await rejected.text().catch(() => "");
+  check(
+    "F: an oversized first message is rejected before persistence",
+    rejected.status === 413,
+    `HTTP ${rejected.status}`,
+  );
+
+  const fAfter = (await api(`/api/conversations/${fId}`)).json?.data;
+  check(
+    "F: a rejected first message does NOT rename the conversation",
+    fAfter?.title === "New conversation",
+    `title="${fAfter?.title}"`,
+  );
+  check(
+    "F: a rejected first message is not persisted at all",
+    (fAfter?.messages ?? []).length === 0,
+    `messages=${(fAfter?.messages ?? []).length}`,
+  );
+
+  // ------------- G: a generation failure after acceptance keeps message + title
+  const providers = (await api("/api/providers")).json?.data ?? [];
+  const provider = providers.find((p) => p.isActive);
+  check("G: an active provider exists in the isolated server", Boolean(provider), provider?.modelId ?? "none");
+
+  if (provider) {
+    const g = await api("/api/conversations", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "New conversation",
+        providerId: provider.id,
+        modelId: provider.modelId,
+        maxTokens: 64,
+      }),
+    });
+    const gId = g.json?.data?.id;
+    ids.push(gId);
+
+    const firstMsg = "Explain how to size a Kubernetes autoscaler";
+    const res = await fetch(`${base}/api/conversations/${gId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: firstMsg }),
+    });
+    const streamText = await res.text().catch(() => "");
+    const generationFailed = /GENERATION_FAILED|"error"/i.test(streamText);
+    console.log(
+      `INFO  generation ${generationFailed ? "FAILED (as expected: the provider cannot answer)" : "succeeded"} — retention is asserted either way`,
+    );
+    await sleep(1500);
+
+    const gAfter = (await api(`/api/conversations/${gId}`)).json?.data;
+    check(
+      "G: the accepted user message is retained despite generation failure",
+      (gAfter?.messages ?? []).some((m) => m.role === "user" && m.content === firstMsg),
+      `messages=${(gAfter?.messages ?? []).length}`,
+    );
+    check(
+      "G: the title derived from that accepted message is retained",
+      typeof gAfter?.title === "string" && gAfter.title !== "New conversation",
+      `title="${gAfter?.title}"`,
+    );
+  }
+
   ws.close();
 } catch (error) {
   console.log(`ACCEPTANCE_ERROR: ${error.message}`);
