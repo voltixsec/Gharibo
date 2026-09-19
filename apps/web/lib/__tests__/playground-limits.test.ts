@@ -35,6 +35,20 @@ describe("identity vs deployment limits", () => {
     expect(limits.defaultMaxOutputTokens).toBe(256);
     expect(limits.maxOutputTokensCeiling).toBe(512);
   });
+
+  it("never lets deployment config claim more context than V1 actually supports", () => {
+    const limits = resolveDeploymentLimits({
+      GHARIBO_V1_CONTEXT_LENGTH: "8192",
+    });
+    expect(limits.contextLength).toBe(V1_CONTEXT_LENGTH);
+  });
+
+  it("allows a deployment to reduce its usable context window", () => {
+    const limits = resolveDeploymentLimits({
+      GHARIBO_V1_CONTEXT_LENGTH: "2048",
+    });
+    expect(limits.contextLength).toBe(2048);
+  });
 });
 
 describe("clampMaxOutputTokens", () => {
