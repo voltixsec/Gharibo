@@ -367,6 +367,83 @@ def _ready_app_with_backend(backend):
     return TestClient(create_app(engine=engine)), engine
 
 
+def test_unknown_model_id_is_rejected_before_generation():
+    backend = _RecordingBackend(responses=[NORMAL_HARMONY])
+    client, _ = _ready_app_with_backend(backend)
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "not-gharibo",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+    )
+    assert res.status_code == 404
+    assert res.json()["error"]["type"] == "model_not_found"
+    assert backend.seen_max_tokens == []
+
+
+def test_nonempty_tools_are_rejected_truthfully():
+    backend = _RecordingBackend(responses=[NORMAL_HARMONY])
+    client, _ = _ready_app_with_backend(backend)
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {"name": "lookup", "parameters": {"type": "object"}},
+                }
+            ],
+        },
+    )
+    assert res.status_code == 400
+    assert res.json()["error"]["type"] == "unsupported_tools"
+    assert backend.seen_max_tokens == []
+
+
+def test_multiple_completions_are_rejected_instead_of_silently_ignored():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "n": 2,
+        },
+    )
+    assert res.status_code == 400
+    assert res.json()["error"]["type"] == "unsupported_n"
+
+
+def test_structured_response_format_is_rejected_when_not_guaranteed():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "response_format": {"type": "json_object"},
+        },
+    )
+    assert res.status_code == 400
+    assert res.json()["error"]["type"] == "unsupported_response_format"
+
+
+def test_unsupported_message_role_is_rejected_at_validation():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "tool", "content": "fake tool result"}],
+        },
+    )
+    assert res.status_code == 422
+    assert res.json()["error"]["type"] == "request_validation_error"
+
+
 def test_max_tokens_is_clamped_to_deployment_ceiling():
     backend = _RecordingBackend(responses=[NORMAL_HARMONY])
     client, _ = _ready_app_with_backend(backend)
@@ -570,6 +647,24 @@ def test_usage_reports_real_estimates_not_zeros():
     assert usage["prompt_tokens"] > 0
     assert usage["completion_tokens"] > 0
     assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
+
+
+def test_stop_sequences_are_honoured_after_final_channel_extraction():
+    harmony = (
+        "<|start|>assistant<|channel|>final<|message|>"
+        "alpha STOP beta<|return|>"
+    )
+    client, _ = make_ready_app(responses=[harmony])
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "hi"}],
+            "stop": [" STOP"],
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["choices"][0]["message"]["content"] == "alpha"
 
 
 # ---------------------------------------------------------------- protocol tail
