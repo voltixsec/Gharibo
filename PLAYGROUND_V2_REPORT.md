@@ -623,6 +623,44 @@ with 2 rows when the full list was 11 — the field had not actually been cleare
 Raised to 60 backspaces and asserted `restored === total`; it now passes at
 11 of 11. Reporting the loose version would have overstated the result.
 
+### Provider routing, proved through the UI (and a weak assertion corrected)
+
+The headline requirement is **"no provider choice is cosmetic-only"**. For most of
+this work it was only proved at the API level — and, as it turns out, more
+weakly than it appeared.
+
+**The weak assertion.** `api-checks.mjs` asserted that a conversation bound to
+another provider is "never silently routed to GHARIBO-V1" by checking the
+response did not mention V1. It passed — on a request that had actually **failed
+with `GENERATION_FAILED`**. Conflating "which provider was used" with "did it
+succeed" let a broken call pass.
+
+**Now proved properly.** `provider-routing.mjs` drives the real inspector
+control: create a conversation (defaults to GHARIBO-V1), switch it to another
+configured provider, send a message, then read the route's own
+`{"status":"generating","modelId":...}` event. That event is emitted by the
+server *after* the routing decision, so its `modelId` is direct evidence of what
+was chosen and cannot be influenced by the client.
+
+| Check | Result |
+|---|---|
+| A conversation created through the UI defaults to GHARIBO-V1 | PASS — `providerId=null, modelId=GHARIBO-V1` |
+| The inspector model selector opens | PASS |
+| The other provider's option can be selected | PASS |
+| The selection persists that provider's id (not the V1 sentinel) | PASS |
+| The model id follows the selection | PASS — `llama3.2` |
+| **The server reports it routed to the selected provider, not GHARIBO-V1** | PASS — `routedModelId=llama3.2` |
+| The routed model matches the selected provider's model | PASS |
+| The selection survives a reload | PASS |
+
+**"Which provider" and "did it answer" are now asserted separately.** On this
+machine ollama has no `llama3.2` pulled (only `qwen3:1.7b/4b/8b`), so the
+upstream fails with `GENERATION_FAILED`. That is reported as **INFO, not a
+pass** — and deliberately not hidden behind the routing assertion. Pulling a
+~2 GB model onto the owner's machine was not done. The routing decision is
+verified regardless; a full provider round-trip needs the model present (or
+credentials for the OpenAI-compatible provider, which has no key configured).
+
 ## 14. Validation command results
 
 Run with **Node 24** (see §16 for why).
@@ -803,7 +841,7 @@ Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pu
 branch : playground-v2
 head   : <HEAD>    (final commit is this report — run `git log -1` for the SHA)
 main   : 2b34e46  (not modified by this work)
-commits: 31 ahead of base   (includes this report's own commit)
+commits: 32 ahead of base   (includes this report's own commit)
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
@@ -848,6 +886,7 @@ the runtime is not `ONLINE`.
 | `smoke-suite.mjs` | model capability smoke suite | 9/11 |
 | `matrix-gaps.mjs` | system-prompt isolation, temperature, 768px | 14/14 |
 | `sidebar-features.mjs` | conversation search and two-step delete | 11/11 |
+| `provider-routing.mjs` | **selecting another provider routes to it** | 10/10 |
 
 See `tools/verification/README.md` for prerequisites and usage. It also records
 the methodology rules that cost real time: never read `$?` after a pipe, never
