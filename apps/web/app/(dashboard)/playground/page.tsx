@@ -126,6 +126,19 @@ function PlaygroundContent() {
     }
   }, [selectionKey, defaultSelection, runtimeLoading]);
 
+  const compareTargetIsValid =
+    (compareTarget === V1_RUNTIME_PROVIDER_ID && v1Configured) ||
+    activeProviders.some((provider) => provider.id === compareTarget);
+
+  useEffect(() => {
+    if (compareTargetIsValid) return;
+    if (v1Configured) {
+      setCompareTarget(V1_RUNTIME_PROVIDER_ID);
+    } else if (activeProviders[0]) {
+      setCompareTarget(activeProviders[0].id);
+    }
+  }, [compareTargetIsValid, v1Configured, activeProviders]);
+
   /**
    * Reflect the ACTIVE CONVERSATION's own routing in the inspector.
    *
@@ -448,7 +461,7 @@ function PlaygroundContent() {
             <Button variant="outline" onClick={() => setCompareSource(null)}>
               Cancel
             </Button>
-            <Button onClick={handleCompareConfirm} disabled={busy}>
+            <Button onClick={handleCompareConfirm} disabled={busy || !compareTargetIsValid}>
               Create comparison
             </Button>
           </DialogFooter>
