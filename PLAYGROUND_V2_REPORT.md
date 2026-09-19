@@ -525,6 +525,43 @@ Also executed end-to-end against the running application:
 
 ---
 
+### Test-matrix gaps closed last (items G and H, and the 768px viewport)
+
+Three items from the section 12 matrix had not been verified, plus one viewport
+from section 14. All are now covered — **14/14**.
+
+| Check | Result |
+|---|---|
+| Temperature slider is focusable | PASS |
+| Changing temperature through the UI persists | PASS — `0.4 -> 0.55` (3 × ArrowRight, step 0.05) |
+| The new temperature survives a reload | PASS — still `0.55` |
+| The slider shows the persisted value | PASS — `aria-valuenow=0.55` |
+| System prompt accepts typed input | PASS |
+| Focus leaves the textarea on Tab | PASS |
+| **System prompt typed in the inspector persists** | PASS |
+| **The system prompt is actually SENT to the model** | PASS — answer was `Hello! ZEPHYR` |
+| A second conversation does not inherit it | PASS — `null` |
+| The second conversation's answer shows no sign of it | PASS — `Hello!` |
+| No horizontal overflow @768 (`/playground`) | PASS — 768 / 768 |
+| Composer usable @768 | PASS — 734 px |
+| No horizontal overflow @768 (`/settings`) | PASS |
+| No horizontal overflow @768 (`/datasets`) | PASS |
+
+**Item G is proven behaviourally, not structurally.** A system prompt of "Always
+end every reply with the exact word ZEPHYR" was entered on one conversation; its
+reply came back **`Hello! ZEPHYR`**. A second conversation, given no system
+prompt and the same question, answered **`Hello!`**. That shows the prompt is
+both transmitted and isolated per conversation.
+
+**Two false failures were hit first, both test artifacts, not app defects** —
+recorded because they cost real time:
+
+1. `element.blur()` on an element that was never focused is a no-op, so React's
+   `onBlur` never ran and the save appeared broken. Fixed by focusing first.
+2. Setting a controlled input's value with the native setter plus a synthetic
+   `Event('input')` is not equivalent to typing. Replaced with a real click,
+   `Input.insertText`, and a real Tab.
+
 ## 14. Validation command results
 
 Run with **Node 24** (see §16 for why).
@@ -545,6 +582,7 @@ Run with **Node 24** (see §16 for why).
 | Cross-page regression (10 routes × desktop/mobile) | **90/90 PASS** |
 | Accessibility (keyboard / focus / ARIA) | **15/15 PASS** |
 | Frontend performance A/B (measured) | **improved, no regression — kept** (re-render script 49 ms -> 30 ms) |
+| Test-matrix gaps (items G / H) + 768px viewport | **14/14 PASS** |
 | WCAG contrast (dark, 95 samples) | **0 failures** |
 | WCAG contrast (light, 95 samples) | **0 failures** |
 
@@ -838,6 +876,9 @@ should resolve in favour of this branch, which is a strict evolution of `2b34e46
 | Every dashboard page regression-checked | ✅ (90/90, 10 routes) |
 | Keyboard navigation and focus visibility | ✅ (15/15, incl. WCAG 2.4.1 bypass) |
 | Accessible names on all controls | ✅ |
+| System prompt is sent and isolated per conversation | ✅ (proven behaviourally: `Hello! ZEPHYR` vs `Hello!`) |
+| Temperature changes persist across reload | ✅ (0.4 -> 0.55, survives reload) |
+| Layout verified at 1440 / 1280 / 1024 / 768 / 390 | ✅ |
 | Desktop and mobile layouts usable | ✅ (4 viewports) |
 | Message actions still work | ✅ |
 | Data/training actions still work | ✅ (Add to Dataset, Edit & Approve) |
