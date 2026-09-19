@@ -137,6 +137,15 @@ export function useConversation(id: string | null) {
   }, [id]);
 
   useEffect(() => {
+    /*
+     * Clear BEFORE fetching.
+     *
+     * `refresh` only assigns once the response lands, so without this the
+     * PREVIOUS conversation's messages stayed rendered under the NEW
+     * conversation's header while the request was in flight — a visible
+     * cross-conversation leak on any non-instant connection.
+     */
+    setConversation(null);
     refresh();
   }, [refresh]);
 

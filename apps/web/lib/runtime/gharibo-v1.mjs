@@ -535,7 +535,14 @@ export function extractV1Answer(responseBody) {
  * }} args
  * @returns {Promise<ReturnType<typeof extractV1Answer>>}
  */
-export async function runV1Chat({ config, token, messages, options = {}, fetchImpl = globalThis.fetch }) {
+export async function runV1Chat({
+  config,
+  token,
+  messages,
+  options = {},
+  fetchImpl = globalThis.fetch,
+  timeoutMs = V1_DEFAULTS.timeoutMs,
+}) {
   if (!config?.configured || !config.baseUrl) {
     throw new Error("GHARIBO V1 runtime is not configured");
   }
@@ -550,21 +557,40 @@ export async function runV1Chat({ config, token, messages, options = {}, fetchIm
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  /*
+   * The inference call gets its OWN abort signal.
+   *
+   * Next.js propagates the incoming request's abort signal to `fetch` calls made
+   * inside a route handler. Without an explicit signal, a client that navigated
+   * away (or hit Cancel) aborted the UPSTREAM inference too — so the answer was
+   * thrown away even though the GPU had already produced it. Owning the signal
+   * decouples the generation from the caller's connection: the request can still
+   * complete and be persisted, and the upstream call is bounded by an explicit
+   * timeout instead of by whatever the browser happens to do.
+   */
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    throw new Error(
-      `GHARIBO V1 runtime error HTTP ${response.status}: ${errText.slice(0, 200)}`,
-    );
+  try {
+    const response = await fetchImpl(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(
+        `GHARIBO V1 runtime error HTTP ${response.status}: ${errText.slice(0, 200)}`,
+      );
+    }
+
+    const json = await response.json();
+    return extractV1Answer(json);
+  } finally {
+    clearTimeout(timer);
   }
-
-  const json = await response.json();
-  return extractV1Answer(json);
 }
 
 // ---------------------------------------------------------------------------

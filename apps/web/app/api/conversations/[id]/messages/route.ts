@@ -197,9 +197,40 @@ export async function POST(
     async start(controller) {
       let fullResponse = "";
       let isError = false;
+      let persisted = false;
 
+      /**
+       * Writes one event to the client.
+       *
+       * A disconnected client (the user switched conversations or cancelled)
+       * makes `enqueue` throw. That is NOT a generation failure: the answer may
+       * still be perfectly valid, so the write is tolerated and the response is
+       * persisted below regardless. Losing a real answer because the user
+       * navigated away would waste the inference and lose the turn.
+       */
       const send = (payload: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(JSON.stringify(payload) + "\n"));
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(payload) + "\n"));
+        } catch {
+          /* client is gone — keep going so the answer is still persisted */
+        }
+      };
+
+      /**
+       * Records an accepted answer.
+       *
+       * Called from inside the generation flow rather than after the response
+       * stream finishes, so the turn is recorded even when the client has
+       * navigated away. Every call site is paired with the `persisted` flag so
+       * the shared tail below can never write the same answer twice.
+       */
+      const persistAnswer = (answer: string) => {
+        conversationsRepository.addMessage(params.id, {
+          role: "assistant",
+          content: answer,
+          modelId: routedModelId,
+          providerId: routedProviderId,
+        });
       };
 
       try {
@@ -208,8 +239,28 @@ export async function POST(
           // generation has started, which is exactly what is known at this point.
           send({ status: "generating", modelId: V1_MODEL_ID });
 
-          const token = resolveRuntimeToken(v1Config, process.env);
-          const extracted = await runV1Chat({ config: v1Config, token, messages, options });
+          /*
+           * Generation and persistence are started here, detached from the
+           * response stream.
+           *
+           * If the client navigates away, the framework tears this stream down
+           * and the code after `await` below may never run — but this promise is
+           * already in flight, so the answer is still validated and recorded.
+           * (The upstream call owns its own abort signal, so it is not cancelled
+           * with the client either.)
+           */
+          const generation = (async () => {
+            const token = resolveRuntimeToken(v1Config, process.env);
+            const extracted = await runV1Chat({ config: v1Config, token, messages, options });
+            if (extracted.ok && extracted.answer) {
+              // Mark as recorded so the shared tail below cannot write it twice.
+              persistAnswer(extracted.answer);
+              persisted = true;
+            }
+            return extracted;
+          })();
+
+          const extracted = await generation;
 
           if (!extracted.ok) {
             // Fail closed: never surface raw model text, which may contain the
@@ -223,7 +274,6 @@ export async function POST(
               },
               done: true,
             });
-            controller.close();
             return;
           }
 
@@ -238,6 +288,10 @@ export async function POST(
             if (chunk.delta) fullResponse += chunk.delta;
             if (chunk.done) break;
           }
+
+          // Persist before anything else can throw (e.g. a closed stream).
+          if (fullResponse) persistAnswer(fullResponse);
+          persisted = true;
         }
       } catch (error) {
         isError = true;
@@ -245,17 +299,18 @@ export async function POST(
         send({ error: { code: "GENERATION_FAILED", message }, done: true });
       }
 
-      // Persist the assistant turn only for a real answer.
-      if (fullResponse && !isError) {
-        conversationsRepository.addMessage(params.id, {
-          role: "assistant",
-          content: fullResponse,
-          modelId: routedModelId,
-          providerId: routedProviderId,
-        });
+      // The V1 path persists inside its generation promise; the provider path
+      // persists above. This covers any remaining path that produced a complete
+      // answer but has not yet been recorded.
+      if (fullResponse && !isError && !persisted) {
+        persistAnswer(fullResponse);
       }
 
-      controller.close();
+      try {
+        controller.close();
+      } catch {
+        /* already closed by the disconnect */
+      }
     },
   });
 

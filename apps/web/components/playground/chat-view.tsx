@@ -76,12 +76,21 @@ export function ChatView({
   const conversationId = conversation?.id ?? null;
 
   /**
+   * The conversation the UI is currently showing.
+   *
+   * Read by in-flight requests after every await so a superseded request can
+   * never write state into a conversation it does not belong to.
+   */
+  const currentConversationIdRef = useRef<string | null>(conversationId);
+
+  /**
    * Reset all transient state when the active conversation changes.
    *
    * This is what prevents a previous conversation's in-flight response, error
    * notice or partial content from leaking into the newly selected one.
    */
   useEffect(() => {
+    currentConversationIdRef.current = conversationId;
     abortRef.current?.abort();
     abortRef.current = null;
     setBusy(false);
@@ -107,6 +116,11 @@ export function ChatView({
     async (rawPrompt: string) => {
       const prompt = rawPrompt.trim();
       if (!prompt || !conversationId || busy) return;
+
+      // The conversation this request belongs to. Every post-await state write
+      // is guarded against it, so switching conversations cannot let this
+      // request's result, error or progress surface anywhere else.
+      const owningConversationId = conversationId;
 
       setInput("");
       setBusy(true);
@@ -154,7 +168,9 @@ export function ChatView({
           const message =
             payload?.error?.message ??
             `The request was rejected (HTTP ${res.status}).`;
-          setNotice({ tone: "error", message });
+          if (currentConversationIdRef.current === owningConversationId) {
+            setNotice({ tone: "error", message });
+          }
           return;
         }
 
@@ -196,28 +212,41 @@ export function ChatView({
         // Surface a truncated final record rather than dropping it.
         handleEvents(parser.flush());
       } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          setNotice({
-            tone: "warning",
-            message: "Request cancelled. The response was not saved.",
-          });
-        } else {
-          setNotice({
-            tone: "error",
-            message:
-              error instanceof Error ? `Network error: ${error.message}` : "Network error.",
-          });
+        // A superseded request reports nothing: the conversation it belonged to
+        // is no longer on screen, and a stale notice must not appear in the new
+        // one.
+        if (currentConversationIdRef.current === owningConversationId) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            // Truthful: the server keeps generating and still persists a valid
+            // answer, so "not saved" would be a lie.
+            setNotice({
+              tone: "warning",
+              message:
+                "Stopped waiting for this response. The runtime may still be " +
+                "generating; if it returns a valid answer it will be saved to " +
+                "this conversation.",
+            });
+          } else {
+            setNotice({
+              tone: "error",
+              message:
+                error instanceof Error ? `Network error: ${error.message}` : "Network error.",
+            });
+          }
         }
       } finally {
         abortRef.current = null;
-        setBusy(false);
-        setStreamingContent("");
+        // Latency is a property of the request, so it is always reported.
         onMetrics({
           ttfbMs,
           totalMs: Math.round(performance.now() - startedAt),
           at: new Date().toISOString(),
         });
-        onRefresh();
+        if (currentConversationIdRef.current === owningConversationId) {
+          setBusy(false);
+          setStreamingContent("");
+          onRefresh();
+        }
       }
     },
     [
@@ -262,7 +291,12 @@ export function ChatView({
   };
 
   const messages = conversation?.messages ?? [];
-  const showEmpty = !conversation || messages.length === 0;
+  /*
+   * The hero is shown only when there is genuinely nothing to show. Keeping it
+   * visible while a first reply is being generated would hide the progress
+   * indicator and make the app look frozen.
+   */
+  const showEmpty = !conversation || (messages.length === 0 && !busy);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[color:var(--gharibo-surface)]">
@@ -372,24 +406,35 @@ export function ChatView({
                 </div>
               </div>
             )}
-
-            {notice && (
-              <div
-                className={cn(
-                  "flex gap-2.5 rounded-lg border p-3 text-xs",
-                  notice.tone === "error"
-                    ? "border-destructive/30 bg-destructive/8 text-destructive"
-                    : "border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-300",
-                )}
-                role="alert"
-              >
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <p className="leading-relaxed">{notice.message}</p>
-              </div>
-            )}
           </div>
         )}
       </div>
+
+      {/*
+        Failure banner.
+
+        Deliberately OUTSIDE the message area: a rejected request leaves the
+        conversation EMPTY (nothing is persisted), so a notice rendered inside
+        the message list was never visible in exactly the case that produces it
+        most often — an oversized prompt, a budget rejection, or a runtime that
+        is not reachable. Here it is always shown, above the composer.
+      */}
+      {notice && (
+        <div className="border-t border-border bg-[color:var(--gharibo-surface)] px-4 pt-3">
+          <div
+            className={cn(
+              "mx-auto flex max-w-3xl gap-2.5 rounded-lg border p-3 text-xs",
+              notice.tone === "error"
+                ? "border-destructive/30 bg-destructive/8 text-destructive"
+                : "border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-300",
+            )}
+            role="alert"
+          >
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <p className="leading-relaxed">{notice.message}</p>
+          </div>
+        </div>
+      )}
 
       {/* -------------------------------------------------------- composer */}
       <Composer
