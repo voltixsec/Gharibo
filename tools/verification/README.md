@@ -36,6 +36,8 @@ layout at real viewport sizes.
 | `matrix-gaps.mjs` | System-prompt isolation/send, temperature persistence, 768px viewport | 14/14 |
 | `sidebar-features.mjs` | Conversation search filtering and the two-step delete flow | 11/11 |
 | `provider-routing.mjs` | Selecting another provider actually routes to it (proven via the server's own status event) | 10/10 |
+| `probe-scope.mjs` | The runtime health probe is scoped to the Playground; other routes must not wake the GPU | 8/8 |
+| `mutation-failure.mjs` | Failed rename / settings writes surface an error and do not pretend to succeed | 7/7 |
 
 ## Usage
 

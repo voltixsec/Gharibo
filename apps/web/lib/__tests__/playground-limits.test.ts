@@ -68,6 +68,48 @@ describe("provider-backed limits", () => {
   });
 });
 
+describe("resolver contract", () => {
+  const SHAPE = [
+    "defaultMaxOutputTokens",
+    "maxOutputTokensCeiling",
+    "contextLength",
+    "reservedPromptTokens",
+    "presets",
+  ];
+
+  it("produces the same set of keys from both resolvers", () => {
+    const deployment = resolveDeploymentLimits({});
+    const provider = resolveProviderLimits(8192);
+    for (const key of SHAPE) {
+      expect(Object.prototype.hasOwnProperty.call(deployment, key)).toBe(true);
+      expect(Object.prototype.hasOwnProperty.call(provider, key)).toBe(true);
+    }
+  });
+
+  it("reports reservedPromptTokens as a plain number from both resolvers", () => {
+    // `DEPLOYMENT_LIMITS` is Object.freeze'd, so its `reservedPromptTokens`
+    // narrows to the literal 128, while the provider resolver computes a plain
+    // number. Both must satisfy the same consumer contract.
+    expect(typeof resolveDeploymentLimits({}).reservedPromptTokens).toBe("number");
+    expect(typeof resolveProviderLimits(8192).reservedPromptTokens).toBe("number");
+  });
+
+  it("accepts provider limits everywhere deployment limits are accepted", () => {
+    // Regression: `validateContextBudget` was typed to accept only
+    // `ReturnType<typeof resolveDeploymentLimits>`, so the provider-backed branch
+    // of the route failed typecheck. Both resolvers must be interchangeable.
+    const provider = resolveProviderLimits(8192);
+    const result = validateContextBudget({
+      messages: [{ role: "user", content: "Hello" }],
+      maxTokens: 2048,
+      limits: provider,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.contextLength).toBe(8192);
+    expect(result.maxTokens).toBe(2048);
+  });
+});
+
 describe("clampMaxOutputTokens", () => {
   const limits = resolveDeploymentLimits({});
 

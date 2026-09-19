@@ -65,9 +65,29 @@ function envInt(env, name, fallback) {
 }
 
 /**
+ * The shape every limit resolver must produce, and the shape every budget
+ * consumer accepts.
+ *
+ * Declared explicitly rather than as `ReturnType<typeof resolveDeploymentLimits>`
+ * because there are two resolvers (deployment and provider). `DEPLOYMENT_LIMITS`
+ * is `Object.freeze`d, so its `reservedPromptTokens` narrows to the literal
+ * `128`; the provider resolver computes its own as a plain `number`. Pinning
+ * consumers to one resolver's return type therefore rejected the other's valid
+ * output. Both produce a `TokenLimits`.
+ *
+ * @typedef {object} TokenLimits
+ * @property {number} defaultMaxOutputTokens
+ * @property {number} maxOutputTokensCeiling
+ * @property {number} contextLength
+ * @property {number} reservedPromptTokens
+ * @property {number[]} presets
+ */
+
+/**
  * Resolves the effective deployment limits, allowing environment overrides.
  *
  * @param {Record<string, string | undefined>} [env]
+ * @returns {TokenLimits}
  */
 export function resolveDeploymentLimits(env = {}) {
   const ceiling = envInt(env, "GHARIBO_MAX_OUTPUT_TOKENS_CEILING", DEPLOYMENT_LIMITS.maxOutputTokensCeiling);
@@ -104,6 +124,7 @@ export function resolveDeploymentLimits(env = {}) {
  *
  * @param {unknown} contextWindow
  * @param {unknown} [defaultMaxOutputTokens]
+ * @returns {TokenLimits}
  */
 export function resolveProviderLimits(contextWindow, defaultMaxOutputTokens = 2048) {
   const parsedContext = Number.parseInt(String(contextWindow ?? ""), 10);
@@ -203,7 +224,7 @@ export function estimatePromptTokens(messages, systemPrompt) {
  *   messages: Array<{role?: string, content?: unknown}>,
  *   systemPrompt?: string | null,
  *   maxTokens?: unknown,
- *   limits: ReturnType<typeof resolveDeploymentLimits>,
+ *   limits: TokenLimits,
  * }} input
  * @returns {{
  *   ok: boolean,
