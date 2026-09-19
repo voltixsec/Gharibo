@@ -431,9 +431,21 @@ suite, so they can never be mistaken for official evaluation artifacts.
 Prompt: *"42.50 per unit, 240 units, 7% volume discount, what is the total purchase cost?"*
 Correct answer: **9,486** (42.50 × 0.93 = 39.525; 39.525 × 240 = 9,486).
 
-**Six independent samples, 1 correct:** `9,498` (×3), `9,492`, `9,480`, and — on the sixth run — the correct `9,486`.
+**The model is inconsistent on this step — not reliably wrong, and not reliably right.**
 
-**Correction.** This section previously said "reliably fails, 0/5 correct". A sixth run produced the right answer, so the honest characterisation is *unreliable* (usually wrong, sometimes right), not *deterministically* wrong. Stating "reliably fails" overstated a finding drawn from five samples, which is exactly the single-sample reasoning the mission warns against. The underlying point stands: this computation cannot be trusted without verification.
+Observed across 12 samples to date, in batches:
+
+| Batch | Result |
+|---|---|
+| Initial (5 samples) | 0/5 correct — `9,498` (×3), `9,492`, `9,480` |
+| Later single runs | mixed — one `9,486` correct, one returned only the intermediate `$39.525` |
+| `repeat-arithmetic.mjs` (6 samples) | **4/6 correct** — `9,486`, `9,486`, `9,486`, `9,486`, `9,498`, and one empty (a 120 s cold-start run that produced nothing) |
+
+**Two corrections, in opposite directions.** This section first said "reliably fails, 0/5" — overstating a five-sample finding. It was then narrowed to "1 of 6", which over-corrected: a fresh six-sample batch produced **4/6**. The defensible statement is the one above: the model gives the correct `9,486` most of the time but intermittently returns a plausible-but-wrong total (`9,480`/`9,492`/`9,498`) or stops at an intermediate value. It is neither deterministic nor uniformly reliable.
+
+Two caveats worth keeping: one sample returned empty after a 120 s cold start (a latency/cold-start artifact, not necessarily a reasoning error), and output-token limits can truncate a long derivation before the final total. Neither is an application defect.
+
+**Practical conclusion (unchanged):** any such computation needs verification before use. Do not treat a single run as establishing a model property in either direction.
 
 The model gets the intermediate right every time (`42.50 × 0.93 = 39.525`) and then
 misses the final multiplication. This is a reproducible arithmetic boundary of the
@@ -761,7 +773,7 @@ was touched.
    used a production build; the dev server remains the owner's normal workflow.
 9. **The model claims capabilities it does not have** (F2). The application is provably clean;
    the cause is the default `model_identity` injected by the accepted chat template. Deferred.
-10. **The model is unreliable on one decimal-multiplication step** (F1) — correct on only 1 of 6 samples. Not deterministic: a sixth run produced the right answer. Any such computation needs verification before use.
+10. **The model is inconsistent on one decimal-multiplication step** (F1) — across 12 samples it returned the correct 9,486 in some batches (4/6 most recently) and wrong totals (9,480/9,492/9,498) in others. Neither reliably right nor reliably wrong; verify before use.
     A model-quality boundary, not an application defect.
 11. **The protocol-tail fix is not yet live.** It is unit-verified against the real FastAPI app
     but the deployed serving build predates it; it takes effect on the next serving deploy.
