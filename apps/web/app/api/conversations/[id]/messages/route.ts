@@ -36,6 +36,7 @@ import {
 import { resolveConversationRoute, ROUTE_KIND } from "@/lib/runtime/routing.mjs";
 import {
   resolveDeploymentLimits,
+  resolveProviderLimits,
   validateContextBudget,
   BUDGET_REASON,
 } from "@/lib/runtime/deployment-limits.mjs";
@@ -182,7 +183,10 @@ export async function POST(
 
   const messages: Message[] = [...history, { role: "user", content: parsed.data.content }];
 
-  const limits = resolveDeploymentLimits(process.env);
+  const limits =
+    route.kind === ROUTE_KIND.V1
+      ? resolveDeploymentLimits(process.env)
+      : resolveProviderLimits(providerConfig!.contextWindow, conv.maxTokens);
   const budget = validateContextBudget({
     messages,
     systemPrompt: conv.systemPrompt,
