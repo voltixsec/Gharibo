@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import {
   resolveDeploymentLimits,
+  resolveProviderLimits,
   clampMaxOutputTokens,
   estimateTokens,
   estimatePromptTokens,
@@ -48,6 +49,22 @@ describe("identity vs deployment limits", () => {
       GHARIBO_V1_CONTEXT_LENGTH: "2048",
     });
     expect(limits.contextLength).toBe(2048);
+  });
+});
+
+describe("provider-backed limits", () => {
+  it("does not inherit GHARIBO's 512-token T4 ceiling", () => {
+    const limits = resolveProviderLimits(8192);
+    expect(limits.contextLength).toBe(8192);
+    expect(limits.maxOutputTokensCeiling).toBe(8192);
+    expect(limits.defaultMaxOutputTokens).toBe(2048);
+    expect(clampMaxOutputTokens(4096, limits).value).toBe(4096);
+  });
+
+  it("never lets the provider default exceed its own context window", () => {
+    const limits = resolveProviderLimits(1024, 4096);
+    expect(limits.defaultMaxOutputTokens).toBe(1024);
+    expect(limits.maxOutputTokensCeiling).toBe(1024);
   });
 });
 
