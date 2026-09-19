@@ -26,6 +26,14 @@ interface ComposerProps {
   modelLabel?: string;
   /** Safe output-token budget for the current runtime. */
   tokenBudget?: number;
+  /**
+   * DOM id for the composer region, so a skip link can jump to it.
+   *
+   * The id goes on the REGION, not the textarea: the textarea is disabled when
+   * no conversation is selected, and a disabled control is not focusable — so a
+   * skip link pointing at it would silently drop focus onto <body>.
+   */
+  regionId?: string;
 }
 
 /**
@@ -49,6 +57,7 @@ export function Composer({
   disabledReason,
   modelLabel,
   tokenBudget,
+  regionId,
 }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -70,7 +79,11 @@ export function Composer({
   const canSend = !disabled && !busy && value.trim().length > 0;
 
   return (
-    <div className="border-t border-border bg-[color:var(--gharibo-surface)] px-4 py-3">
+    <div
+      id={regionId}
+      tabIndex={-1}
+      className="border-t border-border bg-[color:var(--gharibo-surface)] px-4 py-3 focus:outline-none"
+    >
       <div
         className={cn(
           "mx-auto flex max-w-3xl flex-col rounded-xl border border-border bg-[color:var(--gharibo-surface-elevated)] transition-colors",

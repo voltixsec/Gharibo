@@ -5,7 +5,8 @@ import { useConversations, useConversation } from "@/hooks/use-conversations";
 import { useProviders } from "@/hooks/use-providers";
 import { useRuntimeV1 } from "@/components/providers/runtime-status-provider";
 import { ConversationSidebar } from "@/components/playground/conversation-sidebar";
-import { ChatView } from "@/components/playground/chat-view";
+import { ChatView, COMPOSER_ID } from "@/components/playground/chat-view";
+import { SkipLink } from "@/components/skip-link";
 import { Inspector, type RequestMetrics } from "@/components/playground/inspector";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -69,6 +70,24 @@ export default function PlaygroundPage() {
   const { conversation, refresh } = useConversation(activeId);
   const limits = resolveDeploymentLimits({});
   const isDesktop = useIsDesktop();
+
+  /**
+   * Escape closes whichever drawer is open.
+   *
+   * The drawers are plain overlays rather than Radix dialogs, so they get no
+   * built-in dismissal. Without this a keyboard user had to Tab to the close
+   * button to get out.
+   */
+  useEffect(() => {
+    if (!sidebarOpen && !inspectorDrawerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setSidebarOpen(false);
+      setInspectorDrawerOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [sidebarOpen, inspectorDrawerOpen]);
 
   /** One affordance, two meanings: collapse the panel, or open the drawer. */
   const toggleInspector = () => {
@@ -254,6 +273,13 @@ export default function PlaygroundPage() {
 
   return (
     <div className="flex h-full min-h-0">
+      {/*
+        Playground-level bypass (WCAG 2.4.1). The conversation list is long - one
+        row per conversation, each with rename and delete controls - so reaching
+        the composer by Tab alone takes dozens of presses.
+      */}
+      <SkipLink href={`#${COMPOSER_ID}`}>Skip to message composer</SkipLink>
+
       {/* ------------------------------------------------- sidebar (desktop) */}
       <div className="hidden w-72 shrink-0 lg:block">
         <ConversationSidebar

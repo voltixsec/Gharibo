@@ -145,6 +145,9 @@ export function Inspector({
                 onValueChange={(v) => setTemperature(v[0])}
                 onValueCommit={(v) => onPatch({ temperature: v[0] })}
                 disabled={disabled}
+                /* Radix renders the thumb as role="slider"; without a name it is
+                   announced as an unlabelled slider. */
+                aria-label="Temperature"
               />
             </div>
 

@@ -22,6 +22,14 @@ import { AlertCircle, Check, Pencil, PanelRight } from "lucide-react";
 import type { ConversationMessage, ConversationWithMessages } from "@gharibo/shared";
 import type { RequestMetrics } from "./inspector";
 
+/**
+ * DOM id of the composer region.
+ *
+ * Exported so the Playground's skip link can jump to it: a keyboard user would
+ * otherwise Tab through the navigation rail and every conversation row first.
+ */
+export const COMPOSER_ID = "gharibo-composer";
+
 interface ChatViewProps {
   conversation: ConversationWithMessages | null;
   onRefresh: () => void;
@@ -448,6 +456,7 @@ export function ChatView({
         disabledReason="Create or select a conversation to start."
         modelLabel={modelLabel}
         tokenBudget={conversation?.maxTokens ?? limits.defaultMaxOutputTokens}
+        regionId={COMPOSER_ID}
       />
 
       {dialogMessage && conversation && (
