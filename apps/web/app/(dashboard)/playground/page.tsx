@@ -222,6 +222,19 @@ function PlaygroundContent() {
     }
   };
 
+  const handleRename = async (id: string, title: string) => {
+    try {
+      await renameConversation(id, title);
+      if (conversation?.id === id) refresh();
+    } catch (e) {
+      toast({
+        title: "Failed to rename conversation",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSelectionChange = async (key: string) => {
     // With no active conversation this is just the default for the next chat.
     if (!conversation) {
@@ -333,7 +346,7 @@ function PlaygroundContent() {
           onSelect={handleSelect}
           onNew={handleNew}
           onDelete={handleDelete}
-          onRename={renameConversation}
+          onRename={handleRename}
         />
       </div>
 
@@ -353,7 +366,7 @@ function PlaygroundContent() {
               onSelect={handleSelect}
               onNew={handleNew}
               onDelete={handleDelete}
-              onRename={renameConversation}
+              onRename={handleRename}
               onCollapse={() => setSidebarOpen(false)}
             />
           </div>
@@ -380,7 +393,9 @@ function PlaygroundContent() {
           <ChatView
             conversation={conversation}
             onRefresh={refresh}
-            onRename={(title) => conversation && renameConversation(conversation.id, title)}
+            onRename={(title) => {
+              if (conversation) void handleRename(conversation.id, title);
+            }}
             onCompare={setCompareSource}
             onMetrics={setMetrics}
             onToggleInspector={toggleInspector}
