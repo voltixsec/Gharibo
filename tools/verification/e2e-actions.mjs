@@ -190,10 +190,27 @@ try {
     JSON.stringify(midStream),
   );
 
-  // Let the in-flight request finish server-side.
-  await sleep(45000);
+  /*
+   * Wait for the in-flight request to finish server-side.
+   *
+   * This used to be a single `sleep(45000)`, which RACED the GPU: when the
+   * runtime is cold or queued, 45s was not always enough, the check below read
+   * `alpha assistant=0`, and the suite reported a false failure (observed once
+   * during post-review validation; it passed 17/17 on re-run). A flaky test is
+   * its own defect, so poll for the condition instead.
+   *
+   * The assertion is unchanged - it still requires exactly one assistant
+   * message - only the wait is now deterministic.
+   */
+  const deadline = Date.now() + 180000;
+  let aLoaded = null;
+  while (Date.now() < deadline) {
+    aLoaded = await api(`/api/conversations/${convA}`);
+    const pending = aLoaded.json?.data?.messages ?? [];
+    if (pending.filter((m) => m.role === "assistant").length >= 1) break;
+    await sleep(5000);
+  }
 
-  const aLoaded = await api(`/api/conversations/${convA}`);
   const bLoaded = await api(`/api/conversations/${convB}`);
   const aMsgs = aLoaded.json?.data?.messages ?? [];
   const bMsgs = bLoaded.json?.data?.messages ?? [];
