@@ -803,7 +803,7 @@ Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pu
 branch : playground-v2
 head   : <HEAD>    (final commit is this report — run `git log -1` for the SHA)
 main   : 2b34e46  (not modified by this work)
-commits: 30 ahead of base   (includes this report's own commit)
+commits: 31 ahead of base   (includes this report's own commit)
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
@@ -876,6 +876,25 @@ Checked across the **entire branch diff** (`b62e859..HEAD`), not just the workin
 | Secret-shaped strings (`sk-...`, `Bearer <token>`) in the diff | **0** |
 | Files matching `.env`, `.env.local`, `.db`, `.safetensors`, `credentials.json`, `.gguf`, `.bin` | **0** |
 | Identity files changed (`identity.py`, `harmony_final.py`, `adapter_verify.py`) | **0** |
+| Committed build artifacts / `.env` / `.db` / weights / `__pycache__` | **0** |
+| Machine-specific paths **introduced by this branch** | **0** |
+
+**Portability.** Every tracked file was also grepped for hardcoded `C://Dev`
+paths so scripts written here do not become a trap elsewhere. Nine files match,
+and all of them **predate this branch**:
+
+- `data/derived/exp002/*.json` (7 files, last touched `3fcfb1f`, 17 Sep) —
+  pre-existing derived data, deliberately left alone rather than churned.
+- `services/gharibo-v1-serving/tests/test_serving.py:45` — the pre-existing
+  `REAL_ADAPTER_DIR`, present at base `b62e859` (line 41 there), untouched.
+
+The one path this branch *did* introduce — the chat-template location used by the
+new prompt-contract tests — was written portably from the start: resolved
+relative to the test file (`Path(__file__).resolve().parents[3]`) with a
+`CHAT_TEMPLATE` env override, and it **skips rather than fails** when the
+snapshot is absent. Likewise every committed script under `tools/verification/`
+defaults its output to the OS temp dir (`VERIFY_OUT`), so running them never
+writes into the repository.
 | Model weights or adapters committed | **none** |
 | Local databases committed | **none** |
 
