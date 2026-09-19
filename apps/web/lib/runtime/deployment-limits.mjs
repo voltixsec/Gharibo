@@ -69,7 +69,16 @@ function envInt(env, name, fallback) {
 export function resolveDeploymentLimits(env = {}) {
   const ceiling = envInt(env, "GHARIBO_MAX_OUTPUT_TOKENS_CEILING", DEPLOYMENT_LIMITS.maxOutputTokensCeiling);
   const dflt = envInt(env, "GHARIBO_DEFAULT_MAX_OUTPUT_TOKENS", DEPLOYMENT_LIMITS.defaultMaxOutputTokens);
-  const contextLength = envInt(env, "GHARIBO_V1_CONTEXT_LENGTH", V1_CONTEXT_LENGTH);
+  const requestedContextLength = envInt(
+    env,
+    "GHARIBO_V1_CONTEXT_LENGTH",
+    V1_CONTEXT_LENGTH,
+  );
+  // Deployment configuration may reduce the usable window, but it must never
+  // claim a context larger than the accepted model identity. The backend is
+  // hard-bound to V1_CONTEXT_LENGTH, so allowing an override above 3072 here
+  // would make the application admit requests the model itself must reject.
+  const contextLength = Math.min(requestedContextLength, V1_CONTEXT_LENGTH);
 
   return {
     // The default can never exceed the ceiling; a misconfiguration must not
