@@ -12,7 +12,7 @@ import { conversationsRepository, providersRepository } from "@/lib/db/repositor
 import { toApiResponse, HttpError, ok } from "@gharibo/shared";
 import { z } from "zod";
 import { V1_MODEL_ID, V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
-import { resolveDeploymentLimits, clampMaxOutputTokens } from "@/lib/runtime/deployment-limits.mjs";
+import { resolveDeploymentLimits, resolveProviderLimits, clampMaxOutputTokens } from "@/lib/runtime/deployment-limits.mjs";
 
 const patchSchema = z
   .object({
@@ -120,9 +120,25 @@ export async function PATCH(
       }
     }
 
-    if (patch.maxTokens !== undefined) {
-      const limits = resolveDeploymentLimits(process.env);
-      patch.maxTokens = clampMaxOutputTokens(patch.maxTokens, limits).value;
+    // Token ceilings are route-specific. GHARIBO-V1 is constrained by the
+    // current T4 deployment; normal providers are bounded by their own declared
+    // context window instead of inheriting GHARIBO's 512-token ceiling.
+    if (patch.maxTokens !== undefined || routingTouched) {
+      const effectiveProviderId =
+        patch.providerId !== undefined ? patch.providerId : existing.providerId;
+      const requestedMaxTokens = patch.maxTokens ?? existing.maxTokens;
+
+      if (effectiveProviderId) {
+        const provider = providersRepository.get(effectiveProviderId);
+        if (!provider) {
+          throw new HttpError(400, `Provider not found: ${effectiveProviderId}`);
+        }
+        const limits = resolveProviderLimits(provider.contextWindow, requestedMaxTokens);
+        patch.maxTokens = clampMaxOutputTokens(requestedMaxTokens, limits).value;
+      } else {
+        const limits = resolveDeploymentLimits(process.env);
+        patch.maxTokens = clampMaxOutputTokens(requestedMaxTokens, limits).value;
+      }
     }
 
     const updated = conversationsRepository.update(params.id, patch);
