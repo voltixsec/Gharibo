@@ -29,6 +29,7 @@ import {
   resolveV1RuntimeConfig,
   resolveRuntimeToken,
   runV1Chat,
+  V1_ENV,
   V1_MODEL_ID,
   V1_RUNTIME_PROVIDER_ID,
 } from "@/lib/runtime/gharibo-v1.mjs";
@@ -91,7 +92,21 @@ export async function POST(
   // -------------------------------------------------------------------------
   // Resolve routing BEFORE persisting anything.
   // -------------------------------------------------------------------------
-  const v1Config = resolveV1RuntimeConfig(process.env);
+  let v1Config: ReturnType<typeof resolveV1RuntimeConfig> | null = null;
+  let v1ConfigError: Error | null = null;
+  try {
+    v1Config = resolveV1RuntimeConfig(process.env);
+  } catch (error) {
+    v1ConfigError = error instanceof Error ? error : new Error("Invalid GHARIBO-V1 runtime configuration");
+  }
+
+  // Routing an unrelated third-party provider must not depend on GHARIBO's
+  // credential configuration being valid. We only need the endpoint identity
+  // here; a V1-specific configuration error is surfaced later if the resolved
+  // route actually targets V1.
+  const v1BaseUrl =
+    v1Config?.baseUrl ??
+    (process.env[V1_ENV.baseUrl]?.trim() || null);
 
   // A conversation addresses a provider either through a real providers row, or
   // through the persisted V1 model identity. A provider row that points at the
@@ -106,7 +121,7 @@ export async function POST(
     modelId: conv.modelId,
     providerBaseUrl: providerConfig?.baseUrl ?? null,
     requestRuntimeProviderId: parsed.data.runtimeProviderId ?? null,
-    v1BaseUrl: v1Config.baseUrl,
+    v1BaseUrl,
   });
 
   if (route.kind === ROUTE_KIND.UNCONFIGURED) {
@@ -131,16 +146,28 @@ export async function POST(
     );
   }
 
-  if (route.kind === ROUTE_KIND.V1 && !v1Config.configured) {
-    return jsonError(
-      {
-        code: "RUNTIME_NOT_CONFIGURED",
-        message:
-          "The GHARIBO-V1 runtime is not configured on this server. " +
-          `Set ${(v1Config.missing || []).join(" and ")}.`,
-      },
-      503,
-    );
+  if (route.kind === ROUTE_KIND.V1) {
+    if (v1ConfigError) {
+      return jsonError(
+        {
+          code: "RUNTIME_CONFIG_ERROR",
+          message: v1ConfigError.message,
+        },
+        503,
+      );
+    }
+
+    if (!v1Config?.configured) {
+      return jsonError(
+        {
+          code: "RUNTIME_NOT_CONFIGURED",
+          message:
+            "The GHARIBO-V1 runtime is not configured on this server. " +
+            `Set ${(v1Config?.missing || []).join(" and ")}.`,
+        },
+        503,
+      );
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -250,8 +277,10 @@ export async function POST(
            * with the client either.)
            */
           const generation = (async () => {
-            const token = resolveRuntimeToken(v1Config, process.env);
-            const extracted = await runV1Chat({ config: v1Config, token, messages, options });
+            // v1Config is guaranteed configured by the route guard above.
+            const config = v1Config!;
+            const token = resolveRuntimeToken(config, process.env);
+            const extracted = await runV1Chat({ config, token, messages, options });
             if (extracted.ok && extracted.answer) {
               // Mark as recorded so the shared tail below cannot write it twice.
               persistAnswer(extracted.answer);
