@@ -15,6 +15,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// Mutating suite: refuse to run unless started by the isolated runner,
+// so it can never write into the owner's real SQLite database.
+import { requireIsolatedVerification } from "./lib/verification-guard.mjs";
+requireIsolatedVerification("smoke-suite.mjs");
+
 // Portable output root: overridable, defaults to the OS temp dir so running
 // these scripts never writes into the repository.
 const OUT_ROOT = process.env.VERIFY_OUT ?? path.join(os.tmpdir(), "gharibo-verification");

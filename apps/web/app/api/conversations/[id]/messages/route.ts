@@ -34,6 +34,7 @@ import {
   V1_RUNTIME_PROVIDER_ID,
 } from "@/lib/runtime/gharibo-v1.mjs";
 import { resolveConversationRoute, ROUTE_KIND } from "@/lib/runtime/routing.mjs";
+import { deriveConversationTitle, DEFAULT_CONVERSATION_TITLE } from "@/lib/conversation-title.mjs";
 import {
   resolveDeploymentLimits,
   resolveProviderLimits,
@@ -208,10 +209,30 @@ export async function POST(
   // -------------------------------------------------------------------------
   // Accepted: persist the user turn exactly once, then stream.
   // -------------------------------------------------------------------------
-  conversationsRepository.addMessage(params.id, {
-    role: "user",
-    content: parsed.data.content,
-  });
+  /*
+   * Persist the user turn AND derive/persist the automatic title in ONE
+   * transaction.
+   *
+   * Timing: this runs AFTER validation, so a rejected request (bad provider, bad
+   * routing, token budget) can never rename anything. It is derived locally — no
+   * model call, so no GPU is woken.
+   *
+   * Atomicity: "is this the first message?" is answered by the DATABASE at
+   * insertion time, not from the `conv` snapshot read above (which is stale the
+   * moment two first-messages race). Only one auto-title can ever win, and it is
+   * derived from the message that actually landed first. A manual rename is
+   * preserved because the update is still conditional on the persisted title.
+   */
+  const accepted = conversationsRepository.addUserMessageWithAutoTitle(
+    params.id,
+    { content: parsed.data.content },
+    {
+      defaultTitle: DEFAULT_CONVERSATION_TITLE,
+      deriveTitle: deriveConversationTitle,
+    },
+  );
+  // Non-null only when THIS call persisted the title.
+  const autoTitle = accepted.title;
 
   const options = {
     temperature: conv.temperature,
@@ -246,6 +267,10 @@ export async function POST(
           /* client is gone — keep going so the answer is still persisted */
         }
       };
+
+      // Announce an automatic title first, so the sidebar and header can show it
+      // immediately without an extra round trip or a page reload.
+      if (autoTitle) send({ title: autoTitle });
 
       /**
        * Records an accepted answer.

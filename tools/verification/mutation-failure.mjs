@@ -12,6 +12,11 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
+// Mutating suite: refuse to run unless started by the isolated runner,
+// so it can never write into the owner's real SQLite database.
+import { requireIsolatedVerification } from "./lib/verification-guard.mjs";
+requireIsolatedVerification("mutation-failure.mjs");
+
 const CHROME = [
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
   "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",

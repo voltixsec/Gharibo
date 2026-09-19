@@ -10,6 +10,11 @@
  *
  * Usage: node api-checks.mjs <baseUrl>
  */
+// Mutating suite: refuse to run unless started by the isolated runner, so it can
+// never write into the owner's real SQLite database.
+import { requireIsolatedVerification } from "./lib/verification-guard.mjs";
+requireIsolatedVerification("api-checks.mjs");
+
 const base = process.argv[2] ?? "http://localhost:3100";
 
 const results = [];

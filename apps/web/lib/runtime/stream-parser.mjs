@@ -23,6 +23,12 @@ export const STREAM_EVENT = Object.freeze({
   DELTA: "delta",
   ERROR: "error",
   DONE: "done",
+  /**
+   * The server renamed the conversation (automatic title from the first
+   * accepted user message). Carrying it on the stream lets the sidebar and
+   * header update immediately instead of waiting for a refetch.
+   */
+  TITLE: "title",
 });
 
 export class NdjsonStreamParser {
@@ -127,6 +133,12 @@ export function parseLine(line) {
           typeof err.message === "string" ? err.message : "The runtime reported an error.",
       },
     };
+  }
+
+  // Automatic title. Checked before `delta` because a title record carries no
+  // content delta and must not be mistaken for one.
+  if (typeof record.title === "string") {
+    return { type: STREAM_EVENT.TITLE, title: record.title };
   }
 
   if (typeof record.status === "string") {

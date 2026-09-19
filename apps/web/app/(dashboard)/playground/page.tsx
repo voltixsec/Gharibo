@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useConversations, useConversation } from "@/hooks/use-conversations";
 import { useProviders } from "@/hooks/use-providers";
 import { RuntimeStatusProvider, useRuntimeV1 } from "@/components/providers/runtime-status-provider";
@@ -53,6 +53,7 @@ function PlaygroundContent() {
     patchConversation,
     renameConversation,
     deleteConversation,
+    refresh: refreshList,
   } = useConversations();
   const { providers } = useProviders();
   const { runtime, loading: runtimeLoading } = useRuntimeV1();
@@ -221,6 +222,19 @@ function PlaygroundContent() {
       });
     }
   };
+
+  /**
+   * Refreshes the sidebar list AND the active conversation.
+   *
+   * The two live in separate hooks, so refreshing only one would leave the
+   * sidebar and the header disagreeing about a title - exactly what happens
+   * after an automatic title is derived from the first message. Both are
+   * refreshed together so a rename (automatic or manual) is reflected
+   * everywhere at once.
+   */
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refreshList(), refresh()]);
+  }, [refreshList, refresh]);
 
   const handleRename = async (id: string, title: string) => {
     try {
@@ -392,7 +406,7 @@ function PlaygroundContent() {
         <div className="min-h-0 flex-1">
           <ChatView
             conversation={conversation}
-            onRefresh={refresh}
+            onRefresh={refreshAll}
             onRename={(title) => {
               if (conversation) void handleRename(conversation.id, title);
             }}
