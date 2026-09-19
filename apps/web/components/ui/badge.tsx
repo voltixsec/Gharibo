@@ -11,8 +11,16 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
-        success: "border-transparent bg-green-600 text-white hover:bg-green-600/80",
-        warning: "border-transparent bg-amber-500 text-white hover:bg-amber-500/80",
+        /*
+         * 700-weight greens/ambers, not 500/600.
+         *
+         * Badges render at `text-xs` (12px), which is "small text" for WCAG, so
+         * white-on-background must reach 4.5:1. `green-600` measures 3.3:1 and
+         * `amber-500` about 2.2:1 — both below the threshold. The 700 shades
+         * measure ~5.0:1. Found by the cross-page accessibility check.
+         */
+        success: "border-transparent bg-green-700 text-white hover:bg-green-700/85",
+        warning: "border-transparent bg-amber-700 text-white hover:bg-amber-700/85",
       },
     },
     defaultVariants: {
