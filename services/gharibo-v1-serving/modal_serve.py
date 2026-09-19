@@ -78,22 +78,8 @@ def api():
     # the endpoint does not claim ready before the verified model is loaded.
     engine.load()
 
-    web = create_app(engine=engine, config=config)
-
-    # OpenAI-compatible model discovery for clients such as WorkBuddy.
-    @web.get("/v1/models")
-    def models():
-        return {
-            "object": "list",
-            "data": [
-                {
-                    "id": "GHARIBO-V1",
-                    "object": "model",
-                    "owned_by": "gharibo",
-                }
-            ],
-        }
-
-    return web
+    # create_app already exposes the authenticated OpenAI-compatible
+    # /v1/models route. Do not register a second unauthenticated duplicate here.
+    return create_app(engine=engine, config=config)
 
 
