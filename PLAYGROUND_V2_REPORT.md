@@ -69,6 +69,28 @@ Verified against the **local** working tree (not GitHub `main`).
 | D14 | **Badge contrast failed WCAG AA on four other pages** (3.3:1 and ~2.2:1 vs 4.5:1 required for 12px text). **Pre-existing** — `badge.tsx` was untouched by this branch — but surfaced because this work changed the shared layout and the whole colour token system. | Medium | found by cross-page check |
 | D15 | **No keyboard bypass past the navigation** (WCAG 2.4.1), **an unnamed temperature slider**, and **drawers that ignored Escape**. | Medium | found by accessibility audit |
 | D16 | **Light-mode primary failed WCAG AA on four routes** (3.57:1 vs 4.5:1). A regression from this branch's own theme work, invisible in dark mode. | Medium | found by running the cross-page check in light mode |
+| D17 | **Unrelated refreshes could silently discard in-progress inspector edits.** The re-sync effect depended on the whole `conversation` object, so every `refresh()` — including the one `send()` does in its `finally` even on failure — reset the controls. | Low | **found by code review, not by a test** |
+
+### On D17 — a fix with no reproduction, and why no test was added
+
+The inspector re-synced its local state whenever the `conversation` object identity
+changed. Because `conversation` was in the effect's dependency array, any unrelated
+`refresh()` produced a new identity and reset the controls — so text typed into the
+system prompt but not yet committed on blur could be silently discarded. Keyed on the
+conversation id instead; settings here are user-driven, so syncing on switch/load is
+sufficient.
+
+**I could not build a deterministic end-user reproduction.** The practical path is to
+click another control, which blurs the field and commits it first, making the reset a
+no-op. I did write a test — and it passed **identically with and without the fix**
+(the refresh I triggered went through a raw API call, not React's `onRefresh`, so the
+component never re-rendered). I deleted it rather than commit it: **a test that
+passes both ways is worthless and actively misleading.** This is the same category of
+mistake as the earlier `api-checks` assertion that passed on a request which had
+failed with `GENERATION_FAILED`.
+
+So D17 is fixed defensively on the strength of the code reading, and is recorded as
+such — not claimed as a reproduced, test-covered defect.
 
 ---
 
@@ -841,7 +863,7 @@ Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pu
 branch : playground-v2
 head   : <HEAD>    (final commit is this report — run `git log -1` for the SHA)
 main   : 2b34e46  (not modified by this work)
-commits: 34 ahead of base   (includes this report's own commit)
+commits: 36 ahead of base   (includes this report's own commit)
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
