@@ -803,7 +803,7 @@ Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pu
 branch : playground-v2
 head   : <HEAD>    (final commit is this report — run `git log -1` for the SHA)
 main   : 2b34e46  (not modified by this work)
-commits: 26 ahead of base   (includes this report's own commit)
+commits: 28 ahead of base   (includes this report's own commit)
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
@@ -821,10 +821,45 @@ The owner's pre-existing local work is **preserved**: `modal_serve.py`, `modal_b
 the `.before-*` backups, the `.gitignore` edit, and all local serving changes carry forward
 untouched in content.
 
-A recovery checkpoint of the pre-change state is at
-`C:\Dev\_gharibo_playground_v2_recovery\` (`tracked-modifications.patch`, `untracked/`,
-`baseline/`, `bench/`, `shots/`, `tools/`). **This directory is outside the repository** and is
-safe to delete once the branch is reviewed.
+### Verification tooling is in the repository
+
+**Correction to earlier guidance.** This report previously said the recovery
+directory holding the verification harness was "safe to delete". That was wrong:
+deleting it would have discarded the only way to re-run any of these checks after
+a future change. The reusable suites are therefore committed at
+**`tools/verification/`** (21 scripts + README), so the work stays verifiable.
+
+They are **dependency-free** — Node built-ins (`fetch`, `WebSocket`) or Python
+stdlib (plus `jinja2` for one script), driving headless Chrome over CDP. No
+Playwright, no install step. Per mission section 15 they are deliberately **not**
+wired into `npm test` or CI: the live suites call the real GPU runtime and cost
+money, and `live-check` / `smoke-suite` / `e2e-actions` / `bench` self-skip when
+the runtime is not `ONLINE`.
+
+| Script | Verifies | Expected |
+|---|---|---|
+| `final-validate.sh` | typecheck, all web tests, `docs:validate`, `verify:m2`, serving pytest, `git diff --check` | all exit 0 |
+| `e2e.mjs` | Playground UI flows | 30/30 |
+| `e2e-actions.mjs` | message actions, mid-stream switching | 17/17 |
+| `route-check.mjs` | every route × desktop/mobile × both themes | 90/90 |
+| `a11y-check.mjs` | keyboard, focus visibility, accessible names | 15/15 |
+| `api-checks.mjs` | API contract and routing | 13/13 |
+| `live-check.mjs` | one live GHARIBO-V1 request end-to-end | 14/14 |
+| `smoke-suite.mjs` | model capability smoke suite | 9/11 |
+| `matrix-gaps.mjs` | system-prompt isolation, temperature, 768px | 14/14 |
+| `sidebar-features.mjs` | conversation search and two-step delete | 11/11 |
+
+See `tools/verification/README.md` for prerequisites and usage. It also records
+the methodology rules that cost real time: never read `$?` after a pipe, never
+build while `next start` serves, dispatch real key presses, reset focus between
+phases, synthetic events are not typing, verify BOTH themes, and suspect the
+fixture when a count looks suspiciously low.
+
+A separate recovery checkpoint of the pre-change state remains at
+`C:\Dev\_gharibo_playground_v2_recovery\` (patch, untracked backups, baselines,
+benchmarks, screenshots). It is outside the repository and is only a rollback aid
+— the tooling no longer depends on it, so it can be deleted once the branch is
+reviewed.
 
 ### Commits
 
