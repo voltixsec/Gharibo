@@ -60,13 +60,24 @@ export function Inspector({
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(limits.defaultMaxOutputTokens);
 
-  // Re-sync local controls when the active conversation changes.
+  /*
+   * Re-sync local controls when the active conversation changes.
+   *
+   * Keyed on the conversation id ONLY. Including the whole `conversation`
+   * object (or its individual fields) meant every unrelated `refresh()` — for
+   * example after sending a message or setting a quality signal — produced a
+   * new object identity, re-ran this effect, and reset the local state,
+   * silently discarding text the user had typed into the system prompt but not
+   * yet committed on blur. Settings are user-driven here, so syncing on switch
+   * is sufficient and leaving in-progress edits alone is correct.
+   */
   useEffect(() => {
     if (!conversation) return;
     setSystemPrompt(conversation.systemPrompt ?? "");
     setTemperature(conversation.temperature);
     setMaxTokens(conversation.maxTokens);
-  }, [conversation?.id, conversation?.systemPrompt, conversation?.temperature, conversation?.maxTokens, conversation]);
+    // Intentionally keyed on id only; see comment above.
+  }, [conversation?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const disabled = !conversation;
   const diag = runtime?.diagnostics ?? null;
