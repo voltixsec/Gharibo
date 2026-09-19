@@ -803,7 +803,7 @@ Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pu
 branch : playground-v2
 head   : <HEAD>    (final commit is this report — run `git log -1` for the SHA)
 main   : 2b34e46  (not modified by this work)
-commits: 28 ahead of base   (includes this report's own commit)
+commits: 30 ahead of base   (includes this report's own commit)
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
@@ -898,6 +898,28 @@ services/gharibo-v1-serving/app/model_backend.py.modal-backup
 ```
 
 Tracked working tree is clean: **0 modified tracked files** pending.
+
+### Portability audit of every tracked file
+
+Checked once the verification tooling was committed, because scripts that only
+ever ran on this machine are a trap for the next person.
+
+| Check | Result |
+|---|---|
+| Tracked files referencing the recovery directory | only this report (documentation) |
+| Tracked files with hardcoded `C:////Dev` paths | 9 — **1 mine, 8 pre-existing** |
+| Committed build artifacts / `.env` / `.db` / weights / `__pycache__` | 0 |
+
+**The one I was responsible for:** I had hardcoded
+`C:/Dev/GHARIBO/models/weights/exp002-tokenizer-unsloth/chat_template.jinja` in
+the serving prompt-contract tests. On any other machine those tests would have
+skipped silently, quietly losing the very assertion that pins the identity
+finding. Now resolved relative to the test file with a `CHAT_TEMPLATE` override;
+the five prompt tests were re-confirmed to **pass, not skip**.
+
+The other eight (`data/derived/exp002/*.json` and one adapter path in the same
+test file) predate this branch — last touched 3fcfb1f, Sep 17 — so they were
+deliberately left alone rather than churned.
 
 ## 21. Commit plan
 
