@@ -43,6 +43,9 @@ export const DEPLOYMENT_LIMITS = Object.freeze({
   presets: Object.freeze([64, 128, 256, 512]),
 });
 
+/** Generic presets for provider-backed models; filtered by their context window. */
+const PROVIDER_PRESETS = Object.freeze([64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]);
+
 /** Machine-readable rejection reasons. */
 export const BUDGET_REASON = Object.freeze({
   OK: "OK",
@@ -88,6 +91,37 @@ export function resolveDeploymentLimits(env = {}) {
     contextLength,
     reservedPromptTokens: DEPLOYMENT_LIMITS.reservedPromptTokens,
     presets: DEPLOYMENT_LIMITS.presets.filter((p) => p <= ceiling),
+  };
+}
+
+/**
+ * Builds a budget for a normal provider-backed model.
+ *
+ * GHARIBO's T4 ceiling is a deployment property of GHARIBO only. Reusing that
+ * 512-token ceiling for OpenAI/Ollama/vLLM providers silently crippled models
+ * with larger context windows. Provider conversations are instead bounded by
+ * the provider row's declared context window.
+ *
+ * @param {unknown} contextWindow
+ * @param {unknown} [defaultMaxOutputTokens]
+ */
+export function resolveProviderLimits(contextWindow, defaultMaxOutputTokens = 2048) {
+  const parsedContext = Number.parseInt(String(contextWindow ?? ""), 10);
+  const contextLength =
+    Number.isFinite(parsedContext) && parsedContext > 0 ? parsedContext : 4096;
+  const parsedDefault = Number.parseInt(String(defaultMaxOutputTokens ?? ""), 10);
+  const requestedDefault =
+    Number.isFinite(parsedDefault) && parsedDefault > 0 ? parsedDefault : 2048;
+
+  return {
+    defaultMaxOutputTokens: Math.min(requestedDefault, contextLength),
+    maxOutputTokensCeiling: contextLength,
+    contextLength,
+    reservedPromptTokens: Math.min(
+      DEPLOYMENT_LIMITS.reservedPromptTokens,
+      Math.max(1, Math.floor(contextLength / 8)),
+    ),
+    presets: PROVIDER_PRESETS.filter((preset) => preset <= contextLength),
   };
 }
 
