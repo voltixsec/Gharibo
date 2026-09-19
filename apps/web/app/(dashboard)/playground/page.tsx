@@ -158,6 +158,9 @@ function PlaygroundContent() {
   const selectedMaxTokenCeiling = isV1Selection
     ? limits.maxOutputTokensCeiling
     : (selectionProvider?.contextWindow ?? limits.maxOutputTokensCeiling);
+  const newConversationMaxTokens = isV1Selection
+    ? limits.defaultMaxOutputTokens
+    : Math.min(2048, selectedMaxTokenCeiling);
   const modelLabel =
     selectionKey === V1_RUNTIME_PROVIDER_ID
       ? V1_MODEL_ID
@@ -183,7 +186,7 @@ function PlaygroundContent() {
         modelId: target.modelId,
         systemPrompt: null,
         temperature: 0.7,
-        maxTokens: limits.defaultMaxOutputTokens,
+        maxTokens: newConversationMaxTokens,
         toolsEnabled: false,
       });
       setActiveId(conv.id);
