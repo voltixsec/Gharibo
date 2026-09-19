@@ -87,7 +87,13 @@ export function useConversations() {
 
   const deleteConversation = useCallback(
     async (id: string) => {
-      await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || json?.code !== 0) {
+        throw new Error(
+          json?.message || `Failed to delete conversation (HTTP ${res.status})`,
+        );
+      }
       await refresh();
     },
     [refresh],
