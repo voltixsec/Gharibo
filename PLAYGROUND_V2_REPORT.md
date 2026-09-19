@@ -276,8 +276,57 @@ Runtime warm, T4, `max_tokens` ∈ {64,128,256}.
 - **9/9 runs OK**, no OOM, no error, assistant persisted exactly once in every run.
 - Answer lengths 2–158 chars; the tiny prompt correctly returned `42`.
 
-**Before vs after:** no benchmark existed before, so no comparable baseline could be measured
-without altering the old build. The measurable *behavioural* change is in §11: the old probe
+**Before vs after (frontend, this work):** the redesign's cost was measured by A/B — the
+optimisation was reverted, the app rebuilt, and both builds measured with the same harness.
+See §12.1.
+
+### 12.1 Frontend performance, measured before vs after
+
+**Why the first attempt was discarded.** An initial polling-based "hydration" probe was too
+noisy to attribute anything to: the Playground ranged **118-511 ms before** and **97-547 ms
+after** — completely overlapping. Reporting a number from that would have been an assumption
+dressed as a measurement.
+
+**Method (valid).** CDP `Performance.getMetrics` — cumulative `ScriptDuration`,
+`LayoutDuration`, `RecalcStyleDuration`, `TaskDuration`. Five runs per route, one warm-up
+navigation discarded, browser cache disabled, dark theme, 1440x900. A genuine A/B: the
+optimisation was reverted and the app rebuilt to produce the "before" build. Plus a re-render
+test that types 25 real keystrokes into the composer, which is the case the memoisation
+actually targets (what happens on every streaming tick).
+
+| Metric | before | after | delta |
+|---|---|---|---|
+| `/playground` script | 54 ms | 52 ms | -2 ms |
+| `/playground` layout | 30 ms | 25 ms | -5 ms |
+| `/playground` style | 26 ms | 25 ms | -1 ms |
+| `/playground` task | 203 ms | 184 ms | -19 ms |
+| `/playground` DOM nodes | 3064 | 3064 | unchanged |
+| `/playground` JS heap | 14 MB | 14 MB | unchanged |
+| `/settings` script | 35 ms | 33 ms | -2 ms |
+| `/settings` task | 152 ms | 141 ms | -11 ms |
+| **re-render script (25 keystrokes)** | **49 ms** | **30 ms** | **-19 ms (-39%)** |
+| re-render task | 127 ms | 113 ms | -14 ms |
+| re-render layout | 13 ms | 14 ms | +1 ms |
+| re-render style | 14 ms | 15 ms | +1 ms |
+
+**Decision: kept.** The targeted metric improved 39%. The +1 ms layout and style deltas are
+within noise; DOM node count and heap are unchanged; no metric regressed.
+
+**Bundle cost of the redesign** (measured from the build output, not estimated):
+
+| | baseline | current |
+|---|---|---|
+| `/playground` page JS | 10.8 kB | 22.3 kB |
+| First Load JS | 156 kB | 175 kB |
+| JS shared by all routes | 87.2 kB | 87.2 kB (**unchanged** — no new runtime dependency was added) |
+
+The shared chunk is unchanged because nothing was added to `package.json`; the +11.5 kB page
+and +19 kB first-load increase is the new UI itself (markdown renderer, searchable sidebar,
+inspector/telemetry, brand components, empty state).
+
+**Caveat:** all frontend numbers are from a local production server on this machine. They are
+valid for before/after comparison under identical conditions, and are **not** representative
+of real-world network conditions. The measurable *behavioural* change is in §11: the old probe
 used a 5s timeout against a non-existent endpoint, so a healthy runtime was reported OFFLINE and
 the UI never showed real GPU/VRAM data. Both are fixed.
 
@@ -495,6 +544,7 @@ Run with **Node 24** (see §16 for why).
 | Model smoke suite (live) | **9/11 PASS** (2 model-level findings, F1/F2) |
 | Cross-page regression (10 routes × desktop/mobile) | **90/90 PASS** |
 | Accessibility (keyboard / focus / ARIA) | **15/15 PASS** |
+| Frontend performance A/B (measured) | **improved, no regression — kept** (re-render script 49 ms -> 30 ms) |
 | WCAG contrast (dark, 95 samples) | **0 failures** |
 | WCAG contrast (light, 95 samples) | **0 failures** |
 
@@ -539,6 +589,17 @@ was touched.
     A model-quality boundary, not an application defect.
 11. **The protocol-tail fix is not yet live.** It is unit-verified against the real FastAPI app
     but the deployed serving build predates it; it takes effect on the next serving deploy.
+12. **Frontend performance figures are local-only.** They come from a production server on this
+    machine with the cache disabled. They are valid for the before/after comparison in §12.1
+    (identical conditions, same harness) and are **not** representative of real-world network
+    conditions. No field/CWV data was collected.
+13. **The re-render measurement needs an existing conversation.** The harness opens one from the
+    owner's existing data to type into; with an empty database that specific check self-skips.
+    It is a harness precondition, not a product limitation.
+14. **No bundle-size work was attempted.** The redesign adds ~11.5 kB to the `/playground` page
+    and ~19 kB to first load, with the shared chunk unchanged (no new dependency). Code-splitting
+    the inspector or the markdown renderer would likely recover part of that, but was not done
+    because it was not shown to be a bottleneck (0 long tasks, 0 ms TBT).
 
 ---
 
@@ -632,53 +693,24 @@ errors. **90/90 passed.**
 
 ## 20. Exact git status
 
-Branch **`playground-v2`**, base commit `b62e859`, **nothing pushed, nothing merged.**
+Branch **`playground-v2`**, base commit `b62e859` (**17 commits**), **nothing pushed, nothing merged.**
 
 ```
- M .gitignore
- M apps/web/app/(dashboard)/layout.tsx
- M apps/web/app/(dashboard)/playground/page.tsx
- M apps/web/app/api/conversations/[id]/messages/route.ts
- M apps/web/app/api/conversations/[id]/route.ts
- M apps/web/app/api/conversations/route.ts
- M apps/web/app/globals.css
- D apps/web/components/playground/chat-controls.tsx
- M apps/web/components/playground/chat-view.tsx
- D apps/web/components/playground/conversation-list.tsx
- M apps/web/components/playground/message-bubble.tsx
- M apps/web/components/playground/model-selector.tsx
- M apps/web/components/playground/runtime-status-badge.tsx
- M apps/web/components/sidebar.tsx
- M apps/web/hooks/use-conversations.ts
- D apps/web/hooks/use-runtime-v1.ts
- M apps/web/lib/__tests__/exp002-v1-runtime.test.ts
- M apps/web/lib/db/repositories/conversations.ts
- M apps/web/lib/runtime/gharibo-v1.mjs
- M docs/ARCHITECTURE.md
- M docs/DOCUMENT_REGISTER.md
- M services/gharibo-v1-serving/app/main.py
- M services/gharibo-v1-serving/app/model_backend.py
- M services/gharibo-v1-serving/tests/test_serving.py
-?? apps/web/app/icon.png
-?? apps/web/components/brand/          (gharibo-brand.tsx)
-?? apps/web/components/mobile-nav.tsx
-?? apps/web/components/playground/composer.tsx
-?? apps/web/components/playground/conversation-sidebar.tsx
-?? apps/web/components/playground/empty-state.tsx
-?? apps/web/components/playground/inspector.tsx
-?? apps/web/components/playground/markdown-lite.tsx
-?? apps/web/components/providers/runtime-status-provider.tsx
-?? apps/web/hooks/use-media-query.ts
-?? apps/web/lib/__tests__/playground-conversations.test.ts
-?? apps/web/lib/__tests__/playground-conversations.test.ts
-?? apps/web/lib/__tests__/playground-limits.test.ts
-?? apps/web/lib/__tests__/playground-routing.test.ts
-?? apps/web/lib/__tests__/playground-runtime-health.test.ts
-?? apps/web/lib/__tests__/playground-stream-parser.test.ts
-?? apps/web/lib/runtime/deployment-limits.mjs
-?? apps/web/lib/runtime/routing.mjs
-?? apps/web/lib/runtime/stream-parser.mjs
-?? apps/web/public/                     (brand assets)
+branch : playground-v2
+head   : ed4496f
+main   : 2b34e46  (not modified by this work)
+commits: 17 ahead of base
+pending tracked changes: 0        (working tree is clean)
+
+=== untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
+?? apps/web/app/(dashboard)/playground/page.tsx.before-v1-fk-fix
+?? apps/web/app/api/conversations/[id]/messages/route.ts.before-v1-runtime-fix
+?? apps/web/components/playground/chat-view.tsx.before-v1-runtime-fix
+?? services/gharibo-v1-serving/app/main.py.before-422-diagnostics
+?? services/gharibo-v1-serving/app/main.py.before-protocol-tail-fix
+?? services/gharibo-v1-serving/app/main.py.before-t4-token-guard
+?? services/gharibo-v1-serving/app/main.py.before-workbuddy-streaming
+?? services/gharibo-v1-serving/app/model_backend.py.modal-backup
 ```
 
 The owner's pre-existing local work is **preserved**: `modal_serve.py`, `modal_build_base.py`,
@@ -695,6 +727,38 @@ safe to delete once the branch is reviewed.
 See §21 — commits are created on `playground-v2` only.
 
 ---
+
+## 20.1 Secret and artifact audit (verified)
+
+Checked across the **entire branch diff** (`b62e859..HEAD`), not just the working tree:
+
+| Check | Result |
+|---|---|
+| Secret-shaped strings (`sk-...`, `Bearer <token>`) in the diff | **0** |
+| Files matching `.env`, `.env.local`, `.db`, `.safetensors`, `credentials.json`, `.gguf`, `.bin` | **0** |
+| Identity files changed (`identity.py`, `harmony_final.py`, `adapter_verify.py`) | **0** |
+| Model weights or adapters committed | **none** |
+| Local databases committed | **none** |
+
+The real `.env.local` (which holds the Modal API key) is **gitignored** and was never read,
+printed, logged or committed. No authorization header is logged anywhere.
+
+The only untracked files in the repository are the owner's pre-existing scratch backups, which
+were deliberately **not** committed (they are superseded snapshots, retained on disk and in the
+recovery checkpoint):
+
+```
+apps/web/app/(dashboard)/playground/page.tsx.before-v1-fk-fix
+apps/web/app/api/conversations/[id]/messages/route.ts.before-v1-runtime-fix
+apps/web/components/playground/chat-view.tsx.before-v1-runtime-fix
+services/gharibo-v1-serving/app/main.py.before-422-diagnostics
+services/gharibo-v1-serving/app/main.py.before-protocol-tail-fix
+services/gharibo-v1-serving/app/main.py.before-t4-token-guard
+services/gharibo-v1-serving/app/main.py.before-workbuddy-streaming
+services/gharibo-v1-serving/app/model_backend.py.modal-backup
+```
+
+Tracked working tree is clean: **0 modified tracked files** pending.
 
 ## 21. Commit plan
 
@@ -716,6 +780,7 @@ Commits created on `playground-v2`. **No push, no merge, no PR.**
 | `6af6108` | `docs(report): record the validation-harness exit-code bug` |
 | `a964aa8` | `fix(ui): darken success and warning badges to meet WCAG AA` |
 | `4aecd40` | `feat(a11y): keyboard bypass links, a labelled slider, Escape-closable drawers` |
+| `ed4496f` | `perf(playground): memoise markdown parsing and message re-render` |
 
 The working tree is clean relative to `HEAD`. The only untracked files are the owner's
 pre-existing `*.before-*` scratch backups, which were deliberately **not** committed (they are
