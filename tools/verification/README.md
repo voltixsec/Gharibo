@@ -35,6 +35,7 @@ layout at real viewport sizes.
 | `smoke-suite.mjs` | Model capability smoke suite (fresh synthetic prompts) | 9/11 (2 known model findings) |
 | `matrix-gaps.mjs` | System-prompt isolation/send, temperature persistence, 768px viewport | 14/14 |
 | `sidebar-features.mjs` | Conversation search filtering and the two-step delete flow | 11/11 |
+| `provider-routing.mjs` | Selecting another provider actually routes to it (proven via the server's own status event) | 10/10 |
 
 ## Usage
 
