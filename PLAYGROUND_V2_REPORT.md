@@ -863,7 +863,7 @@ Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pu
 branch : playground-v2
 head   : <HEAD>    (final commit is this report — run `git log -1` for the SHA)
 main   : 2b34e46  (not modified by this work)
-commits: 36 ahead of base   (includes this report's own commit)
+commits: 38 ahead of base   (includes this report's own commit)
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
@@ -978,6 +978,17 @@ services/gharibo-v1-serving/app/model_backend.py.modal-backup
 ```
 
 Tracked working tree is clean: **0 modified tracked files** pending.
+
+### Dead code removed
+
+The mission's "remove dead code" item, completed last by review rather than by a
+failing test: the `terminal` variable in `ChatView`'s stream handler was assigned in
+three places and never read. The `DONE` event genuinely needs no action — any answer
+has already arrived as a `DELTA` or an `ERROR` — so the branch was replaced with a
+comment explaining that, and the variable deleted. Typecheck clean.
+
+The rest of the handler was reviewed at the same time: the `pendingPrompt` auto-send
+is ref-guarded against double-send and is correct.
 
 ### Portability audit of every tracked file
 
