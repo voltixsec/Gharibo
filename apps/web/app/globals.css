@@ -53,7 +53,17 @@
     --card-foreground: 220 57% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 57% 10%;
-    --primary: 202 88% 45%;
+    /*
+     * 38% lightness, not 45%.
+     *
+     * White on `202 88% 45%` measures 3.57:1, which fails WCAG AA for the small
+     * text used on primary buttons ("Run Task", "New Dataset", "Generate
+     * Training Package", "Add Provider"). At 38% it measures ~4.8:1. The dark
+     * theme pairs a bright primary with DARK text, so it was never affected —
+     * which is why this only showed up when the cross-page check was finally
+     * run in light mode.
+     */
+    --primary: 202 88% 38%;
     --primary-foreground: 0 0% 100%;
     --secondary: 218 40% 95%;
     --secondary-foreground: 220 57% 14%;
