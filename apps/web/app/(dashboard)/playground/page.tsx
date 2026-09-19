@@ -195,8 +195,12 @@ function PlaygroundContent() {
   };
 
   const handleSelectionChange = async (key: string) => {
-    setSelectionKey(key);
-    if (!conversation) return;
+    // With no active conversation this is just the default for the next chat.
+    if (!conversation) {
+      setSelectionKey(key);
+      return;
+    }
+
     const provider = activeProviders.find((p) => p.id === key) ?? null;
     const target = targetFromSelection(key, provider);
     try {
@@ -204,6 +208,8 @@ function PlaygroundContent() {
         providerId: target.providerId,
         modelId: target.modelId,
       });
+      // Do not make the selector claim a route until persistence succeeded.
+      setSelectionKey(key);
       refresh();
     } catch (e) {
       toast({
@@ -233,12 +239,12 @@ function PlaygroundContent() {
   };
 
   /**
-   * Compare: branch this conversation to a different model.
+   * Compare the selected prompt against a different model.
    *
-   * Creates a new conversation carrying the same system prompt and settings but
-   * a different routing target, then re-sends the prompt that produced the
-   * selected response. The two conversations can then be compared side by side.
-   * This is a REAL comparison, not a relabelled edit dialog.
+   * This deliberately starts a FRESH conversation with the same system prompt
+   * and generation settings, then re-sends only the prompt that produced the
+   * selected response. Earlier chat history is not copied, so the UI must not
+   * describe this as a full conversation branch.
    */
   const handleCompareConfirm = async () => {
     if (!conversation || !compareSource) return;
@@ -410,11 +416,12 @@ function PlaygroundContent() {
       <Dialog open={!!compareSource} onOpenChange={(open) => !open && setCompareSource(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Compare with another model</DialogTitle>
+            <DialogTitle>Compare prompt with another model</DialogTitle>
             <DialogDescription>
-              Creates a new conversation with the same settings and re-sends the
-              prompt that produced this response, so the two answers can be
-              compared side by side.
+              Runs the same prompt in a fresh conversation with the same system
+              prompt and generation settings. Earlier chat history is not copied,
+              so this compares the prompt-level answer rather than the full
+              multi-turn context.
             </DialogDescription>
           </DialogHeader>
 
