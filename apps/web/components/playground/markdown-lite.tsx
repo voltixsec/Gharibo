@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Check, Copy } from "lucide-react";
 
@@ -20,7 +20,12 @@ interface MarkdownLiteProps {
 }
 
 export function MarkdownLite({ content, className }: MarkdownLiteProps) {
-  const blocks = parseBlocks(content);
+  /*
+   * Memoised: parsing is pure and depends only on the content, but the
+   * surrounding chat re-renders on every streaming delta. Without this, each
+   * already-rendered message re-parsed its entire body once per token.
+   */
+  const blocks = useMemo(() => parseBlocks(content), [content]);
   return <div className={cn("space-y-3 text-sm leading-relaxed", className)}>{blocks}</div>;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GhariboMark } from "@/components/brand/gharibo-brand";
@@ -29,7 +29,12 @@ interface MessageBubbleProps {
   onRetry?: (prompt: string) => void;
 }
 
-export function MessageBubble({
+/**
+ * Memoised so an unchanged message is not re-rendered (or re-parsed) while
+ * another message is streaming. All props are stable: the handlers are
+ * useCallback-wrapped in ChatView and the state setters are inherently stable.
+ */
+function MessageBubbleImpl({
   message,
   promptForRetry,
   onAddToDataset,
@@ -157,3 +162,5 @@ function ActionButton({
     </Button>
   );
 }
+
+export const MessageBubble = memo(MessageBubbleImpl);

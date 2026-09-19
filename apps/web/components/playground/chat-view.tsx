@@ -283,14 +283,18 @@ export function ChatView({
     send(pendingPrompt);
   }, [pendingPrompt, conversationId, busy, send, onPendingPromptConsumed]);
 
-  const handleQualitySignal = async (messageId: string, signal: "good" | "bad") => {
-    await fetch(`/api/conversations/${conversationId}/messages/${messageId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ qualitySignal: signal }),
-    });
-    onRefresh();
-  };
+  // useCallback so the memoised MessageBubble is not invalidated every render.
+  const handleQualitySignal = useCallback(
+    async (messageId: string, signal: "good" | "bad") => {
+      await fetch(`/api/conversations/${conversationId}/messages/${messageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qualitySignal: signal }),
+      });
+      onRefresh();
+    },
+    [conversationId, onRefresh],
+  );
 
   const commitTitle = () => {
     const next = titleDraft.trim();
@@ -397,7 +401,7 @@ export function ChatView({
                 onQualitySignal={handleQualitySignal}
                 onEditApprove={setDialogMessage}
                 onCompare={onCompare}
-                onRetry={(prompt) => send(prompt)}
+                onRetry={send}
               />
             ))}
 
