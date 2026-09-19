@@ -33,8 +33,9 @@ screens.
 
 The model smoke suite (§13) additionally surfaced **two model-level findings** that are NOT
 application defects and are reported rather than patched:
-- **F1** — the model is *unreliable* on one decimal-multiplication step (correct on only 1 of
-  6 samples; a sixth run produced the right answer, so it is not deterministic).
+- **F1** — the model is *inconsistent* on one decimal-multiplication step: across 12 samples
+  it returned the correct 9,486 in some batches (4/6 most recently) and plausible-but-wrong
+  totals (9,480/9,492/9,498) in others. Neither reliably right nor reliably wrong.
 - **F2** — it claims tool capabilities it does not have, root-caused to a default
   `model_identity` of "You are ChatGPT" injected by the accepted chat template. Fixing this is
   a one-line change that would alter the served prompt contract, so it is deferred to the owner.
