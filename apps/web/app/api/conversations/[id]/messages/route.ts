@@ -264,7 +264,10 @@ export async function POST(
 
           if (!extracted.ok) {
             // Fail closed: never surface raw model text, which may contain the
-            // hidden analysis channel.
+            // hidden analysis channel. Do NOT return from start() here: the
+            // shared tail below must still close the ReadableStream, otherwise
+            // clients can receive the error event and then wait forever for EOF.
+            isError = true;
             send({
               error: {
                 code: extracted.reason || "NO_FINAL_ANSWER",
@@ -274,11 +277,10 @@ export async function POST(
               },
               done: true,
             });
-            return;
+          } else {
+            fullResponse = extracted.answer ?? "";
+            send({ delta: fullResponse, done: true });
           }
-
-          fullResponse = extracted.answer ?? "";
-          send({ delta: fullResponse, done: true });
         } else {
           const provider = getProvider(providerConfig!);
           send({ status: "generating", modelId: routedModelId ?? undefined });
@@ -316,7 +318,7 @@ export async function POST(
 
   return new Response(stream, {
     headers: {
-      "Content-Type": "text/event-stream",
+      "Content-Type": "application/x-ndjson; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
     },
