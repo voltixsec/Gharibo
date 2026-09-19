@@ -141,7 +141,6 @@ export function ChatView({
       const startedAt = performance.now();
       let ttfbMs: number | null = null;
       let accumulated = "";
-      let terminal = false;
 
       try {
         const body: Record<string, unknown> = { content: prompt };
@@ -197,7 +196,6 @@ export function ChatView({
               if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
               accumulated += event.delta ?? "";
               setStreamingContent(accumulated);
-              if (event.done) terminal = true;
             } else if (event.type === STREAM_EVENT.STATUS) {
               if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
             } else if (event.type === STREAM_EVENT.ERROR) {
@@ -205,10 +203,9 @@ export function ChatView({
                 tone: event.error?.code === "NO_FINAL_ANSWER" ? "warning" : "error",
                 message: event.error?.message ?? "The runtime reported an error.",
               });
-              terminal = true;
-            } else if (event.type === STREAM_EVENT.DONE) {
-              terminal = true;
             }
+            // STREAM_EVENT.DONE needs no action — the stream simply ends, and any
+            // answer has already been delivered either as a DELTA or an ERROR.
           }
         };
 
