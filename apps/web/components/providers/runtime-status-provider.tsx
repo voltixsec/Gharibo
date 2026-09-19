@@ -120,6 +120,13 @@ export function RuntimeStatusProvider({ children }: { children: ReactNode }) {
   const checkedAt = runtime?.health?.checkedAt;
 
   useEffect(() => {
+    // A completed warm-up cycle must not consume the polling budget forever.
+    // If the scaled-to-zero runtime becomes cold again later in the same page
+    // session, a manual refresh can start a fresh bounded warm-up sequence.
+    if (!isWarming) warmingPolls.current = 0;
+  }, [isWarming]);
+
+  useEffect(() => {
     if (!isWarming) return;
     if (warmingPolls.current >= MAX_WARMING_POLLS) return;
     warmingPolls.current += 1;
