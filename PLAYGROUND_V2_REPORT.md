@@ -595,6 +595,34 @@ The dynamic training route was also verified (it is the one route the static
 walk could not reach): HTTP 200, hydrates, renders 2162 chars, 11 nav links, no
 overflow at 1440 or 390, WCAG AA on 95 samples, no console errors.
 
+### Sidebar features: search filtering and the delete flow
+
+Two features built during the redesign had never been exercised by any earlier
+suite. Both are now verified — **11/11**.
+
+| Check | Result |
+|---|---|
+| Conversation rows render | PASS — 11 rows |
+| The search input exists | PASS |
+| A unique term filters the list | PASS — 11 -> 2 rows |
+| Every visible row matches the term | PASS |
+| A non-matching term shows the empty message (no stale rows) | PASS — 0 rows |
+| **Clearing the search restores the FULL list** | PASS — 11 of 11 rows |
+| The delete control is reachable on a row | PASS |
+| **The first click only asks for confirmation** — nothing deleted | PASS — 11 -> 11 |
+| A confirm control appears | PASS |
+| **Confirming removes exactly one conversation** | PASS — 11 -> 10 |
+| The other matching conversation was not removed | PASS |
+
+The delete flow is confirmed to be two-step: the first click reveals a confirm
+control and changes nothing; only confirming deletes, and only the targeted row.
+
+**A weak assertion was caught and tightened.** The first version pressed 20
+backspaces to clear the search and asserted only `restored >= filtered`, passing
+with 2 rows when the full list was 11 — the field had not actually been cleared.
+Raised to 60 backspaces and asserted `restored === total`; it now passes at
+11 of 11. Reporting the loose version would have overstated the result.
+
 ## 14. Validation command results
 
 Run with **Node 24** (see §16 for why).
@@ -620,6 +648,7 @@ Run with **Node 24** (see §16 for why).
 | Cross-page, dark theme | **90/90 PASS** |
 | Accessibility, light theme | **15/15 PASS** |
 | Accessibility, dark theme | **15/15 PASS** |
+| Sidebar search filtering + delete flow | **11/11 PASS** |
 | WCAG contrast (dark, 95 samples) | **0 failures** |
 | WCAG contrast (light, 95 samples) | **0 failures** |
 
@@ -774,7 +803,7 @@ Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pu
 branch : playground-v2
 head   : <HEAD>    (final commit is this report — run `git log -1` for the SHA)
 main   : 2b34e46  (not modified by this work)
-commits: 24 ahead of base   (includes this report's own commit)
+commits: 25 ahead of base   (includes this report's own commit)
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
@@ -921,6 +950,8 @@ should resolve in favour of this branch, which is a strict evolution of `2b34e46
 | Layout verified at 1440 / 1280 / 1024 / 768 / 390 | ✅ |
 | Both themes verified, not just the default | ✅ (D16 found this way) |
 | The dynamic `/training/[runId]` route verified | ✅ |
+| Sidebar search filtering works | ✅ |
+| Delete requires confirmation and removes only the target | ✅ |
 | Desktop and mobile layouts usable | ✅ (4 viewports) |
 | Message actions still work | ✅ |
 | Data/training actions still work | ✅ (Add to Dataset, Edit & Approve) |
