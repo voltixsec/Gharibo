@@ -39,7 +39,7 @@ temperature slider and made the drawers Escape-closable.
 **Validation: typecheck PASS · 381/381 unit tests PASS · production build PASS ·
 `docs:validate` PASS · `verify:m2` PASS · 53/53 serving tests PASS · 13/13 API checks PASS ·
 14/14 live runtime checks PASS · 47/47 browser E2E checks PASS · 90/90 cross-page checks PASS ·
-15/15 accessibility checks PASS · 9/11 smoke checks PASS (2 model-level findings) ·
+15/15 accessibility checks PASS · 10/11 smoke checks PASS (1 model-level finding, F1) ·
 WCAG AA contrast PASS in both themes.**
 
 No model identity, adapter, weights, or governance safeguard was changed. Nothing was pushed or
@@ -701,7 +701,7 @@ Run with **Node 24** (see §16 for why).
 | `git diff --check` | **clean** |
 | Browser E2E phase 1 | **30/30 PASS** |
 | Browser E2E phase 2 (live) | **17/17 PASS** |
-| Model smoke suite (live) | **9/11 PASS** (2 model-level findings, F1/F2) |
+| Model smoke suite (live) | **10/11 PASS** (1 model-level finding, F1 — see correction in §13) |
 | Cross-page regression (10 routes × desktop/mobile) | **90/90 PASS** |
 | Accessibility (keyboard / focus / ARIA) | **15/15 PASS** |
 | Frontend performance A/B (measured) | **improved, no regression — kept** (re-render script 49 ms -> 30 ms) |
@@ -907,7 +907,7 @@ the runtime is not `ONLINE`.
 | `a11y-check.mjs` | keyboard, focus visibility, accessible names | 15/15 |
 | `api-checks.mjs` | API contract and routing | 13/13 |
 | `live-check.mjs` | one live GHARIBO-V1 request end-to-end | 14/14 |
-| `smoke-suite.mjs` | model capability smoke suite | 9/11 |
+| `smoke-suite.mjs` | model capability smoke suite | 10/11 |
 | `matrix-gaps.mjs` | system-prompt isolation, temperature, 768px | 14/14 |
 | `sidebar-features.mjs` | conversation search and two-step delete | 11/11 |
 | `provider-routing.mjs` | **selecting another provider routes to it** | 10/10 |
