@@ -690,7 +690,15 @@ def test_client_safe_answer_still_preserves_inline_assistant_text():
 # application sends: the template injects a system message of its own. Asserting
 # on the RENDERED text is the only way to know what the model sees.
 
-TEMPLATE_PATH = Path("C:/Dev/GHARIBO/models/weights/exp002-tokenizer-unsloth/chat_template.jinja")
+# Resolved relative to this file (repo root is three levels up) so the tests are
+# not tied to one machine. Override with CHAT_TEMPLATE=/path/to/chat_template.jinja
+# if the snapshot lives elsewhere; the tests skip (not fail) when it is absent.
+TEMPLATE_PATH = Path(
+    os.environ.get(
+        "CHAT_TEMPLATE",
+        Path(__file__).resolve().parents[3] / "models" / "weights" / "exp002-tokenizer-unsloth" / "chat_template.jinja",
+    )
+)
 
 
 def _render_prompt(messages=None, **overrides):
