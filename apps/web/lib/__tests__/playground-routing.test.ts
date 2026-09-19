@@ -150,9 +150,10 @@ describe("helpers", () => {
     expect(isV1Sentinel(undefined)).toBe(false);
   });
 
-  it("isV1Endpoint normalises trailing slashes and case", () => {
+  it("isV1Endpoint normalises host case without collapsing path case", () => {
     expect(isV1Endpoint("https://A.example.com/", "https://a.example.com")).toBe(true);
     expect(isV1Endpoint("https://a.example.com/x", "https://a.example.com")).toBe(false);
+    expect(isV1Endpoint("https://a.example.com/API", "https://a.example.com/api")).toBe(false);
     expect(isV1Endpoint(null, "https://a.example.com")).toBe(false);
   });
 });
