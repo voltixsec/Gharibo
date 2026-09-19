@@ -207,6 +207,13 @@ export function ChatView({
                 tone: event.error?.code === "NO_FINAL_ANSWER" ? "warning" : "error",
                 message: event.error?.message ?? "The runtime reported an error.",
               });
+            } else if (event.type === STREAM_EVENT.TITLE) {
+              // The server derived a title from the first accepted message and
+              // confirmed it persisted. Refresh so the sidebar and header show
+              // it immediately. We deliberately do NOT paint `event.title`
+              // locally: the source of truth is the refreshed conversation, so a
+              // rename that failed to persist can never appear to have worked.
+              onRefresh();
             }
             // STREAM_EVENT.DONE needs no action — the stream simply ends, and any
             // answer has already been delivered either as a DELTA or an ERROR.

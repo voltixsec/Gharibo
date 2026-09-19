@@ -148,6 +148,38 @@ export const conversationsRepository = {
     return result.changes > 0;
   },
 
+  /**
+   * Renames a conversation ONLY while it is still untitled.
+   *
+   * This is the atomic guard behind automatic titling. The decision is made in
+   * SQL against the CURRENT persisted value, not against a value the client (or
+   * an earlier read in this request) happens to hold:
+   *
+   *   - two concurrent first-messages cannot both rename;
+   *   - a manual rename that landed between our read and our write is preserved;
+   *   - a conversation renamed by the user is never auto-renamed again.
+   *
+   * "Untitled" means the default title or a blank title, so legacy rows that
+   * somehow carry an empty string are still eligible.
+   *
+   * @param id conversation id
+   * @param title the derived title
+   * @param defaultTitle the value that marks a conversation as untitled
+   * @returns true when this call performed the rename
+   */
+  renameIfUntitled(id: string, title: string, defaultTitle: string): boolean {
+    const ts = now();
+    const result = db()
+      .prepare(
+        `UPDATE conversations
+            SET title = ?, updated_at = ?
+          WHERE id = ?
+            AND (title = ? OR TRIM(title) = '')`,
+      )
+      .run(title, ts, id, defaultTitle);
+    return result.changes > 0;
+  },
+
   // Message operations
 
   addMessage(conversationId: string, input: {

@@ -35,6 +35,11 @@ import {
 } from "@/lib/runtime/gharibo-v1.mjs";
 import { resolveConversationRoute, ROUTE_KIND } from "@/lib/runtime/routing.mjs";
 import {
+  deriveConversationTitle,
+  DEFAULT_CONVERSATION_TITLE,
+  isAutoTitleEligible,
+} from "@/lib/conversation-title.mjs";
+import {
   resolveDeploymentLimits,
   resolveProviderLimits,
   validateContextBudget,
@@ -213,6 +218,34 @@ export async function POST(
     content: parsed.data.content,
   });
 
+  // -------------------------------------------------------------------------
+  // Automatic title, derived from this first accepted user message.
+  //
+  // Timing matters: this runs AFTER validation (so a rejected request - bad
+  // provider, bad routing, token budget - can never rename anything) and AFTER
+  // the user message is persisted (so the title genuinely describes an accepted
+  // turn). It is derived locally; no model call, so no GPU is woken.
+  //
+  // `conv` was read before this message was inserted, so "no user message yet"
+  // reliably identifies the FIRST one. Only an untitled conversation is renamed,
+  // and the rename is conditional in SQL, so a manual rename is authoritative
+  // and concurrent first-messages cannot both win.
+  // -------------------------------------------------------------------------
+  let autoTitle: string | null = null;
+  const isFirstUserMessage = !conv.messages.some((m) => m.role === "user");
+  if (isFirstUserMessage && isAutoTitleEligible(conv.title)) {
+    const derived = deriveConversationTitle(parsed.data.content);
+    if (derived !== DEFAULT_CONVERSATION_TITLE) {
+      const renamed = conversationsRepository.renameIfUntitled(
+        params.id,
+        derived,
+        DEFAULT_CONVERSATION_TITLE,
+      );
+      // Only advertise a title we actually persisted.
+      if (renamed) autoTitle = derived;
+    }
+  }
+
   const options = {
     temperature: conv.temperature,
     maxTokens: budget.maxTokens,
@@ -246,6 +279,10 @@ export async function POST(
           /* client is gone — keep going so the answer is still persisted */
         }
       };
+
+      // Announce an automatic title first, so the sidebar and header can show it
+      // immediately without an extra round trip or a page reload.
+      if (autoTitle) send({ title: autoTitle });
 
       /**
        * Records an accepted answer.
