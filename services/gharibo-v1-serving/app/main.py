@@ -386,12 +386,15 @@ def create_app(
                 "gpu_name": diag.gpu_name,
                 "vram_total_bytes": diag.vram_total_bytes,
                 "vram_allocated_bytes": diag.vram_allocated_bytes,
-                "base_model_loaded": diag.base_model,
+                "base_model_loaded": bool(diag.base_model),
                 "adapter_loaded": diag.adapter_loaded,
                 "adapter_sha256_verified": diag.adapter_sha256_verified,
                 "ready": diag.ready,
             },
-            "error": report.error,
+            # /health is intentionally unauthenticated so cold-start probes work.
+            # Do not expose backend/library/path details through that public
+            # surface; full diagnostics belong in server logs.
+            "error": "Runtime initialization failed." if report.error else None,
         }
 
     @app.get("/v1/models")
