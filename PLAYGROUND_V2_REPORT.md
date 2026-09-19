@@ -30,10 +30,17 @@ have — root-caused to a default `model_identity` of "You are ChatGPT" injected
 accepted chat template. Fixing the latter is a one-line change that would alter the served
 prompt contract, so it is deferred to the owner.
 
+Because this work changed shared code — the dashboard layout, the navigation
+sidebar and the whole colour token system — every dashboard route was regression-checked,
+not just the Playground. That found and fixed a pre-existing WCAG failure on four other
+pages, and a keyboard/assistive-technology audit added the missing bypass links, labelled the
+temperature slider and made the drawers Escape-closable.
+
 **Validation: typecheck PASS · 381/381 unit tests PASS · production build PASS ·
 `docs:validate` PASS · `verify:m2` PASS · 53/53 serving tests PASS · 13/13 API checks PASS ·
-14/14 live runtime checks PASS · 47/47 browser E2E checks PASS · 9/11 smoke checks PASS
-(2 model-level findings) · WCAG AA contrast PASS in both themes.**
+14/14 live runtime checks PASS · 47/47 browser E2E checks PASS · 90/90 cross-page checks PASS ·
+15/15 accessibility checks PASS · 9/11 smoke checks PASS (2 model-level findings) ·
+WCAG AA contrast PASS in both themes.**
 
 No model identity, adapter, weights, or governance safeguard was changed. Nothing was pushed or
 merged.
@@ -59,6 +66,8 @@ Verified against the **local** working tree (not GitHub `main`).
 | D11 | **Switching conversations displayed the previous conversation's messages** until the new fetch resolved. | High | found by browser E2E |
 | D12 | **A superseded request could write state into the wrong conversation** (stale notice / busy flag after an await). | High | found by browser E2E |
 | D13 | **A client disconnect discarded a valid answer.** Next.js propagates the request's abort signal to `fetch`, so navigating away aborted the upstream inference and the already-generated answer was thrown away. | High | found by browser E2E |
+| D14 | **Badge contrast failed WCAG AA on four other pages** (3.3:1 and ~2.2:1 vs 4.5:1 required for 12px text). **Pre-existing** — `badge.tsx` was untouched by this branch — but surfaced because this work changed the shared layout and the whole colour token system. | Medium | found by cross-page check |
+| D15 | **No keyboard bypass past the navigation** (WCAG 2.4.1), **an unnamed temperature slider**, and **drawers that ignored Escape**. | Medium | found by accessibility audit |
 
 ---
 
@@ -398,6 +407,61 @@ text is never touched and a non-trailing occurrence is preserved as content.
 serving deploy. It is verified by unit tests against the real FastAPI app on both the
 streaming and non-streaming paths; the live host still runs the previous build.
 
+### Cross-page regression check
+
+This work changed SHARED code — the dashboard layout (providers, scroll
+container), the navigation sidebar, the composer, and `globals.css` (the entire
+colour token system). Those affect every dashboard page, yet only `/playground`
+had been visually verified, so all ten static routes were walked at desktop and
+mobile widths.
+
+**90/90 checks pass**: HTTP 200, hydration, content, navigation, no horizontal
+overflow at 1440 and 390, WCAG AA contrast, and no console errors on every route.
+
+The first run was **86/90** — four contrast failures on `/data-factory`
+("APPROVED"), `/training` ("COMPLETED"), `/system` and `/settings` ("Active"),
+all the same pre-existing badge defect (D14), now fixed.
+
+### Accessibility audit (keyboard, focus, ARIA)
+
+Driven by **real** Tab/Enter/Escape key presses over CDP, because
+`:focus-visible` only engages for genuine keyboard input — a programmatic
+`element.focus()` reports a missing indicator that a user would never see (that
+false positive was hit and corrected during this pass).
+
+**15/15 checks pass:**
+
+| Check | Result |
+|---|---|
+| First Tab stop is a skip link | PASS — "Skip to main content" |
+| Activating it moves focus out of the navigation | PASS |
+| The Playground offers a composer bypass | PASS — "Skip to message composer" |
+| The bypass lands focus in the composer | PASS — `DIV#gharibo-composer` |
+| Tab reaches interactive elements | PASS — 40 stops |
+| Every focused element shows a visible indicator | PASS — all 40 |
+| Primary navigation keyboard reachable | PASS |
+| Form controls keyboard reachable | PASS |
+| Every visible control has an accessible name | PASS |
+| Landmarks present (main / nav) | PASS |
+| Inspector toggle exists on a narrow viewport | PASS |
+| Drawer opens | PASS |
+| Drawer close control reachable by Tab and shows focus | PASS |
+| Escape closes the drawer | PASS |
+
+Three real defects were found and fixed (D15):
+
+1. **No bypass past the navigation.** Reaching the composer by Tab took dozens of
+   presses (~12 nav stops plus one row per conversation, each with rename and
+   delete controls). Two skip links were added, hidden until focused.
+2. **The composer skip link targeted a disabled control.** The textarea is
+   disabled when no conversation is selected and a disabled control is not
+   focusable, so fragment navigation silently dropped focus onto `<body>`. The
+   target is now the composer region (`tabIndex={-1}`), focusable in every state.
+3. **The temperature slider had no accessible name.** Radix puts `role="slider"`
+   on the *thumb*, not on Root, so spreading `aria-label` onto Root — as the stock
+   shadcn component does — left it announced as an unlabelled slider.
+4. **The drawers ignored Escape**, being plain overlays rather than Radix dialogs.
+
 Also executed end-to-end against the running application:
 
 - **`api-checks.mjs` — 13/13 PASS.** Sentinel rejected as `provider_id`; no-model → clear
@@ -429,6 +493,8 @@ Run with **Node 24** (see §16 for why).
 | Browser E2E phase 1 | **30/30 PASS** |
 | Browser E2E phase 2 (live) | **17/17 PASS** |
 | Model smoke suite (live) | **9/11 PASS** (2 model-level findings, F1/F2) |
+| Cross-page regression (10 routes × desktop/mobile) | **90/90 PASS** |
+| Accessibility (keyboard / focus / ARIA) | **15/15 PASS** |
 | WCAG contrast (dark, 95 samples) | **0 failures** |
 | WCAG contrast (light, 95 samples) | **0 failures** |
 
@@ -553,6 +619,15 @@ switched, and no cloud spend was authorised. This is a recommendation only.
 
 No horizontal overflow at any tested width (`scrollWidth === clientWidth`).
 
+### All dashboard routes (cross-page regression)
+
+`/playground` · `/research-gym` · `/data-factory` · `/datasets` · `/training` ·
+`/evaluations` · `/models` · `/experiments` · `/system` · `/settings`
+
+Each verified at 1440×900 and 390×844 for: HTTP 200, hydration, rendered content,
+navigation present, no horizontal overflow, WCAG AA contrast, and no console
+errors. **90/90 passed.**
+
 ---
 
 ## 20. Exact git status
@@ -636,6 +711,11 @@ Commits created on `playground-v2`. **No push, no merge, no PR.**
 | `e8e5855` | `fix(playground): close isolation and feedback gaps found by browser E2E` |
 | `4285253` | `docs(report): add the browser-E2E findings and final results` |
 | `0ff204f` | `fix(serving): strip a bare trailing </assistant> fragment; prove the prompt contract` |
+| `6faab22` | `docs(report): add the model smoke-suite findings` |
+| `ca79e9f` | `fix(runtime): document that buildV1Request accepts and ignores toolsEnabled` |
+| `6af6108` | `docs(report): record the validation-harness exit-code bug` |
+| `a964aa8` | `fix(ui): darken success and warning badges to meet WCAG AA` |
+| `4aecd40` | `feat(a11y): keyboard bypass links, a labelled slider, Escape-closable drawers` |
 
 The working tree is clean relative to `HEAD`. The only untracked files are the owner's
 pre-existing `*.before-*` scratch backups, which were deliberately **not** committed (they are
@@ -690,6 +770,9 @@ should resolve in favour of this branch, which is a strict evolution of `2b34e46
 | Switching conversations never shows another conversation's content | ✅ (D11/D12 fixed) |
 | A valid answer survives a client disconnect | ✅ (D13 fixed, verified exactly-once) |
 | Dark and light themes usable | ✅ (WCAG AA both) |
+| Every dashboard page regression-checked | ✅ (90/90, 10 routes) |
+| Keyboard navigation and focus visibility | ✅ (15/15, incl. WCAG 2.4.1 bypass) |
+| Accessible names on all controls | ✅ |
 | Desktop and mobile layouts usable | ✅ (4 viewports) |
 | Message actions still work | ✅ |
 | Data/training actions still work | ✅ (Add to Dataset, Edit & Approve) |
