@@ -123,6 +123,20 @@ class TransformersBackend(ModelBackend):
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA is not available")
 
+        # The accepted GHARIBO-V1 serving path is the verified 4-bit base on the
+        # first visible CUDA device. Do not silently accept configuration values
+        # that this backend would ignore.
+        if not self._load_in_4bit:
+            raise RuntimeError(
+                "GHARIBO-V1 serving requires the accepted 4-bit base; "
+                "GHARIBO_LOAD_IN_4BIT=false is unsupported."
+            )
+        if self._device not in ("auto", "cuda", "cuda:0"):
+            raise RuntimeError(
+                f"Unsupported GHARIBO_DEVICE={self._device!r}; "
+                "this serving backend uses the first visible CUDA device."
+            )
+
         gpu_name = torch.cuda.get_device_name(0)
         vram_total = torch.cuda.get_device_properties(0).total_memory
 
@@ -251,7 +265,6 @@ class TransformersBackend(ModelBackend):
             generation_kwargs.update(
                 {
                     "do_sample": False,
-                    "temperature": None,
                 }
             )
 
