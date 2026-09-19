@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Conversation, ConversationWithMessages } from "@gharibo/shared";
 
 /** Fields that can be patched on a conversation. */
@@ -113,8 +113,14 @@ export function useConversations() {
 export function useConversation(id: string | null) {
   const [conversation, setConversation] = useState<ConversationWithMessages | null>(null);
   const [loading, setLoading] = useState(true);
+  // Monotonic request generation: when the user switches conversations faster
+  // than the network responds, an older response must never overwrite the newer
+  // selection.
+  const refreshGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
+
     if (!id) {
       setConversation(null);
       setLoading(false);
@@ -124,15 +130,20 @@ export function useConversation(id: string | null) {
     try {
       const res = await fetch(`/api/conversations/${id}`);
       const json = await res.json();
+      if (generation !== refreshGeneration.current) return;
       if (json.code === 0) {
         setConversation(json.data);
       } else {
         setConversation(null);
       }
     } catch {
-      setConversation(null);
+      if (generation === refreshGeneration.current) {
+        setConversation(null);
+      }
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) {
+        setLoading(false);
+      }
     }
   }, [id]);
 
@@ -147,6 +158,12 @@ export function useConversation(id: string | null) {
      */
     setConversation(null);
     refresh();
+
+    // Invalidate any in-flight response from this id as soon as the selection
+    // changes or the hook unmounts.
+    return () => {
+      refreshGeneration.current += 1;
+    };
   }, [refresh]);
 
   return { conversation, loading, refresh, setConversation };
