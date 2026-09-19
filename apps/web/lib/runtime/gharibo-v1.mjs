@@ -168,8 +168,18 @@ export function resolveRuntimeToken(config, env = {}) {
  * `systemPrompt` is carried as the first message, exactly as the governed
  * training representation does, so the inference prompt is the training prompt.
  *
+ *  is accepted and DELIBERATELY IGNORED: the runtime has no tools,
+ * so no tool declaration is ever placed on the wire. It is part of the signature
+ * because the application passes the conversation's setting through, and the
+ * guarantee that it changes nothing is asserted by test.
+ *
  * @param {Array<{role: string, content: string}>} messages
- * @param {{systemPrompt?: string, temperature?: number, maxTokens?: number}} [options]
+ * @param {{
+ *   systemPrompt?: string,
+ *   temperature?: number,
+ *   maxTokens?: number,
+ *   toolsEnabled?: boolean,
+ * }} [options]
  * @returns {Record<string, unknown>}
  */
 export function buildV1Request(messages, options = {}) {
