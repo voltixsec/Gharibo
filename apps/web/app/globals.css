@@ -2,52 +2,129 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   GHARIBO AI — DESIGN TOKENS
+   ==========================================================================
+
+   Derived from the official GHARIBO AI identity: a deep midnight / near-black
+   navy foundation, an electric cyan, a luminous azure, a rich royal blue, and
+   cool white / silver typography around a dimensional orbital intelligence
+   symbol.
+
+   Two layers, on purpose:
+
+   1. `--gharibo-*` — the brand's own semantic tokens. These are the values
+      components should reach for. They are raw colours so they can be used in
+      gradients, glows and SVG without an HSL wrapper.
+
+   2. The shadcn/ui HSL slots (`--background`, `--card`, ...) are then DERIVED
+      from the brand tokens, so every existing component in the application
+      inherits the GHARIBO palette without being rewritten.
+
+   Dark mode is the hero experience; light mode is a genuine complementary
+   system, not an afterthought.
+   ========================================================================== */
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* --- Brand primitives (light theme) ------------------------------- */
+    --gharibo-bg: #f6f8fc;
+    --gharibo-surface: #ffffff;
+    --gharibo-surface-elevated: #ffffff;
+    --gharibo-surface-sunken: #eef2f9;
+    --gharibo-border: #d7e0ee;
+    --gharibo-border-strong: #c0cee2;
+    --gharibo-cyan: #0a7195;
+    --gharibo-cyan-bright: #0d9fd8;
+    --gharibo-blue: #2f6fe4;
+    --gharibo-blue-deep: #1a3f9e;
+    --gharibo-text: #0b1428;
+    --gharibo-text-muted: #5b6f8d;
+    --gharibo-text-subtle: #5c6d87;
+    --gharibo-glow: rgba(13, 159, 216, 0.16);
+    --gharibo-success: #0f7a52;
+    --gharibo-warning: #96601a;
+    --gharibo-danger: #b02a1f;
+
+    /* --- shadcn/ui slots, derived from the brand ---------------------- */
+    --background: 220 44% 98%;
+    --foreground: 220 57% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 57% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --popover-foreground: 220 57% 10%;
+    /*
+     * 38% lightness, not 45%.
+     *
+     * White on `202 88% 45%` measures 3.57:1, which fails WCAG AA for the small
+     * text used on primary buttons ("Run Task", "New Dataset", "Generate
+     * Training Package", "Add Provider"). At 38% it measures ~4.8:1. The dark
+     * theme pairs a bright primary with DARK text, so it was never affected —
+     * which is why this only showed up when the cross-page check was finally
+     * run in light mode.
+     */
+    --primary: 202 88% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 218 40% 95%;
+    --secondary-foreground: 220 57% 14%;
+    --muted: 218 40% 95%;
+    --muted-foreground: 217 22% 46%;
+    --accent: 218 44% 94%;
+    --accent-foreground: 220 57% 14%;
+    --destructive: 6 72% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 32% 89%;
+    --input: 217 32% 89%;
+    --ring: 202 88% 45%;
+    --radius: 0.625rem;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco,
+      Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 6.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    /* --- Brand primitives (dark theme — the hero experience) ---------- */
+    --gharibo-bg: #050a18;
+    --gharibo-surface: #0a1226;
+    --gharibo-surface-elevated: #101c36;
+    --gharibo-surface-sunken: #060d1e;
+    --gharibo-border: #1b2a4a;
+    --gharibo-border-strong: #27395f;
+    --gharibo-cyan: #2cc7ff;
+    --gharibo-cyan-bright: #5fd8ff;
+    --gharibo-blue: #3b82f6;
+    --gharibo-blue-deep: #1d4ed8;
+    --gharibo-text: #e8f1ff;
+    --gharibo-text-muted: #93a9c9;
+    /* Lightened from #64789a, which measured 4.33:1 (below WCAG AA 4.5:1). */
+    --gharibo-text-subtle: #7f93b5;
+    --gharibo-glow: rgba(44, 199, 255, 0.35);
+    --gharibo-success: #34d399;
+    --gharibo-warning: #fbbf24;
+    --gharibo-danger: #f87171;
+
+    /* --- shadcn/ui slots, derived from the brand ---------------------- */
+    --background: 220 71% 6%;
+    --foreground: 214 100% 96%;
+    --card: 219 58% 9%;
+    --card-foreground: 214 100% 96%;
+    --popover: 220 60% 8%;
+    --popover-foreground: 214 100% 96%;
+    --primary: 194 100% 59%;
+    --primary-foreground: 220 71% 8%;
+    --secondary: 219 45% 16%;
+    --secondary-foreground: 214 100% 96%;
+    --muted: 219 45% 15%;
+    --muted-foreground: 214 30% 70%;
+    --accent: 219 48% 18%;
+    --accent-foreground: 214 100% 96%;
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 220 71% 8%;
+    --border: 219 47% 20%;
+    --input: 219 47% 20%;
+    --ring: 194 100% 59%;
   }
 }
 
@@ -59,20 +136,149 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Visible, brand-coloured focus for keyboard users. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
 }
 
-/* Premium scrollbar styling */
+/* ==========================================================================
+   GHARIBO GRAPHICAL LANGUAGE
+   Orbital arcs, radial rings and a faint coordinate grid — motifs that echo
+   the logo's spherical intelligence symbol without plastering the globe
+   everywhere.
+   ========================================================================== */
+
+@layer components {
+  /* Faint coordinate grid, used behind hero / empty states. */
+  .gharibo-grid {
+    background-image:
+      linear-gradient(to right, var(--gharibo-border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--gharibo-border) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 10%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 10%, transparent 75%);
+    opacity: 0.5;
+  }
+
+  /* The single sanctioned glow. Reserved for active brand/runtime elements. */
+  .gharibo-glow {
+    box-shadow: 0 0 0 1px hsl(var(--border)), 0 0 24px -6px var(--gharibo-glow);
+  }
+
+  .gharibo-glow-text {
+    text-shadow: 0 0 18px var(--gharibo-glow);
+  }
+
+  /* Brand gradient edge, for the active conversation and hero accents. */
+  .gharibo-edge {
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--gharibo-cyan),
+      var(--gharibo-blue),
+      transparent
+    );
+  }
+}
+
+/* ==========================================================================
+   MOTION
+   Short and purposeful (150–250ms). Every animation is disabled under
+   `prefers-reduced-motion: reduce`.
+   ========================================================================== */
+
+@keyframes gharibo-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes gharibo-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes gharibo-pulse-ring {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.85);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes gharibo-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.gharibo-animate-orbit {
+  animation: gharibo-orbit 3.2s linear infinite;
+  transform-origin: center;
+}
+
+.gharibo-animate-breathe {
+  animation: gharibo-breathe 2.6s ease-in-out infinite;
+}
+
+.gharibo-animate-pulse-ring {
+  animation: gharibo-pulse-ring 2.2s ease-out infinite;
+}
+
+.gharibo-animate-sweep {
+  animation: gharibo-sweep 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gharibo-animate-orbit,
+  .gharibo-animate-breathe,
+  .gharibo-animate-pulse-ring,
+  .gharibo-animate-sweep {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   SCROLLBARS
+   ========================================================================== */
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 4px;
+  background: hsl(var(--muted-foreground) / 0.28);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--muted-foreground) / 0.45);
+  background-clip: content-box;
 }

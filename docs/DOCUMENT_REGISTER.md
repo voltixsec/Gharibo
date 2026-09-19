@@ -20,7 +20,7 @@ control are in [`DOCUMENTATION_GOVERNANCE.md`](DOCUMENTATION_GOVERNANCE.md).
 |----------|------|-------|------|--------|---------|--------------|
 | Product Requirements | `docs/PRD.md` | Product | PRD | Approved | 1.0.0 | 2026-09-14 |
 | Product Requirements (M2) | `docs/PRD_MILESTONE_2.md` | Product | PRD | Approved | 1.0.0 | 2026-09-14 |
-| System Architecture | `docs/ARCHITECTURE.md` | Architecture | Architecture | Frozen | 1.2.1 | 2026-09-15 |
+| System Architecture | `docs/ARCHITECTURE.md` | Architecture | Architecture | Frozen | 1.2.2 | 2026-09-19 |
 | System Architecture (M2) | `docs/ARCHITECTURE_MILESTONE_2.md` | Architecture | Architecture | Frozen | 1.1.0 | 2026-09-15 |
 | Training Strategy | `docs/TRAINING_STRATEGY.md` | Architecture | Domain spec | Frozen | 1.4.0 | 2026-09-15 |
 | Environment Qualification Contract | `docs/ENV_QUALIFICATION_CONTRACT.md` | Architecture | Domain spec | Draft | 1.5.0 | 2026-09-15 |

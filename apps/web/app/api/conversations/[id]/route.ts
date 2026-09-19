@@ -1,10 +1,33 @@
 /**
- * GET /api/conversations/[id] — get a conversation with messages.
+ * GET    /api/conversations/[id] — get a conversation with its messages.
+ * PATCH  /api/conversations/[id] — update title / settings / routing.
  * DELETE /api/conversations/[id] — delete a conversation.
+ *
+ * PATCH applies the same routing invariant as creation: the GHARIBO-V1 sentinel
+ * is never written into `provider_id`, and output tokens are clamped to the
+ * deployment ceiling.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { conversationsRepository } from "@/lib/db/repositories";
+import { conversationsRepository, providersRepository } from "@/lib/db/repositories";
 import { toApiResponse, HttpError, ok } from "@gharibo/shared";
+import { z } from "zod";
+import { V1_MODEL_ID, V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
+import { resolveDeploymentLimits, resolveProviderLimits, clampMaxOutputTokens } from "@/lib/runtime/deployment-limits.mjs";
+
+const patchSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    providerId: z.string().nullable(),
+    modelId: z.string().nullable(),
+    systemPrompt: z.string().nullable(),
+    temperature: z.number().min(0).max(2),
+    maxTokens: z.number().int().positive(),
+    toolsEnabled: z.boolean(),
+  })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field must be provided",
+  });
 
 export async function GET(
   _request: NextRequest,
@@ -14,6 +37,113 @@ export async function GET(
     const conv = conversationsRepository.get(params.id);
     if (!conv) throw new HttpError(404, "Conversation not found");
     return conv;
+  });
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  return toApiResponse(async () => {
+    const existing = conversationsRepository.get(params.id);
+    if (!existing) throw new HttpError(404, "Conversation not found");
+
+    const body = await request.json();
+    const parsed = patchSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new HttpError(400, parsed.error.errors.map((e) => e.message).join("; "));
+    }
+
+    const patch = { ...parsed.data };
+
+    if (patch.providerId === V1_RUNTIME_PROVIDER_ID) {
+      throw new HttpError(
+        400,
+        "The GHARIBO-V1 runtime sentinel must not be stored as provider_id. " +
+          "Send providerId: null with modelId: \"GHARIBO-V1\" instead.",
+      );
+    }
+
+    const routingTouched =
+      patch.providerId !== undefined || patch.modelId !== undefined;
+
+    if (routingTouched) {
+      if (patch.providerId !== undefined) {
+        if (patch.providerId === null) {
+          // Clearing a provider must also clear its model identity unless the
+          // caller explicitly switches to the environment-backed V1 runtime.
+          const requestedModel = patch.modelId ?? null;
+          if (requestedModel !== null && requestedModel !== V1_MODEL_ID) {
+            throw new HttpError(
+              400,
+              `Model ${requestedModel} has no provider. Only ${V1_MODEL_ID} may be stored without provider_id.`,
+            );
+          }
+          patch.modelId = requestedModel;
+        } else {
+          const provider = providersRepository.get(patch.providerId);
+          if (!provider) {
+            throw new HttpError(400, `Provider not found: ${patch.providerId}`);
+          }
+          if (
+            patch.modelId !== undefined &&
+            patch.modelId !== null &&
+            patch.modelId !== provider.modelId
+          ) {
+            throw new HttpError(
+              400,
+              `Model/provider mismatch: provider ${patch.providerId} serves ${provider.modelId}, not ${patch.modelId}`,
+            );
+          }
+          patch.modelId = provider.modelId;
+        }
+      } else if (patch.modelId !== undefined) {
+        // Changing only modelId must still remain coherent with the persisted
+        // provider target.
+        if (existing.providerId) {
+          const provider = providersRepository.get(existing.providerId);
+          if (!provider) {
+            throw new HttpError(400, `Provider not found: ${existing.providerId}`);
+          }
+          if (patch.modelId !== provider.modelId) {
+            throw new HttpError(
+              400,
+              `Model/provider mismatch: provider ${existing.providerId} serves ${provider.modelId}, not ${patch.modelId}`,
+            );
+          }
+        } else if (patch.modelId !== null && patch.modelId !== V1_MODEL_ID) {
+          throw new HttpError(
+            400,
+            `Model ${patch.modelId} has no provider. Only ${V1_MODEL_ID} may be stored without provider_id.`,
+          );
+        }
+      }
+    }
+
+    // Token ceilings are route-specific. GHARIBO-V1 is constrained by the
+    // current T4 deployment; normal providers are bounded by their own declared
+    // context window instead of inheriting GHARIBO's 512-token ceiling.
+    if (patch.maxTokens !== undefined || routingTouched) {
+      const effectiveProviderId =
+        patch.providerId !== undefined ? patch.providerId : existing.providerId;
+      const requestedMaxTokens = patch.maxTokens ?? existing.maxTokens;
+
+      if (effectiveProviderId) {
+        const provider = providersRepository.get(effectiveProviderId);
+        if (!provider) {
+          throw new HttpError(400, `Provider not found: ${effectiveProviderId}`);
+        }
+        const limits = resolveProviderLimits(provider.contextWindow, requestedMaxTokens);
+        patch.maxTokens = clampMaxOutputTokens(requestedMaxTokens, limits).value;
+      } else {
+        const limits = resolveDeploymentLimits(process.env);
+        patch.maxTokens = clampMaxOutputTokens(requestedMaxTokens, limits).value;
+      }
+    }
+
+    const updated = conversationsRepository.update(params.id, patch);
+    if (!updated) throw new HttpError(404, "Conversation not found");
+    return updated;
   });
 }
 

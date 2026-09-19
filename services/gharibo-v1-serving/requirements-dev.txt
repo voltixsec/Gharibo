@@ -6,3 +6,6 @@ pydantic==2.9.2
 python-dotenv==1.0.1
 httpx==0.27.2
 pytest==8.3.3
+# Used by test_prompt_contract to render the tokenizer chat template
+# exactly as the serving backend does.
+jinja2==3.1.6

@@ -100,6 +100,12 @@ yarn-error.log*
 Thumbs.db
 
 # --------------------------------------------------------------------------
+# Secrets & runtime caches (never versioned)
+# --------------------------------------------------------------------------
+apps/web/credentials.json
+services/gharibo-v1-serving/unsloth_compiled_cache/
+
+# --------------------------------------------------------------------------
 # Next.js generated
 # --------------------------------------------------------------------------
 next-env.d.ts
@@ -120,7 +126,3 @@ data/derived/exp002/qualification/
 data/derived/exp002/qualification-recovered/
 data/derived/exp002/production-recovered/
 data/derived/exp002/v1qual-recovered/
-
-# GHARIBO local secrets and generated runtime cache
-apps/web/credentials.json
-services/gharibo-v1-serving/unsloth_compiled_cache/

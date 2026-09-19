@@ -30,6 +30,17 @@ interface MessageRow {
   created_at: string;
 }
 
+/**
+ * Deterministic message ordering.
+ *
+ * `created_at` has millisecond resolution, and a user turn plus its assistant
+ * reply can land inside the same millisecond. Ordering by `created_at` alone is
+ * then non-deterministic, which can flip the rendered conversation order (and the
+ * order fed back to the model). `rowid` is SQLite's monotonic insertion counter
+ * for this table and is the correct tiebreaker.
+ */
+const MESSAGE_ORDER = "ORDER BY created_at ASC, rowid ASC";
+
 function rowToConversation(row: ConversationRow): Conversation {
   return {
     id: row.id,
@@ -68,7 +79,7 @@ export const conversationsRepository = {
     const row = db().prepare("SELECT * FROM conversations WHERE id = ?").get(id) as ConversationRow | undefined;
     if (!row) return null;
     const msgRows = db()
-      .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC")
+      .prepare(`SELECT * FROM messages WHERE conversation_id = ? ${MESSAGE_ORDER}`)
       .all(id) as MessageRow[];
     return {
       ...rowToConversation(row),
@@ -171,7 +182,7 @@ export const conversationsRepository = {
 
   getMessages(conversationId: string): ConversationMessage[] {
     const rows = db()
-      .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC")
+      .prepare(`SELECT * FROM messages WHERE conversation_id = ? ${MESSAGE_ORDER}`)
       .all(conversationId) as MessageRow[];
     return rows.map(rowToMessage);
   },
