@@ -106,7 +106,7 @@ class ChatMessage(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    role: str
+    role: Literal["system", "user", "assistant"]
     content: Union[str, List[Any], None] = None
 
 
@@ -200,6 +200,19 @@ def estimate_tokens(text: str) -> int:
     if not text:
         return 0
     return int(len(text) / CHARS_PER_TOKEN) + 1
+
+
+def apply_stop_sequences(text: str, stop: Optional[Union[str, List[str]]]) -> str:
+    """Apply OpenAI-style stop sequences to an already governed final answer."""
+    if not text or stop is None:
+        return text
+    sequences = [stop] if isinstance(stop, str) else stop
+    positions = [
+        text.find(seq)
+        for seq in sequences
+        if isinstance(seq, str) and seq and text.find(seq) >= 0
+    ]
+    return text if not positions else text[: min(positions)]
 
 
 def _openai_response(
@@ -404,6 +417,65 @@ def create_app(
         if not req.messages:
             raise HTTPException(status_code=422, detail="messages must not be empty.")
 
+        # Single-model endpoint: never silently serve GHARIBO-V1 when the
+        # caller asked for a different model id.
+        if req.model is not None and req.model != engine.config.model_id:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": {
+                        "message": (
+                            f"Model '{req.model}' is not served by this endpoint. "
+                            f"Use '{engine.config.model_id}'."
+                        ),
+                        "type": "model_not_found",
+                        "param": "model",
+                        "code": "model_not_found",
+                    }
+                },
+            )
+
+        # GHARIBO-V1 currently has no tool-calling runtime. Silently ignoring a
+        # non-empty tool declaration would make clients believe a capability
+        # exists when it does not.
+        if req.tools:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": {
+                        "message": "GHARIBO-V1 does not support tool calling.",
+                        "type": "unsupported_tools",
+                    }
+                },
+            )
+
+        if req.n not in (None, 1):
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": {
+                        "message": "GHARIBO-V1 serves exactly one completion per request.",
+                        "type": "unsupported_n",
+                    }
+                },
+            )
+
+        if req.response_format:
+            response_type = req.response_format.get("type")
+            if response_type not in (None, "text"):
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": {
+                            "message": (
+                                "GHARIBO-V1 does not guarantee structured response_format "
+                                f"'{response_type}'."
+                            ),
+                            "type": "unsupported_response_format",
+                        }
+                    },
+                )
+
         # Normalise content parts -> text. Non-text parts are rejected loudly.
         try:
             messages = [
@@ -539,7 +611,7 @@ def create_app(
                         float(temperature),
                         int(max_tokens),
                     )
-                except BaseException as exc:  # noqa: BLE001 - classify then report
+                except Exception as exc:  # noqa: BLE001 - classify then report
                     if is_cuda_oom(exc):
                         # Do not retry: the request cannot fit, and retrying an
                         # impossible allocation would only destabilise the worker.
@@ -568,6 +640,7 @@ def create_app(
                     return
 
                 answer = _client_safe_answer(result["answer"] or "")
+                answer = apply_stop_sequences(answer, req.stop)
 
                 if answer:
                     yield chunk({"content": answer})
@@ -594,7 +667,7 @@ def create_app(
                 float(temperature),
                 int(max_tokens),
             )
-        except BaseException as exc:  # noqa: BLE001 - classify then report
+        except Exception as exc:  # noqa: BLE001 - classify then report
             if is_cuda_oom(exc):
                 raise HTTPException(
                     status_code=503,
@@ -627,6 +700,7 @@ def create_app(
             )
 
         answer = _client_safe_answer(result["answer"] or "")
+        answer = apply_stop_sequences(answer, req.stop)
 
         return _openai_response(
             engine.config.model_id,
