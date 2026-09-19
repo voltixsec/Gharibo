@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ModelSelector } from "./model-selector";
 import { RuntimeStatusBadge } from "./runtime-status-badge";
 import { useRuntimeV1 } from "@/components/providers/runtime-status-provider";
-import { resolveDeploymentLimits, DEPLOYMENT_LIMITS } from "@/lib/runtime/deployment-limits.mjs";
+import { resolveDeploymentLimits } from "@/lib/runtime/deployment-limits.mjs";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import type { Conversation } from "@gharibo/shared";
@@ -35,6 +35,10 @@ interface InspectorProps {
   }) => Promise<boolean>;
   /** True when the selected target declares tool support. */
   toolsSupported: boolean;
+  /** Token ceiling for the selected routed model/provider. */
+  maxTokenCeiling: number;
+  /** True only for the environment-backed GHARIBO-V1 development runtime. */
+  isV1Selection: boolean;
   metrics: RequestMetrics | null;
 }
 
@@ -51,6 +55,8 @@ export function Inspector({
   onSelectionChange,
   onPatch,
   toolsSupported,
+  maxTokenCeiling,
+  isV1Selection,
   metrics,
 }: InspectorProps) {
   const { runtime } = useRuntimeV1();
@@ -64,6 +70,16 @@ export function Inspector({
   useEffect(() => {
     activeConversationIdRef.current = conversation?.id ?? null;
   }, [conversation?.id]);
+
+  // Route changes can lower the legal ceiling (for example provider -> V1).
+  // Keep the local control truthful while the refreshed conversation arrives.
+  useEffect(() => {
+    setMaxTokens((current) => Math.min(current, maxTokenCeiling));
+  }, [maxTokenCeiling]);
+
+  const tokenPresets = [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384].filter(
+    (preset) => preset <= maxTokenCeiling,
+  );
 
   /*
    * Re-sync local controls when the active conversation changes.
@@ -192,7 +208,7 @@ export function Inspector({
                 <span className="font-mono text-xs text-muted-foreground">{maxTokens}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {DEPLOYMENT_LIMITS.presets.map((preset) => (
+                {tokenPresets.map((preset) => (
                   <button
                     key={preset}
                     type="button"
@@ -221,7 +237,7 @@ export function Inspector({
                   id="max-tokens"
                   type="number"
                   min={1}
-                  max={limits.maxOutputTokensCeiling}
+                  max={maxTokenCeiling}
                   value={maxTokens}
                   disabled={disabled}
                   onChange={(e) => {
@@ -240,8 +256,9 @@ export function Inspector({
                 />
               </div>
               <p className="text-[0.6875rem] leading-relaxed text-[color:var(--gharibo-text-subtle)]">
-                Capped at {limits.maxOutputTokensCeiling} on the current development GPU.
-                The server clamps larger values.
+                {isV1Selection
+                  ? `Capped at ${maxTokenCeiling} on the current GHARIBO development GPU. The server clamps larger values.`
+                  : `Bounded by the selected provider's declared ${maxTokenCeiling}-token context window.`}
               </p>
             </div>
 
@@ -333,14 +350,16 @@ export function Inspector({
           </section>
 
           {/* --------------------------------------------- T4 warning */}
-          <div className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/8 p-3">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-            <p className="text-[0.6875rem] leading-relaxed text-amber-700 dark:text-amber-300">
-              Development runtime: Tesla T4 (~14.56 GiB VRAM, ~11.6 GiB resident).
-              The identity-preserving deployment target is a 24 GB GPU. Output is
-              deliberately bounded here to avoid CUDA OOM.
-            </p>
-          </div>
+          {isV1Selection && (
+            <div className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/8 p-3">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+              <p className="text-[0.6875rem] leading-relaxed text-amber-700 dark:text-amber-300">
+                Development runtime: Tesla T4 (~14.56 GiB VRAM, ~11.6 GiB resident).
+                The identity-preserving deployment target is a 24 GB GPU. Output is
+                deliberately bounded here to avoid CUDA OOM.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
