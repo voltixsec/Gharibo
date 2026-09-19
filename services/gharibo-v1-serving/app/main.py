@@ -24,7 +24,7 @@ from typing import Any, List, Literal, Optional, Union
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from .config import ServingConfig, load_config
 from .engine import EngineState, ServingEngine
@@ -127,9 +127,10 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: Optional[int] = None
     max_completion_tokens: Optional[int] = None
     stream: Optional[bool] = False
-    # Accepted and ignored: sampling/penalty/format controls this runtime does
-    # not implement. They are listed so the intent is explicit rather than
-    # accidental.
+    # Compatibility fields. Safe no-op values are tolerated; semantics the
+    # runtime cannot truthfully provide (multiple completions, tool calls,
+    # structured response formats) are rejected below. Stop sequences are
+    # applied after governed final-channel extraction.
     top_p: Optional[float] = None
     n: Optional[int] = None
     stop: Optional[Union[str, List[str]]] = None
