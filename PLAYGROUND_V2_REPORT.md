@@ -25,7 +25,7 @@ inspector, and working drawers on small screens.
 
 The model smoke suite (§13) additionally surfaced **two model-level findings** that are NOT
 application defects and are reported rather than patched: the model reproducibly fails one
-decimal-multiplication step (0/5 samples correct), and it claims tool capabilities it does not
+decimal-multiplication step (correct on only 1 of 6 samples), and it claims tool capabilities it does not
 have — root-caused to a default `model_identity` of "You are ChatGPT" injected by the
 accepted chat template. Fixing the latter is a one-line change that would alter the served
 prompt contract, so it is deferred to the owner.
@@ -416,12 +416,14 @@ suite, so they can never be mistaken for official evaluation artifacts.
 | Capability — runtime declares no tools | PASS (deterministic) |
 | **Capability — model self-report** | **FAIL — see F2** |
 
-#### F1 — the model reliably fails one decimal-multiplication step
+#### F1 — the model is unreliable on one decimal-multiplication step
 
 Prompt: *"42.50 per unit, 240 units, 7% volume discount, what is the total purchase cost?"*
 Correct answer: **9,486** (42.50 × 0.93 = 39.525; 39.525 × 240 = 9,486).
 
-**Five independent samples, 0 correct:** `9,498` (×3), `9,492`, `9,480`.
+**Six independent samples, 1 correct:** `9,498` (×3), `9,492`, `9,480`, and — on the sixth run — the correct `9,486`.
+
+**Correction.** This section previously said "reliably fails, 0/5 correct". A sixth run produced the right answer, so the honest characterisation is *unreliable* (usually wrong, sometimes right), not *deterministically* wrong. Stating "reliably fails" overstated a finding drawn from five samples, which is exactly the single-sample reasoning the mission warns against. The underlying point stands: this computation cannot be trusted without verification.
 
 The model gets the intermediate right every time (`42.50 × 0.93 = 39.525`) and then
 misses the final multiplication. This is a reproducible arithmetic boundary of the
@@ -749,7 +751,7 @@ was touched.
    used a production build; the dev server remains the owner's normal workflow.
 9. **The model claims capabilities it does not have** (F2). The application is provably clean;
    the cause is the default `model_identity` injected by the accepted chat template. Deferred.
-10. **The model fails one decimal-multiplication step reproducibly** (F1) — 0/5 samples correct.
+10. **The model is unreliable on one decimal-multiplication step** (F1) — correct on only 1 of 6 samples. Not deterministic: a sixth run produced the right answer. Any such computation needs verification before use.
     A model-quality boundary, not an application defect.
 11. **The protocol-tail fix is not yet live.** It is unit-verified against the real FastAPI app
     but the deployed serving build predates it; it takes effect on the next serving deploy.
@@ -863,7 +865,7 @@ Branch **`playground-v2`**, base commit `b62e859` (**20 commits**), **nothing pu
 branch : playground-v2
 head   : <HEAD>    (final commit is this report — run `git log -1` for the SHA)
 main   : 2b34e46  (not modified by this work)
-commits: 38 ahead of base   (includes this report's own commit)
+commits: 40 ahead of base   (includes this report's own commit)
 pending tracked changes: 0        (working tree is clean)
 
 === untracked (owner's pre-existing scratch backups, deliberately NOT committed) ===
