@@ -11,8 +11,8 @@ Env vars (all optional except a source for the adapter):
   GHARIBO_ADAPTER_SHA256  Expected adapter sha256 (defaults to the accepted one)
   GHARIBO_BASE_MODEL      Override the serving base (default: adapter's trained base)
   GHARIBO_API_KEY         If set, requests must carry Bearer <key> (OpenAI-style)
-  GHARIBO_DEVICE          torch device (default "auto")
-  GHARIBO_LOAD_IN_4BIT    "true"/"false" - serve the 4-bit base (default "true")
+  GHARIBO_DEVICE          accepted values: "auto", "cuda", "cuda:0" (default "auto")
+  GHARIBO_LOAD_IN_4BIT    must remain "true" for the accepted V1 serving path
   PORT                    HTTP port (default 8000)
   HF_TOKEN                HuggingFace token, only if required to fetch the base
 """
