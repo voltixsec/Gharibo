@@ -173,6 +173,99 @@ describe("automatic title happens once", () => {
   });
 });
 
+describe("addUserMessageWithAutoTitle is atomic (concurrency)", () => {
+  const derive = (content: string) => deriveConversationTitle(content);
+
+  it("titles from the FIRST persisted user message, never the second", () => {
+    const conv = newChat();
+    const first = "Compare NVIDIA NIM with OpenRouter for this project";
+    const second = "Now explain how to migrate our PostgreSQL schema safely";
+
+    const r1 = conversationsRepository.addUserMessageWithAutoTitle(
+      conv.id,
+      { content: first },
+      { defaultTitle: DEFAULT_CONVERSATION_TITLE, deriveTitle: derive },
+    );
+    const r2 = conversationsRepository.addUserMessageWithAutoTitle(
+      conv.id,
+      { content: second },
+      { defaultTitle: DEFAULT_CONVERSATION_TITLE, deriveTitle: derive },
+    );
+
+    // Exactly one of them observed itself as first.
+    expect(r1.wasFirstUserMessage).toBe(true);
+    expect(r2.wasFirstUserMessage).toBe(false);
+    // Exactly one auto-title operation occurred.
+    expect(r1.title).not.toBeNull();
+    expect(r2.title).toBeNull();
+
+    const loaded = conversationsRepository.get(conv.id)!;
+    const users = loaded.messages.filter((m) => m.role === "user");
+    // Both messages are stored...
+    expect(users.length).toBe(2);
+    // ...in deterministic insertion order.
+    expect(users[0].content).toBe(first);
+    expect(users[1].content).toBe(second);
+    // The title came from the FIRST message only.
+    expect(loaded.title).toBe(derive(first));
+    expect(loaded.title).not.toBe(derive(second));
+  });
+
+  it("still derives a title when the first message is the only one", () => {
+    const conv = newChat();
+    const r = conversationsRepository.addUserMessageWithAutoTitle(
+      conv.id,
+      { content: "عايز اعمل برنامج لإدارة المخازن والمشتريات للشركة" },
+      { defaultTitle: DEFAULT_CONVERSATION_TITLE, deriveTitle: derive },
+    );
+    expect(r.wasFirstUserMessage).toBe(true);
+    expect(r.title).not.toBeNull();
+    expect(/[؀-ۿ]/.test(r.title ?? "")).toBe(true);
+    // The message itself is returned and stored.
+    expect(r.message.role).toBe("user");
+    expect(conversationsRepository.get(conv.id)!.messages[0].id).toBe(r.message.id);
+  });
+
+  it("a manual rename made before the first message is preserved", () => {
+    const conv = newChat();
+    conversationsRepository.update(conv.id, { title: "Renamed By Hand First" });
+
+    const r = conversationsRepository.addUserMessageWithAutoTitle(
+      conv.id,
+      { content: "some first question about storage systems" },
+      { defaultTitle: DEFAULT_CONVERSATION_TITLE, deriveTitle: derive },
+    );
+    // It IS the first message, but it must not rename a manually named chat.
+    expect(r.wasFirstUserMessage).toBe(true);
+    expect(r.title).toBeNull();
+    expect(conversationsRepository.get(conv.id)!.title).toBe("Renamed By Hand First");
+  });
+
+  it("does not renumber: later messages keep history intact and untitled stays untitled", () => {
+    const conv = newChat();
+    // A first message that yields no usable title.
+    const r1 = conversationsRepository.addUserMessageWithAutoTitle(
+      conv.id,
+      { content: "???" },
+      { defaultTitle: DEFAULT_CONVERSATION_TITLE, deriveTitle: derive },
+    );
+    expect(r1.title).toBeNull();
+    expect(conversationsRepository.get(conv.id)!.title).toBe(DEFAULT_CONVERSATION_TITLE);
+
+    // A later, title-worthy message must NOT become the source of the title.
+    const r2 = conversationsRepository.addUserMessageWithAutoTitle(
+      conv.id,
+      { content: "Explain Kubernetes autoscaling" },
+      { defaultTitle: DEFAULT_CONVERSATION_TITLE, deriveTitle: derive },
+    );
+    expect(r2.wasFirstUserMessage).toBe(false);
+    expect(r2.title).toBeNull();
+    expect(conversationsRepository.get(conv.id)!.title).toBe(DEFAULT_CONVERSATION_TITLE);
+    // Both messages are still recorded.
+    expect(conversationsRepository.get(conv.id)!.messages.length).toBe(2);
+  });
+});
+
 describe("manual rename is authoritative", () => {
   it("a manual rename is never overwritten by auto-title logic", () => {
     const conv = newChat();

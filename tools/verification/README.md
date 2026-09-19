@@ -41,24 +41,52 @@ layout at real viewport sizes.
 | `history-titles-acceptance.mjs` | Conversation history from message #1, automatic titles (Arabic/English), manual rename authority, switch isolation, rename-failure UX | 14/14 |
 | `rename-ux-acceptance.mjs` | Escape cancels rename, blank title rejected, search by persisted title, long titles clip visually without losing data | 12/12 |
 
+## Database isolation (IMPORTANT)
+
+Suites that CREATE, PATCH or DELETE conversations must **never** run against your
+normal server — that writes into `apps/web/data/gharibo.db`, the real database.
+Cleaning up afterwards is not isolation.
+
+Run them through the isolated runner instead. It starts a throwaway Next.js
+server backed by a throwaway SQLite file in the OS temp directory, seeds a
+synthetic provider row, runs the suite, then removes the server and the temp DB:
+
+```bash
+# mutating suites — ALWAYS via the isolated runner
+node tools/verification/run-isolated.mjs e2e.mjs
+node tools/verification/run-isolated.mjs api-checks.mjs
+node tools/verification/run-isolated.mjs sidebar-features.mjs
+node tools/verification/run-isolated.mjs history-titles-acceptance.mjs dark
+node tools/verification/run-isolated.mjs rename-ux-acceptance.mjs dark
+node tools/verification/run-isolated.mjs smoke-suite.mjs
+# ...etc.
+
+# prove isolation holds:
+node tools/verification/verification-db-isolation.mjs [suite.mjs]
+```
+
+Each mutating suite calls `requireIsolatedVerification(...)` and **exits 2** if it
+was not started by the runner, so an accidental run against the real server fails
+closed rather than writing. A deliberate exception is possible with
+`--allow-real-db`, which prints a warning.
+
+Non-mutating suites (route-check, a11y-check, probe-scope) do not need isolation,
+but running them through `run-isolated.mjs` is harmless and keeps one command for
+everything.
+
 ## Usage
 
 ```bash
 # core validation (no server needed)
 bash tools/verification/final-validate.sh
 
-# browser suites — start the server FIRST, and do not rebuild while it runs
-npm run build && npm start -p 3100
+# mutating browser suites — use the isolated runner (see above)
+node tools/verification/run-isolated.mjs <suite.mjs> [theme]
 
-node tools/verification/e2e.mjs            http://localhost:3100
+# non-mutating suites may also be pointed at a running server directly
 node tools/verification/route-check.mjs    http://localhost:3100 dark     # or light
 node tools/verification/a11y-check.mjs     http://localhost:3100 dark
-node tools/verification/api-checks.mjs     http://localhost:3100
-node tools/verification/live-check.mjs     http://localhost:3100
-node tools/verification/matrix-gaps.mjs    http://localhost:3100 dark
-node tools/verification/sidebar-features.mjs http://localhost:3100 dark
-node tools/verification/smoke-suite.mjs    http://localhost:3100
-node tools/verification/e2e-actions.mjs    http://localhost:3100
+node tools/verification/probe-scope.mjs    http://localhost:3100 dark
 ```
 
 Optional extras:

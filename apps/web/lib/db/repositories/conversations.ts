@@ -204,6 +204,88 @@ export const conversationsRepository = {
     return rowToMessage(row);
   },
 
+  /**
+   * Persists a user message and, when it is genuinely the FIRST persisted user
+   * message, derives and persists an automatic title — all in ONE transaction.
+   *
+   * WHY THIS MUST BE ATOMIC
+   * -----------------------
+   * "Is this the first message?" must be answered by the database at the moment
+   * of insertion. Deciding it from a conversation snapshot read earlier in the
+   * request is stale the instant two first-messages race: both would believe
+   * they were first, and whichever title landed last would win — even though it
+   * belongs to the SECOND message.
+   *
+   * Doing the count, the insert and the conditional rename inside a single
+   * better-sqlite3 transaction guarantees:
+   *   - exactly one message is observed as "first";
+   *   - insertion order is the real, deterministic order;
+   *   - only one auto-title can ever be applied;
+   *   - the title applied is derived from the message that actually won.
+   *
+   * The rename is still conditional on the CURRENT persisted title, so a manual
+   * rename (or a rename from another request) is always preserved.
+   *
+   * @param conversationId conversation to append to
+   * @param input the user message content
+   * @param options.defaultTitle the value that marks a conversation as untitled
+   * @param options.deriveTitle deterministic title function (never a model call)
+   * @returns the inserted message, whether it was the first user message, and the
+   *   new title IF (and only if) this call is the one that changed it.
+   */
+  addUserMessageWithAutoTitle(
+    conversationId: string,
+    input: { content: string },
+    options: { defaultTitle: string; deriveTitle: (content: string) => string },
+  ): { message: ConversationMessage; wasFirstUserMessage: boolean; title: string | null } {
+    const { defaultTitle, deriveTitle } = options;
+
+    const run = db().transaction(() => {
+      // 1. Is there already a user message? Decided HERE, at insert time.
+      const prior = db()
+        .prepare(
+          "SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ? AND role = 'user'",
+        )
+        .get(conversationId) as { n: number } | undefined;
+      const wasFirstUserMessage = (prior?.n ?? 0) === 0;
+
+      // 2. Insert the user turn.
+      const id = genId();
+      const ts = now();
+      db()
+        .prepare(
+          `INSERT INTO messages (id, conversation_id, role, content, model_id, provider_id, quality_signal, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(id, conversationId, "user", input.content, null, null, null, ts);
+      db()
+        .prepare("UPDATE conversations SET updated_at = ? WHERE id = ?")
+        .run(ts, conversationId);
+
+      // 3. Only the FIRST persisted user message may generate a title, and only
+      //    while the persisted title is still the default/blank.
+      let title: string | null = null;
+      if (wasFirstUserMessage) {
+        const derived = deriveTitle(input.content);
+        if (derived !== defaultTitle && derived.length > 0) {
+          const result = db()
+            .prepare(
+              `UPDATE conversations SET title = ?, updated_at = ?
+                WHERE id = ? AND (title = ? OR TRIM(title) = '')`,
+            )
+            .run(derived, ts, conversationId, defaultTitle);
+          // Only claim a title we actually wrote.
+          if (result.changes > 0) title = derived;
+        }
+      }
+
+      const row = db().prepare("SELECT * FROM messages WHERE id = ?").get(id) as MessageRow;
+      return { message: rowToMessage(row), wasFirstUserMessage, title };
+    });
+
+    return run();
+  },
+
   setMessageQuality(messageId: string, quality: QualitySignal): ConversationMessage | null {
     db()
       .prepare("UPDATE messages SET quality_signal = ? WHERE id = ?")
