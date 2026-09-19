@@ -191,6 +191,10 @@ export function ChatView({
         const parser = new NdjsonStreamParser();
 
         const handleEvents = (events: ReturnType<NdjsonStreamParser["push"]>) => {
+          // A chunk already queued before an abort can still be delivered after
+          // the user switches conversations. Never let it mutate the new view.
+          if (currentConversationIdRef.current !== owningConversationId) return;
+
           for (const event of events) {
             if (event.type === STREAM_EVENT.DELTA) {
               if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
@@ -240,14 +244,20 @@ export function ChatView({
           }
         }
       } finally {
-        abortRef.current = null;
-        // Latency is a property of the request, so it is always reported.
-        onMetrics({
-          ttfbMs,
-          totalMs: Math.round(performance.now() - startedAt),
-          at: new Date().toISOString(),
-        });
+        // Do not let an older request clear the AbortController belonging to a
+        // newer conversation/request that started while this one was unwinding.
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
+
         if (currentConversationIdRef.current === owningConversationId) {
+          // Request metrics belong to the conversation that initiated them.
+          // Reporting them after a switch would contaminate the new inspector.
+          onMetrics({
+            ttfbMs,
+            totalMs: Math.round(performance.now() - startedAt),
+            at: new Date().toISOString(),
+          });
           setBusy(false);
           setStreamingContent("");
           onRefresh();
@@ -274,8 +284,12 @@ export function ChatView({
   const consumedPromptRef = useRef<string | null>(null);
   useEffect(() => {
     if (!pendingPrompt || !conversationId || busy) return;
-    if (consumedPromptRef.current === pendingPrompt) return;
-    consumedPromptRef.current = pendingPrompt;
+    // The same prompt may legitimately be compared more than once in different
+    // conversations. Key the de-duplication guard by destination conversation,
+    // not by prompt text alone.
+    const promptKey = `${conversationId}\u0000${pendingPrompt}`;
+    if (consumedPromptRef.current === promptKey) return;
+    consumedPromptRef.current = promptKey;
     onPendingPromptConsumed?.();
     send(pendingPrompt);
   }, [pendingPrompt, conversationId, busy, send, onPendingPromptConsumed]);
