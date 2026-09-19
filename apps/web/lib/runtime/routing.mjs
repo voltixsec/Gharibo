@@ -52,11 +52,27 @@ export function isV1Sentinel(value) {
   return typeof value === "string" && value === V1_RUNTIME_PROVIDER_ID;
 }
 
-/** Normalises a base URL for identity comparison (trailing slashes, case). */
+/**
+ * Normalises a base URL for identity comparison.
+ *
+ * Scheme/host are case-insensitive, but URL paths are not. Lower-casing the
+ * entire string can collapse two distinct case-sensitive endpoints and route an
+ * ordinary provider through the GHARIBO-V1 contract by mistake.
+ */
 export function normalizeBaseUrl(value) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().replace(/\/+$/, "");
-  return trimmed.length === 0 ? null : trimmed.toLowerCase();
+  if (trimmed.length === 0) return null;
+
+  try {
+    const url = new URL(trimmed);
+    const pathname = url.pathname.replace(/\/+$/, "");
+    return `${url.protocol.toLowerCase()}//${url.host.toLowerCase()}${pathname}${url.search}`;
+  } catch {
+    // Keep invalid/non-standard values comparable without changing
+    // case-sensitive path-like content.
+    return trimmed;
+  }
 }
 
 /**
