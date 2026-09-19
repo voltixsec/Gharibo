@@ -8,18 +8,25 @@ Branch: `playground-v2` · Base commit: `b62e859` · Date: 2026-09-19
 ## 1. Executive summary
 
 The Playground was rebuilt end-to-end and the GHARIBO-V1 serving contract was hardened.
-Four defects were **correctness** bugs, not cosmetics: model selection was cosmetic (every
-conversation silently routed to GHARIBO-V1), the health probe targeted an endpoint the serving
-service never implemented, the default output budget could OOM the development GPU, and the
-client's stream parser silently dropped tokens split across network chunk boundaries.
 
-All four are fixed and covered by tests. The Playground is now a three-pane GHARIBO-branded
+Eight defects were **correctness** bugs, not cosmetics. Four were found by reading the code:
+model selection was cosmetic (every conversation silently routed to GHARIBO-V1), the health
+probe targeted an endpoint the serving service never implemented, the default output budget
+could OOM the development GPU, and the client's stream parser silently dropped tokens split
+across network chunk boundaries. Four more were found by an **automated browser E2E** built
+during this work, which the unit suites could not have caught: failure notices were invisible
+in an empty conversation, switching conversations briefly displayed the previous one's
+messages, a superseded request could write state into the wrong conversation, and a client
+disconnect discarded an already-generated answer.
+
+All eight are fixed and covered by tests. The Playground is now a three-pane GHARIBO-branded
 workspace with a real conversation sidebar, a document-style chat view, a settings/telemetry
 inspector, and working drawers on small screens.
 
 **Validation: typecheck PASS · 377/377 unit tests PASS · production build PASS ·
 `docs:validate` PASS · `verify:m2` PASS · 35/35 serving tests PASS · 13/13 API checks PASS ·
-14/14 live runtime checks PASS · WCAG AA contrast PASS in both themes.**
+14/14 live runtime checks PASS · 47/47 browser E2E checks PASS · WCAG AA contrast PASS in both
+themes.**
 
 No model identity, adapter, weights, or governance safeguard was changed. Nothing was pushed or
 merged.
@@ -41,6 +48,10 @@ Verified against the **local** working tree (not GitHub `main`).
 | D7 | **No preflight token budget.** Oversized prompts went straight to the GPU and failed as an opaque CUDA error. | High | `main.py` (pre-change) |
 | D8 | **Fake capability implications.** UI implied vision/tools the model does not have; "Compare" merely reopened the edit dialog. | Medium | `message-bubble.tsx` (pre-change) |
 | D9 | **`stream: true` rejected at HEAD but implemented locally**, with the test never updated → a pre-existing failing test. | Medium | `test_serving.py::test_stream_true_is_rejected` |
+| D10 | **Failure notices were invisible in an empty conversation.** The notice rendered only inside the non-empty branch, but a rejected request leaves the conversation empty — so the most common error path showed the user nothing. | High | found by browser E2E |
+| D11 | **Switching conversations displayed the previous conversation's messages** until the new fetch resolved. | High | found by browser E2E |
+| D12 | **A superseded request could write state into the wrong conversation** (stale notice / busy flag after an await). | High | found by browser E2E |
+| D13 | **A client disconnect discarded a valid answer.** Next.js propagates the request's abort signal to `fetch`, so navigating away aborted the upstream inference and the already-generated answer was thrown away. | High | found by browser E2E |
 
 ---
 
@@ -262,7 +273,9 @@ the dominant cost on this hardware.
 
 ## 13. Automated tests added
 
-**+87 web tests** (288 → 377) and **+13 serving tests** (22 → 35).
+**+87 web tests** (288 → 377) and **+13 serving tests** (22 → 35), plus a
+**74-check automated browser E2E** driven over the Chrome DevTools Protocol
+(real clicks, real typing into React-controlled inputs, real reloads).
 
 | Suite | Tests | Covers |
 |-------|-------|--------|
@@ -272,6 +285,27 @@ the dominant cost on this hardware.
 | `playground-runtime-health.test.ts` | 18 | All health states, WARMING on timeout, secret safety, descriptor redaction |
 | `playground-conversations.test.ts` | 15 | Isolation, ordering under timestamp collision, single persistence, FK constraint proof |
 | `test_serving.py` (new cases) | +13 | SSE handshake, final-channel-only, fail-closed, OOM, clamping, preflight, `/v1/models`, content arrays, 415, extra fields, usage |
+
+### Automated browser E2E (mission section 15)
+
+`tools/e2e.mjs` (30 checks) and `tools/e2e-actions.mjs` (17 checks) drive the real UI.
+They found D10–D13 above, all now fixed and re-verified.
+
+| Area | Checks |
+|---|---|
+| Hydration, empty state | 2 |
+| Create a conversation from the UI (routing + safe default budget) | 4 |
+| Model selector shows GHARIBO-V1 | 1 |
+| Rename from the sidebar persists | 2 |
+| Max-token preset persists, and survives a reload | 3 |
+| **Oversized prompt renders a readable error state** | 2 |
+| Conversation isolation on switch (no history leak) | 3 |
+| **Switching conversations while streaming** | 3 |
+| Quality actions (Good / Bad persist) | 2 |
+| Add to Dataset, Edit & Approve, Compare dialogs | 5 |
+| Refresh persistence | 1 |
+| Responsive smoke test (1440 / 1280 / 1024 / 390): no overflow, composer usable | 8 |
+| Cleanup + no console errors | 3 |
 
 Also executed end-to-end against the running application:
 
@@ -301,6 +335,8 @@ Run with **Node 24** (see §16 for why).
 | `pytest services/gharibo-v1-serving/tests` | **PASS — 35/35** |
 | `python -m py_compile` (serving) | **PASS** |
 | `git diff --check` | **clean** |
+| Browser E2E phase 1 | **30/30 PASS** |
+| Browser E2E phase 2 (live) | **17/17 PASS** |
 | WCAG contrast (dark, 95 samples) | **0 failures** |
 | WCAG contrast (light, 95 samples) | **0 failures** |
 
@@ -325,8 +361,9 @@ was touched.
    output tokens is a development-runtime constraint, not a model capability. See §16.
 2. **Generation is buffered, not token-by-token.** Deliberate: the hidden `analysis` channel is
    chain-of-thought, and streaming it would leak it. Correctness outranks stream smoothness.
-3. **"Stop" cancels waiting, not the GPU request.** The control is labelled accordingly; the
-   server completes the inference it started.
+3. **"Stop" cancels waiting, not the GPU request.** The control and its message say so
+   explicitly. The server completes the inference and persists a valid answer, which is why
+   the wording is "Stopped waiting… if it returns a valid answer it will be saved".
 4. **`Compare` branches a conversation** (new conversation, same settings, prompt re-sent) rather
    than showing a side-by-side diff in one view.
 5. **Legacy conversations are not migrated.** They resolve via the per-request sentinel. A
@@ -489,6 +526,8 @@ Commits created on `playground-v2`. **No push, no merge, no PR.**
 | `6e7e2f0` | `fix(serving): harden streaming, content handling and request memory safety` |
 | `aec3fa8` | `test(playground): add end-to-end runtime regression coverage` |
 | `cc8003c` | `docs(architecture): record the api_handlers counter bump (v1.2.2)` |
+| `3993505` | `docs(report): record the external main fast-forward and exact commits` |
+| `e8e5855` | `fix(playground): close isolation and feedback gaps found by browser E2E` |
 
 The working tree is clean relative to `HEAD`. The only untracked files are the owner's
 pre-existing `*.before-*` scratch backups, which were deliberately **not** committed (they are
@@ -539,6 +578,9 @@ should resolve in favour of this branch, which is a strict evolution of `2b34e46
 | OpenAI-compatible streaming behaviour tested | ✅ |
 | Main chat experience is modern and high quality | ✅ (screenshot-verified) |
 | Conversation sidebar / settings / empty state / composer polished | ✅ |
+| Failure states are visible in every conversation state | ✅ (D10 fixed) |
+| Switching conversations never shows another conversation's content | ✅ (D11/D12 fixed) |
+| A valid answer survives a client disconnect | ✅ (D13 fixed, verified exactly-once) |
 | Dark and light themes usable | ✅ (WCAG AA both) |
 | Desktop and mobile layouts usable | ✅ (4 viewports) |
 | Message actions still work | ✅ |
