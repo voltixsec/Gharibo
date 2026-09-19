@@ -154,6 +154,10 @@ function PlaygroundContent() {
 
   const selectionProvider = activeProviders.find((p) => p.id === selectionKey) ?? null;
   const toolsSupported = selectionProvider?.supportsTools ?? false;
+  const isV1Selection = selectionKey === V1_RUNTIME_PROVIDER_ID;
+  const selectedMaxTokenCeiling = isV1Selection
+    ? limits.maxOutputTokensCeiling
+    : (selectionProvider?.contextWindow ?? limits.maxOutputTokensCeiling);
   const modelLabel =
     selectionKey === V1_RUNTIME_PROVIDER_ID
       ? V1_MODEL_ID
@@ -396,6 +400,8 @@ function PlaygroundContent() {
             onSelectionChange={handleSelectionChange}
             onPatch={handlePatch}
             toolsSupported={toolsSupported}
+            maxTokenCeiling={selectedMaxTokenCeiling}
+            isV1Selection={isV1Selection}
             metrics={metrics}
           />
         </div>
@@ -428,6 +434,8 @@ function PlaygroundContent() {
                 onSelectionChange={handleSelectionChange}
                 onPatch={handlePatch}
                 toolsSupported={toolsSupported}
+                maxTokenCeiling={selectedMaxTokenCeiling}
+                isV1Selection={isV1Selection}
                 metrics={metrics}
               />
             </div>
