@@ -18,7 +18,7 @@ import { NextRequest } from "next/server";
 import { conversationsRepository, providersRepository } from "@/lib/db/repositories";
 import { toApiResponse, HttpError } from "@gharibo/shared";
 import { z } from "zod";
-import { V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
+import { V1_MODEL_ID, V1_RUNTIME_PROVIDER_ID } from "@/lib/runtime/gharibo-v1.mjs";
 import { resolveDeploymentLimits, clampMaxOutputTokens } from "@/lib/runtime/deployment-limits.mjs";
 
 const createSchema = z.object({
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { providerId } = parsed.data;
+    let modelId = parsed.data.modelId;
 
     if (providerId === V1_RUNTIME_PROVIDER_ID) {
       throw new HttpError(
@@ -53,13 +54,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (providerId !== null && !providersRepository.get(providerId)) {
-      throw new HttpError(400, `Provider not found: ${providerId}`);
+    if (providerId !== null) {
+      const provider = providersRepository.get(providerId);
+      if (!provider) {
+        throw new HttpError(400, `Provider not found: ${providerId}`);
+      }
+      if (modelId !== null && modelId !== provider.modelId) {
+        throw new HttpError(
+          400,
+          `Model/provider mismatch: provider ${providerId} serves ${provider.modelId}, not ${modelId}`,
+        );
+      }
+      // Provider rows own their model identity. Persist the canonical value even
+      // when an API client omitted modelId.
+      modelId = provider.modelId;
+    } else if (modelId !== null && modelId !== V1_MODEL_ID) {
+      throw new HttpError(
+        400,
+        `Model ${modelId} has no provider. Only ${V1_MODEL_ID} may be stored without provider_id.`,
+      );
     }
 
     const limits = resolveDeploymentLimits(process.env);
     const { value: maxTokens } = clampMaxOutputTokens(parsed.data.maxTokens, limits);
 
-    return conversationsRepository.create({ ...parsed.data, maxTokens });
+    return conversationsRepository.create({ ...parsed.data, modelId, maxTokens });
   });
 }
