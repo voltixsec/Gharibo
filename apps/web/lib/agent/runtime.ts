@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Message } from "@gharibo/shared";
-import type { AgentActivityEvent, AgentToolResult, AgentTurnResult } from "./contracts";
+import type { AgentActivityEvent, AgentPlan, AgentToolResult, AgentTurnResult } from "./contracts";
 import { buildPlannerSystemPrompt, parseAgentPlan } from "./planner";
 import { routeAgentCapabilities } from "./registry";
 import { executeAgentTool, type AgentToolAdapters } from "./tool-executor";
@@ -48,8 +48,22 @@ function toolContext(results: readonly AgentToolResult[]): string {
   })).join("\n");
 }
 
-function hasTool(plan: { toolCalls: Array<{ name: string }> }, name: string): boolean {
+function hasTool(plan: AgentPlan, name: string): boolean {
   return plan.toolCalls.some((call) => call.name === name);
+}
+
+function plannerRepairPrompt(allowedTools: readonly string[], reason: "INVALID_JSON" | "MISSING_CALCULATOR"): string {
+  return [
+    buildPlannerSystemPrompt(allowedTools),
+    reason === "INVALID_JSON"
+      ? "CORRECTION: the previous planner response was not valid machine-readable JSON."
+      : "CORRECTION: this request contains arithmetic and the calculator is mandatory.",
+    "Return exactly ONE compact JSON object and nothing else.",
+    "Do not explain the plan. Do not use markdown. Do not answer the user's question.",
+    allowedTools.includes("calculator")
+      ? "Include a calculator tool call. Break chained formulas into operations and use {\"step\":N} for prior exact results."
+      : "Use only the allowed tools.",
+  ].join("\n");
 }
 
 export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnResult> {
@@ -60,40 +74,30 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
   const activity: AgentActivityEvent[] = [];
   const toolResults: AgentToolResult[] = [];
 
-  // Ordinary chat remains one model call. The planner wakes only when the
-  // deterministic router identifies a capability that can materially improve accuracy.
   if (allowedTools.length > 0) {
     activity.push(event(now, "PLANNING", "Planning the request", "RUNNING"));
-    let plan;
-    try {
-      const plannerContext = compactPlannerContext(input.messages);
-      const rawPlan = await input.modelCall({
-        messages: [{ role: "user", content: plannerContext }],
-        systemPrompt: buildPlannerSystemPrompt(allowedTools),
-        temperature: 0,
-        maxTokens: 512,
-      });
-      plan = parseAgentPlan(rawPlan);
+    const plannerContext = compactPlannerContext(input.messages);
 
-      // Deterministic tools that protect correctness are mandatory once the
-      // router has classified the request. If the first planner pass omits one,
-      // repair the plan once with an explicit bounded instruction instead of
-      // silently falling back to mental arithmetic.
+    const callPlanner = async (systemPrompt: string, maxTokens: number): Promise<string> => input.modelCall({
+      messages: [{ role: "user", content: plannerContext }],
+      systemPrompt,
+      temperature: 0,
+      maxTokens,
+    });
+
+    let plan: AgentPlan;
+    try {
+      const firstRaw = await callPlanner(buildPlannerSystemPrompt(allowedTools), 1024);
+      try {
+        plan = parseAgentPlan(firstRaw);
+      } catch {
+        const repairedRaw = await callPlanner(plannerRepairPrompt(allowedTools, "INVALID_JSON"), 1536);
+        plan = parseAgentPlan(repairedRaw);
+      }
+
       if (allowedTools.includes("calculator") && !hasTool(plan, "calculator")) {
-        const retryPrompt = [
-          buildPlannerSystemPrompt(allowedTools),
-          "CORRECTION: this request contains arithmetic and the calculator is mandatory.",
-          "Return a revised plan that includes at least one calculator call.",
-          "Break chained formulas into calculator operations and use {\"step\":N} references for prior exact results.",
-          "Do not answer the arithmetic yourself.",
-        ].join("\n");
-        const repairedRawPlan = await input.modelCall({
-          messages: [{ role: "user", content: plannerContext }],
-          systemPrompt: retryPrompt,
-          temperature: 0,
-          maxTokens: 768,
-        });
-        plan = parseAgentPlan(repairedRawPlan);
+        const repairedRaw = await callPlanner(plannerRepairPrompt(allowedTools, "MISSING_CALCULATOR"), 1536);
+        plan = parseAgentPlan(repairedRaw);
       }
     } catch (error) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
