@@ -371,15 +371,17 @@ def test_stream_fails_closed_without_final_channel():
 
 
 class _RecordingBackend(FakeBackend):
-    """FakeBackend that records the max_tokens it was asked to generate."""
+    """FakeBackend that records generation limits and tool declarations."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.seen_max_tokens = []
+        self.seen_tools = []
 
-    def generate(self, messages, temperature, max_tokens):
+    def generate(self, messages, temperature, max_tokens, tools=None):
         self.seen_max_tokens.append(max_tokens)
-        return super().generate(messages, temperature, max_tokens)
+        self.seen_tools.append(tools)
+        return super().generate(messages, temperature, max_tokens, tools=tools)
 
 
 def _ready_app_with_backend(backend):
@@ -407,25 +409,56 @@ def test_unknown_model_id_is_rejected_before_generation():
     assert backend.seen_max_tokens == []
 
 
-def test_nonempty_tools_are_rejected_truthfully():
-    backend = _RecordingBackend(responses=[NORMAL_HARMONY])
+def test_nonempty_tools_return_openai_compatible_tool_call():
+    tool_harmony = (
+        "<|start|>assistant<|channel|>analysis<|message|>private reasoning<|end|>"
+        "<|start|>assistant<|channel|>commentary to=functions.lookup "
+        "<|constrain|>json<|message|>{\"value\":\"x\"}<|call|>"
+    )
+    backend = _RecordingBackend(responses=[tool_harmony])
     client, _ = _ready_app_with_backend(backend)
+    tools = [{
+        "type": "function",
+        "function": {
+            "name": "lookup",
+            "description": "Lookup a value",
+            "parameters": {"type": "object", "properties": {"value": {"type": "string"}}},
+        },
+    }]
+    res = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "GHARIBO-V1",
+            "messages": [{"role": "user", "content": "look up x"}],
+            "tools": tools,
+            "stream": False,
+        },
+    )
+    assert res.status_code == 200
+    choice = res.json()["choices"][0]
+    assert choice["finish_reason"] == "tool_calls"
+    assert choice["message"]["content"] is None
+    call = choice["message"]["tool_calls"][0]
+    assert call["function"]["name"] == "lookup"
+    assert call["function"]["arguments"] == '{"value":"x"}'
+    assert "private reasoning" not in res.text
+    assert backend.seen_tools == [tools]
+
+
+
+def test_tool_calling_with_stream_true_is_rejected_truthfully():
+    client, _ = make_ready_app(responses=[NORMAL_HARMONY])
     res = client.post(
         "/v1/chat/completions",
         json={
             "model": "GHARIBO-V1",
             "messages": [{"role": "user", "content": "hi"}],
-            "tools": [
-                {
-                    "type": "function",
-                    "function": {"name": "lookup", "parameters": {"type": "object"}},
-                }
-            ],
+            "tools": [{"type": "function", "function": {"name": "lookup", "parameters": {"type": "object"}}}],
+            "stream": True,
         },
     )
     assert res.status_code == 400
-    assert res.json()["error"]["type"] == "unsupported_tools"
-    assert backend.seen_max_tokens == []
+    assert res.json()["error"]["type"] == "tools_streaming_not_supported"
 
 
 def test_multiple_completions_are_rejected_instead_of_silently_ignored():
@@ -591,7 +624,7 @@ def test_models_endpoint_lists_the_served_model():
     # Capability declaration must be truthful: text only.
     assert entry["capabilities"]["text"] is True
     assert entry["capabilities"]["vision"] is False
-    assert entry["capabilities"]["tools"] is False
+    assert entry["capabilities"]["tools"] is True
 
 
 def test_text_content_parts_are_normalised():

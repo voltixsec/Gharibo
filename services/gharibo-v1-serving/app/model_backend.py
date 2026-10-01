@@ -1,4 +1,4 @@
-﻿"""
+"""
 GHARIBO-V1 model backends.
 
 Production backend:
@@ -45,6 +45,7 @@ class ModelBackend(ABC):
         messages: List[Dict[str, str]],
         temperature: float,
         max_tokens: int,
+        tools: Optional[List[Dict]] = None,
     ) -> str:
         pass
 
@@ -82,6 +83,7 @@ class FakeBackend(ModelBackend):
         messages: List[Dict[str, str]],
         temperature: float,
         max_tokens: int,
+        tools: Optional[List[Dict]] = None,
     ) -> str:
         if self._responses:
             return self._responses.pop(0)
@@ -213,6 +215,7 @@ class TransformersBackend(ModelBackend):
         messages: List[Dict[str, str]],
         temperature: float,
         max_tokens: int,
+        tools: Optional[List[Dict]] = None,
     ) -> str:
         if self._model is None or self._tokenizer is None:
             raise RuntimeError(
@@ -221,11 +224,16 @@ class TransformersBackend(ModelBackend):
 
         import torch
 
+        template_kwargs = {
+            "tokenize": False,
+            "add_generation_prompt": True,
+            "reasoning_effort": "medium",
+        }
+        if tools:
+            template_kwargs["tools"] = tools
         rendered = self._tokenizer.apply_chat_template(
             messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            reasoning_effort="medium",
+            **template_kwargs,
         )
 
         inputs = self._tokenizer(

@@ -14,6 +14,7 @@ from typing import List, Optional
 from . import adapter_verify, identity
 from .config import ServingConfig
 from .harmony_final import extract_v1_answer
+from .harmony_tools import HarmonyToolCallError, extract_tool_call
 from .model_backend import BackendDiagnostics, ModelBackend, TransformersBackend
 
 
@@ -122,8 +123,25 @@ class ServingEngine:
         messages: List[dict],
         temperature: float,
         max_tokens: int,
+        tools: Optional[List[dict]] = None,
     ) -> dict:
         if self.state != EngineState.READY:
             raise RuntimeError("Engine is not ready")
-        raw = self.backend.generate(messages, temperature, max_tokens)
+        raw = (
+            self.backend.generate(messages, temperature, max_tokens, tools=tools)
+            if tools
+            else self.backend.generate(messages, temperature, max_tokens)
+        )
+        try:
+            tool_call = extract_tool_call(raw)
+        except HarmonyToolCallError as exc:
+            return {"ok": False, "answer": None, "reason": str(exc), "analysisPresent": True}
+        if tool_call is not None:
+            return {
+                "ok": True,
+                "answer": None,
+                "reason": "TOOL_CALL",
+                "analysisPresent": True,
+                "toolCall": tool_call,
+            }
         return extract_v1_answer({"choices": [{"message": {"content": raw}}]})

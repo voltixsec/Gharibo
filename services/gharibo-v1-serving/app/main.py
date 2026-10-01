@@ -242,6 +242,42 @@ def _openai_response(
     }
 
 
+def _openai_tool_response(
+    model_id: str,
+    tool_call: dict,
+    prompt_tokens: int = 0,
+) -> dict:
+    call_id = f"call-{uuid.uuid4().hex}"
+    arguments_json = tool_call.get("arguments_json", "{}")
+    return {
+        "id": f"chatcmpl-{uuid.uuid4().hex}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model_id,
+        "choices": [{
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": call_id,
+                    "type": "function",
+                    "function": {
+                        "name": tool_call["name"],
+                        "arguments": arguments_json,
+                    },
+                }],
+            },
+            "finish_reason": "tool_calls",
+        }],
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": estimate_tokens(arguments_json),
+            "total_tokens": prompt_tokens + estimate_tokens(arguments_json),
+        },
+    }
+
+
 def _model_listing(model_id: str, context_length: int) -> dict:
     """OpenAI-compatible model listing for this single-model server."""
     return {
@@ -253,11 +289,12 @@ def _model_listing(model_id: str, context_length: int) -> dict:
                 "created": int(time.time()),
                 "owned_by": "gharibo",
                 "context_length": context_length,
-                # Explicit capability declaration. Text only: no vision, no tools.
+                # Explicit capability declaration. Text only; native Harmony
+                # function calls are supported on non-streaming requests.
                 "capabilities": {
                     "text": True,
                     "vision": False,
-                    "tools": False,
+                    "tools": True,
                     "streaming": True,
                 },
             }
@@ -439,16 +476,16 @@ def create_app(
                 },
             )
 
-        # GHARIBO-V1 currently has no tool-calling runtime. Silently ignoring a
-        # non-empty tool declaration would make clients believe a capability
-        # exists when it does not.
-        if req.tools:
+        # Tool calls are emitted as a complete OpenAI-compatible response.
+        # Raw Harmony analysis is never streamed, so tool-enabled streaming is
+        # rejected until a governed tool-call SSE contract is implemented.
+        if req.tools and req.stream:
             return JSONResponse(
                 status_code=400,
                 content={
                     "error": {
-                        "message": "GHARIBO-V1 does not support tool calling.",
-                        "type": "unsupported_tools",
+                        "message": "Tool calling currently requires stream=false.",
+                        "type": "tools_streaming_not_supported",
                     }
                 },
             )
@@ -525,6 +562,10 @@ def create_app(
         prompt_tokens = sum(
             estimate_tokens(m["content"]) + 4 for m in messages
         )
+        if req.tools:
+            prompt_tokens += estimate_tokens(
+                json.dumps(req.tools, ensure_ascii=False, separators=(",", ":"))
+            ) + 16
         prompt_budget = context_length - RESERVED_PROMPT_TOKENS
 
         if prompt_tokens > prompt_budget:
@@ -670,6 +711,7 @@ def create_app(
                 messages,
                 float(temperature),
                 int(max_tokens),
+                tools=req.tools,
             )
         except Exception as exc:  # noqa: BLE001 - classify then report
             if is_cuda_oom(exc):
@@ -701,6 +743,14 @@ def create_app(
                         "type": "model_output_error",
                     }
                 },
+            )
+
+        tool_call = result.get("toolCall")
+        if tool_call is not None:
+            return _openai_tool_response(
+                engine.config.model_id,
+                tool_call,
+                prompt_tokens=prompt_tokens,
             )
 
         answer = _client_safe_answer(result["answer"] or "")
