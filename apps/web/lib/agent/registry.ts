@@ -39,7 +39,7 @@ export function routeAgentCapabilities(goal: string, maxVisible = 6): AgentCapab
   }
   // Product/supplier/price words alone are NOT proof that browsing is wanted.
   // Research is enabled only for an explicit freshness/search intent.
-  if (/\b(search|research|web|website|source|latest|current|online|browse|look\s*up|find\s*online|ابحث|الويب|موقع|مصدر|أحدث|حالي|اونلاين)\b/i.test(text)) {
+  if (/https?:\/\//i.test(text) || /\b(search|research|web|website|source|latest|current|online|browse|look\s*up|find\s*online|ابحث|الويب|موقع|مصدر|أحدث|حالي|اونلاين)\b/i.test(text)) {
     wanted.add("web_search");
     wanted.add("web_fetch");
     wanted.add("evidence_verify");

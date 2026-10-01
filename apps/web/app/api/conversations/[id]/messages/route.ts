@@ -321,9 +321,9 @@ export async function POST(
               ? await (async () => {
                   send({ status: "agent", modelId: V1_MODEL_ID });
                   const research = createResearchAdapters(process.env);
-                  const enabledTools: AgentToolCall["name"][] = research.configured
+                  const enabledTools: AgentToolCall["name"][] = research.searchConfigured
                     ? ["calculator", "web_search", "web_fetch"]
-                    : ["calculator"];
+                    : ["calculator", "web_fetch"];
                   const agent = await runAgentTurn({
                     messages,
                     enabledTools,

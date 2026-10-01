@@ -5,7 +5,10 @@ import { SafeWebFetcher } from "./safe-fetch";
 import { resolveWebSearchProvider, type WebSearchProvider, type WebSearchResult } from "./search-provider";
 
 export interface ResearchAdapterBundle {
+  /** True because direct public-URL fetch is always available server-side. */
   configured: boolean;
+  /** True only when a zero/controlled-cost search provider key is configured. */
+  searchConfigured: boolean;
   providerName: string | null;
   adapters: AgentToolAdapters;
 }
@@ -84,38 +87,41 @@ export function createResearchAdapters(
 ): ResearchAdapterBundle {
   const provider = options.provider ?? resolveWebSearchProvider(environment);
   const fetcher = options.fetcher ?? new SafeWebFetcher();
-  if (!provider) return { configured: false, providerName: null, adapters: {} };
+  const webFetch: NonNullable<AgentToolAdapters["webFetch"]> = async (input: unknown) => {
+    const url = typeof (input as FetchInput | null)?.url === "string"
+      ? (input as { url: string }).url.trim()
+      : "";
+    if (!url) throw new Error("WEB_FETCH_URL_REQUIRED");
+    const page = await fetcher.fetch(url, { timeoutMs: 8_000, maxTextLength: 12_000 });
+    const evidence = pageEvidence(page);
+    return agentToolAdapterResult({
+      url: page.finalUrl,
+      title: page.title,
+      description: page.description,
+      publisher: page.publisher,
+      domain: page.domain,
+      excerpt: excerpt(page.visibleText),
+      observedAt: page.observedAt,
+      verification: "FETCHED_SOURCE_CONTENT" as const,
+      governance: { candidateOnly: true, missingFactsStayMissing: true },
+    }, [evidence]);
+  };
+
+  const adapters: AgentToolAdapters = { webFetch };
+  if (provider) {
+    adapters.webSearch = async (input: unknown) => {
+      const query = typeof (input as ResearchInput | null)?.query === "string"
+        ? (input as { query: string }).query.trim()
+        : "";
+      if (!query) throw new Error("WEB_SEARCH_QUERY_REQUIRED");
+      return searchWithEvidence(provider, fetcher, query);
+    };
+  }
 
   return {
     configured: true,
-    providerName: provider.providerName,
-    adapters: {
-      webSearch: async (input: unknown) => {
-        const query = typeof (input as ResearchInput | null)?.query === "string"
-          ? (input as { query: string }).query.trim()
-          : "";
-        if (!query) throw new Error("WEB_SEARCH_QUERY_REQUIRED");
-        return searchWithEvidence(provider, fetcher, query);
-      },
-      webFetch: async (input: unknown) => {
-        const url = typeof (input as FetchInput | null)?.url === "string"
-          ? (input as { url: string }).url.trim()
-          : "";
-        if (!url) throw new Error("WEB_FETCH_URL_REQUIRED");
-        const page = await fetcher.fetch(url, { timeoutMs: 8_000, maxTextLength: 12_000 });
-        const evidence = pageEvidence(page);
-        return agentToolAdapterResult({
-          url: page.finalUrl,
-          title: page.title,
-          description: page.description,
-          publisher: page.publisher,
-          domain: page.domain,
-          excerpt: excerpt(page.visibleText),
-          observedAt: page.observedAt,
-          verification: "FETCHED_SOURCE_CONTENT" as const,
-          governance: { candidateOnly: true, missingFactsStayMissing: true },
-        }, [evidence]);
-      },
-    },
+    searchConfigured: !!provider,
+    providerName: provider?.providerName ?? null,
+    adapters,
   };
 }

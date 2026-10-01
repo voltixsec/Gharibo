@@ -69,7 +69,33 @@ describe("GHARIBO research adapters", () => {
     };
 
     expect(bundle.configured).toBe(true);
+    expect(bundle.searchConfigured).toBe(true);
     expect(result.data.candidates[0]?.verification).toBe("SEARCH_CANDIDATE_ONLY");
     expect(result.evidence[0]?.sourceUrl).toBe("https://manufacturer.example/camera");
+  });
+
+  it("keeps direct URL evidence fetch available without a search-provider key", async () => {
+    const fetcher = {
+      fetch: vi.fn(async () => ({
+        finalUrl: "https://official.example/page",
+        statusCode: 200,
+        contentType: "text/html",
+        title: "Official Page",
+        description: null,
+        publisher: null,
+        canonicalUrl: null,
+        visibleText: "Verified source text",
+        observedAt: "2026-10-01T00:00:00.000Z",
+        domain: "official.example",
+        truncated: false,
+        originalBytes: 100,
+      })),
+    } as unknown as SafeWebFetcher;
+    const bundle = createResearchAdapters({}, { fetcher });
+
+    expect(bundle.configured).toBe(true);
+    expect(bundle.searchConfigured).toBe(false);
+    expect(bundle.adapters.webFetch).toBeTypeOf("function");
+    expect(bundle.adapters.webSearch).toBeUndefined();
   });
 });
