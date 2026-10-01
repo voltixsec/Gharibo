@@ -1,9 +1,15 @@
 import { z } from "zod";
 import type { AgentPlan, AgentToolCall } from "./contracts";
 
+const calculatorOperandSchema = z.union([
+  z.string(),
+  z.number(),
+  z.object({ step: z.number().int().min(0).max(99) }),
+]);
+
 const calculatorOperationSchema = z.discriminatedUnion("op", [
-  z.object({ op: z.enum(["add", "subtract", "multiply", "divide"]), a: z.union([z.string(), z.number()]), b: z.union([z.string(), z.number()]) }),
-  z.object({ op: z.literal("percent_of"), a: z.union([z.string(), z.number()]), b: z.union([z.string(), z.number()]) }),
+  z.object({ op: z.enum(["add", "subtract", "multiply", "divide"]), a: calculatorOperandSchema, b: calculatorOperandSchema }),
+  z.object({ op: z.literal("percent_of"), a: calculatorOperandSchema, b: calculatorOperandSchema }),
 ]);
 
 const toolCallSchema = z.discriminatedUnion("name", [
@@ -18,9 +24,7 @@ const planSchema = z.object({
   canAnswerDirectly: z.boolean(),
   toolCalls: z.array(toolCallSchema).max(8),
 }).superRefine((value, ctx) => {
-  if (value.canAnswerDirectly && value.toolCalls.length > 0) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A direct answer cannot include tool calls." });
-  }
+  if (value.canAnswerDirectly && value.toolCalls.length > 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A direct answer cannot include tool calls." });
 });
 
 export function buildPlannerSystemPrompt(allowedTools: readonly string[]): string {
@@ -29,6 +33,7 @@ export function buildPlannerSystemPrompt(allowedTools: readonly string[]): strin
     "Return ONLY valid JSON. Do not include markdown or hidden reasoning.",
     "Choose tools only when they materially improve correctness.",
     "Never do arithmetic mentally when calculator is available.",
+    "For chained calculator work, reference an earlier exact result as {\"step\":0}, {\"step\":1}, etc. Never copy an intermediate value from memory.",
     "Never claim web facts without web_search/web_fetch evidence.",
     `Allowed tools: ${allowedTools.join(", ") || "none"}.`,
     "Schema:",
@@ -39,15 +44,9 @@ export function buildPlannerSystemPrompt(allowedTools: readonly string[]): strin
 export function parseAgentPlan(raw: string): AgentPlan {
   const text = raw.trim();
   let decoded: unknown;
-  try {
-    decoded = JSON.parse(text);
-  } catch {
-    throw new Error("AGENT_PLAN_INVALID_JSON");
-  }
+  try { decoded = JSON.parse(text); }
+  catch { throw new Error("AGENT_PLAN_INVALID_JSON"); }
   const parsed = planSchema.safeParse(decoded);
   if (!parsed.success) throw new Error(`AGENT_PLAN_INVALID:${parsed.error.issues.map((issue) => issue.message).join(";")}`);
-  return {
-    canAnswerDirectly: parsed.data.canAnswerDirectly,
-    toolCalls: parsed.data.toolCalls as AgentToolCall[],
-  };
+  return { canAnswerDirectly: parsed.data.canAnswerDirectly, toolCalls: parsed.data.toolCalls as AgentToolCall[] };
 }
