@@ -37,7 +37,9 @@ export function routeAgentCapabilities(goal: string, maxVisible = 6): AgentCapab
   if (/\b(code|typescript|javascript|python|debug|algorithm|constraint|logic|json|solve|كود|برمجة|منطق|حل)\b/i.test(text)) {
     wanted.add("code_solver");
   }
-  if (/\b(search|research|web|website|source|latest|current|price|supplier|product|manufacturer|ابحث|الويب|موقع|مصدر|مورد|منتج|سعر)\b/i.test(text)) {
+  // Product/supplier/price words alone are NOT proof that browsing is wanted.
+  // Research is enabled only for an explicit freshness/search intent.
+  if (/\b(search|research|web|website|source|latest|current|online|browse|look\s*up|find\s*online|ابحث|الويب|موقع|مصدر|أحدث|حالي|اونلاين)\b/i.test(text)) {
     wanted.add("web_search");
     wanted.add("web_fetch");
     wanted.add("evidence_verify");
