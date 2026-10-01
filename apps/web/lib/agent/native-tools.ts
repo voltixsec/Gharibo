@@ -14,16 +14,28 @@ const DEFINITIONS: Record<AgentToolName, NativeToolDefinition> = {
     type: "function",
     function: {
       name: "calculator",
-      description: "Perform one exact arithmetic operation. Use this instead of mental arithmetic.",
+      description: "Perform exact arithmetic. For a multi-step business calculation, send all required formulas in expressions so every requested figure is computed deterministically in one tool call. Never calculate mentally.",
       parameters: {
         type: "object",
         properties: {
-          op: { type: "string", enum: ["add", "subtract", "multiply", "divide", "percent_of"], description: "Arithmetic operation." },
-          a: { type: "number", description: "First operand." },
-          b: { type: "number", description: "Second operand. For percent_of, this is the percentage." },
+          op: { type: "string", enum: ["add", "subtract", "multiply", "divide", "percent_of"], description: "Single arithmetic operation when only one result is needed." },
+          a: { type: "number", description: "First operand for a single operation." },
+          b: { type: "number", description: "Second operand for a single operation. For percent_of, this is the percentage." },
+          expressions: {
+            type: "array",
+            description: "For multi-step work, calculate every requested output here. Expressions allow only numbers, +, -, *, /, parentheses and decimals. Do not use commas or percent signs; write 7% as 0.07.",
+            items: {
+              type: "object",
+              properties: {
+                label: { type: "string", description: "Short result name." },
+                expression: { type: "string", description: "Exact arithmetic expression using the values from the user request." },
+              },
+              required: ["label", "expression"],
+            },
+          },
           precision: { type: "integer", minimum: 0, maximum: 12, default: 6, description: "Decimal precision for display." },
         },
-        required: ["op", "a", "b"],
+        required: [],
       },
     },
   },  code_solver: {

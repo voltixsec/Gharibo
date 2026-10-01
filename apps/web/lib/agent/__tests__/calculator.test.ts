@@ -35,4 +35,18 @@ describe("runCalculator", () => {
   it("rejects forward step references", () => {
     expect(() => runCalculator({ operations: [{ op: "add", a: { step: 0 }, b: 1 }] })).toThrow("CALCULATOR_INVALID_STEP_REFERENCE");
   });
+
+  it("evaluates a full procurement deal in one exact batch", () => {
+    const result = runCalculator({ precision: 6, expressions: [
+      { label: "gross_goods", expression: "240 * 42.5" },
+      { label: "discounted_goods", expression: "(240 * 42.5) * (1 - 0.07)" },
+      { label: "customs", expression: "(((240 * 42.5) * (1 - 0.07)) + 385) * 0.05" },
+      { label: "landed", expression: "((240 * 42.5) * (1 - 0.07)) + 385 + ((((240 * 42.5) * (1 - 0.07)) + 385) * 0.05) + 95" },
+      { label: "sales", expression: "240 * 49.9" },
+      { label: "profit", expression: "(240 * 49.9) - (((240 * 42.5) * (1 - 0.07)) + 385 + ((((240 * 42.5) * (1 - 0.07)) + 385) * 0.05) + 95)" },
+    ] });
+    expect(result.expressions.map((item) => item.value)).toEqual([
+      "10200", "9486", "493.55", "10459.55", "11976", "1516.45",
+    ]);
+  });
 });

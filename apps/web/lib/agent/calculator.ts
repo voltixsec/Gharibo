@@ -1,3 +1,5 @@
+import { evaluateExactExpressions, type ExactExpressionInput, type ExactExpressionResult } from "./expression-calculator";
+
 export type CalculatorOperand = string | number | { step: number };
 
 export type CalculatorOperation =
@@ -5,7 +7,8 @@ export type CalculatorOperation =
   | { op: "percent_of"; a: CalculatorOperand; b: CalculatorOperand };
 
 export interface CalculatorRequest {
-  operations: CalculatorOperation[];
+  operations?: CalculatorOperation[];
+  expressions?: ExactExpressionInput[];
   precision?: number;
 }
 
@@ -17,6 +20,7 @@ export interface CalculatorStepResult {
 
 export interface CalculatorResult {
   steps: CalculatorStepResult[];
+  expressions: ExactExpressionResult[];
   final: string | null;
 }
 
@@ -84,13 +88,16 @@ function resolveOperand(operand: CalculatorOperand, exactSteps: Rational[], curr
 }
 
 export function runCalculator(request: CalculatorRequest): CalculatorResult {
-  if (!request || !Array.isArray(request.operations) || request.operations.length === 0) throw new Error("CALCULATOR_OPERATIONS_REQUIRED");
-  if (request.operations.length > 100) throw new Error("CALCULATOR_OPERATION_LIMIT");
+  if (!request) throw new Error("CALCULATOR_REQUEST_REQUIRED");
+  const operations = Array.isArray(request.operations) ? request.operations : [];
+  const expressions = Array.isArray(request.expressions) ? request.expressions : [];
+  if (operations.length === 0 && expressions.length === 0) throw new Error("CALCULATOR_INPUT_REQUIRED");
+  if (operations.length > 100) throw new Error("CALCULATOR_OPERATION_LIMIT");
   const precision = request.precision ?? 6;
   const exactSteps: Rational[] = [];
   const steps: CalculatorStepResult[] = [];
 
-  request.operations.forEach((operation, index) => {
+  operations.forEach((operation, index) => {
     const a = resolveOperand(operation.a, exactSteps, index);
     const b = resolveOperand(operation.b, exactSteps, index);
     const value = operation.op === "add"
@@ -106,5 +113,10 @@ export function runCalculator(request: CalculatorRequest): CalculatorResult {
     steps.push({ index, op: operation.op, value: render(value, precision) });
   });
 
-  return { steps, final: steps.at(-1)?.value ?? null };
+  const expressionResults = expressions.length ? evaluateExactExpressions(expressions, precision) : [];
+  return {
+    steps,
+    expressions: expressionResults,
+    final: expressionResults.at(-1)?.value ?? steps.at(-1)?.value ?? null,
+  };
 }

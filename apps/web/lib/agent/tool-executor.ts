@@ -35,7 +35,7 @@ export async function executeAgentTool(call: AgentToolCall, adapters: AgentToolA
         b?: string | number;
         precision?: number;
       };
-      const request: CalculatorRequest = Array.isArray(raw.operations)
+      const request: CalculatorRequest = Array.isArray(raw.operations) || Array.isArray((raw as Partial<CalculatorRequest>).expressions)
         ? raw as CalculatorRequest
         : {
             operations: [{
