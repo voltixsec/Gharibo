@@ -27,4 +27,28 @@ describe("runAgentTurn", () => {
     expect(result.toolResults[0]?.ok).toBe(true);
     expect(modelCall).toHaveBeenCalledTimes(2);
   });
+
+  it("repairs one invalid planner response before failing the turn", async () => {
+    const repairedPlan = JSON.stringify({
+      canAnswerDirectly: false,
+      toolCalls: [{
+        id: "calc-1",
+        name: "calculator",
+        input: { operations: [{ op: "multiply", a: 240, b: "42.500" }] },
+      }],
+    });
+    const modelCall = vi.fn<AgentModelCall>()
+      .mockResolvedValueOnce("I will calculate this carefully.")
+      .mockResolvedValueOnce(repairedPlan)
+      .mockResolvedValueOnce("KWD 10,200");
+
+    const result = await runAgentTurn({
+      messages: [{ role: "user", content: "Calculate 240 units at KWD 42.500 each" }],
+      modelCall,
+    });
+
+    expect(result.answer).toBe("KWD 10,200");
+    expect(result.toolResults[0]?.data).toMatchObject({ final: "10200" });
+    expect(modelCall).toHaveBeenCalledTimes(3);
+  });
 });
