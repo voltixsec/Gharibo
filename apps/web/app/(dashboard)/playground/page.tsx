@@ -59,8 +59,8 @@ function PlaygroundContent() {
   const { runtime, loading: runtimeLoading } = useRuntimeV1();
 
   const [activeId, setActiveId] = useState<string | null>(null);
-  /** Desktop side-panel preference. Defaults open, as a wide screen has room. */
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  /** Desktop inspector stays collapsed by default, matching a chat-first workspace. */
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   /**
    * Mobile/tablet drawer visibility, tracked separately and defaulting CLOSED.
    *
@@ -154,8 +154,8 @@ function PlaygroundContent() {
   }, [conversation?.id, conversation?.providerId, conversation?.modelId, conversation]);
 
   const selectionProvider = activeProviders.find((p) => p.id === selectionKey) ?? null;
-  const toolsSupported = selectionProvider?.supportsTools ?? false;
   const isV1Selection = selectionKey === V1_RUNTIME_PROVIDER_ID;
+  const toolsSupported = isV1Selection ? true : (selectionProvider?.supportsTools ?? false);
   const selectedMaxTokenCeiling = isV1Selection
     ? limits.maxOutputTokensCeiling
     : (selectionProvider?.contextWindow ?? limits.maxOutputTokensCeiling);
@@ -188,7 +188,7 @@ function PlaygroundContent() {
         systemPrompt: null,
         temperature: 0.7,
         maxTokens: newConversationMaxTokens,
-        toolsEnabled: false,
+        toolsEnabled: isV1Selection,
       });
       setActiveId(conv.id);
       setMetrics(null);
@@ -325,7 +325,7 @@ function PlaygroundContent() {
         systemPrompt: conversation.systemPrompt,
         temperature: conversation.temperature,
         maxTokens: conversation.maxTokens,
-        toolsEnabled: false,
+        toolsEnabled: compareTarget === V1_RUNTIME_PROVIDER_ID,
       });
       setSelectionKey(compareTarget);
       setActiveId(branch.id);

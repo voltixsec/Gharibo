@@ -270,9 +270,13 @@ export function Inspector({
                 </Badge>
               </div>
               <p className="text-[0.6875rem] leading-relaxed text-[color:var(--gharibo-text-subtle)]">
-                {toolsSupported
-                  ? "The selected provider declares tool support."
-                  : "GHARIBO-V1 is a text model. It cannot execute tools, run shell commands, or call other models."}
+                {isV1Selection
+                  ? conversation?.toolsEnabled
+                    ? "GHARIBO Agent is enabled for this chat. Deterministic tools are used only when the runtime routes the request to them."
+                    : "GHARIBO Agent tools are available, but this existing conversation has tools disabled. Start a new GHARIBO-V1 chat to enable them by default."
+                  : toolsSupported
+                    ? "The selected provider declares tool support."
+                    : "The selected provider does not declare tool support."}
               </p>
             </div>
           </section>
@@ -349,14 +353,12 @@ export function Inspector({
             )}
           </section>
 
-          {/* --------------------------------------------- T4 warning */}
+          {/* ---------------------------------------- development warning */}
           {isV1Selection && (
             <div className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/8 p-3">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
               <p className="text-[0.6875rem] leading-relaxed text-amber-700 dark:text-amber-300">
-                Development runtime: Tesla T4 (~14.56 GiB VRAM, ~11.6 GiB resident).
-                The identity-preserving deployment target is a 24 GB GPU. Output is
-                deliberately bounded here to avoid CUDA OOM.
+                Development runtime{diag?.gpuName ? ` on ${diag.gpuName}` : ""}. It may scale to zero after inactivity, so the first request can be slower. Output remains bounded to protect the model context and GPU memory.
               </p>
             </div>
           )}

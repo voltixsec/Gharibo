@@ -72,6 +72,7 @@ export function ChatView({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [runtimeStatus, setRuntimeStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [dialogMessage, setDialogMessage] = useState<ConversationMessage | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -103,6 +104,7 @@ export function ChatView({
     abortRef.current = null;
     setBusy(false);
     setStreamingContent("");
+    setRuntimeStatus(null);
     setNotice(null);
     setInput("");
     setDialogMessage(null);
@@ -133,6 +135,7 @@ export function ChatView({
       setInput("");
       setBusy(true);
       setStreamingContent("");
+      setRuntimeStatus(null);
       setNotice(null);
 
       const controller = new AbortController();
@@ -202,6 +205,7 @@ export function ChatView({
               setStreamingContent(accumulated);
             } else if (event.type === STREAM_EVENT.STATUS) {
               if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
+              setRuntimeStatus(event.status ?? null);
             } else if (event.type === STREAM_EVENT.ERROR) {
               setNotice({
                 tone: event.error?.code === "NO_FINAL_ANSWER" ? "warning" : "error",
@@ -267,6 +271,7 @@ export function ChatView({
           });
           setBusy(false);
           setStreamingContent("");
+          setRuntimeStatus(null);
           onRefresh();
         }
       }
@@ -378,6 +383,11 @@ export function ChatView({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {toolsSupported && conversation?.toolsEnabled && (
+            <span className="hidden rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground sm:inline-flex">
+              Agent tools
+            </span>
+          )}
           <RuntimeStatusBadge />
           {!inspectorOpen && (
             <Tooltip>
@@ -431,7 +441,15 @@ export function ChatView({
                       {streamingContent}
                     </p>
                   ) : (
-                    <GhariboOrbit label="Generating with GHARIBO-V1…" />
+                    <GhariboOrbit
+                      label={
+                        runtimeStatus === "agent"
+                          ? "GHARIBO Agent is selecting and using tools…"
+                          : runtimeStatus === "generating"
+                            ? "Generating with GHARIBO-V1…"
+                            : "Preparing GHARIBO…"
+                      }
+                    />
                   )}
                 </div>
               </div>
