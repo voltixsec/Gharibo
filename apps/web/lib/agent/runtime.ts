@@ -68,6 +68,23 @@ function toolContext(results: readonly AgentToolResult[]): string {
   })).join("\n");
 }
 
+function renderDeterministicLogicAnswer(result: AgentToolResult): string | null {
+  if (result.name !== "code_solver" || !result.ok || !result.data || typeof result.data !== "object") return null;
+  const data = result.data as { validOrders?: unknown; count?: unknown; checkedPermutations?: unknown; truncated?: unknown };
+  if (!Array.isArray(data.validOrders) || typeof data.count !== "number") return null;
+  const orders = data.validOrders
+    .filter((order): order is string[] => Array.isArray(order) && order.every((item) => typeof item === "string"))
+    .map((order, index) => `${index + 1}. ${order.join(" → ")}`);
+  return [
+    "Valid orders:",
+    ...(orders.length ? orders : ["None"]),
+    "",
+    `Count: ${data.count}`,
+    typeof data.checkedPermutations === "number" ? `Verified across ${data.checkedPermutations} permutations.` : "",
+    data.truncated === true ? "Result list was truncated by the configured solution limit." : "",
+  ].filter(Boolean).join("\n");
+}
+
 function hasTool(plan: AgentPlan, name: string): boolean {
   return plan.toolCalls.some((call) => call.name === name);
 }
@@ -176,6 +193,23 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
       activity[activity.length - 1] = { ...started, status: result.ok ? "DONE" : "FAILED" };
       await input.onActivity?.(activity[activity.length - 1]!);
       if (!result.ok) throw new Error(`AGENT_TOOL_FAILED:${call.name}:${result.error?.code ?? "UNKNOWN"}`);
+    }
+  }
+
+  // A fully deterministic ordering solution does not need a second GPU pass to
+  // paraphrase facts the solver already proved. Returning it directly is faster,
+  // cheaper and removes an opportunity for the model to corrupt a correct set.
+  if (toolResults.length === 1) {
+    const deterministicAnswer = renderDeterministicLogicAnswer(toolResults[0]!);
+    if (deterministicAnswer) {
+      await record(event(now, "COMPLETED", "Completed with deterministic verification", "DONE"));
+      return {
+        answer: deterministicAnswer,
+        toolResults,
+        activity,
+        evidence: [],
+        verified: true,
+      };
     }
   }
 

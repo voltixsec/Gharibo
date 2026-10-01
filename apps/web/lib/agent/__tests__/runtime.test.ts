@@ -62,11 +62,8 @@ describe("runAgentTurn", () => {
     ]));
   });
 
-  it("bypasses GPU tool selection for a recognised ordering puzzle", async () => {
-    const modelCall = vi.fn<AgentModelCall>().mockImplementation(async (request) => {
-      expect(request.systemPrompt).toContain('"count":2');
-      return "Valid orders: A-D-B-C and D-A-C-B. Count: 2.";
-    });
+  it("bypasses both GPU passes for a recognised ordering puzzle", async () => {
+    const modelCall = vi.fn<AgentModelCall>().mockRejectedValue(new Error("model must not run"));
     const toolSelector = vi.fn().mockRejectedValue(new Error("selector must not run"));
 
     const result = await runAgentTurn({
@@ -76,9 +73,13 @@ describe("runAgentTurn", () => {
     });
 
     expect(toolSelector).not.toHaveBeenCalled();
+    expect(modelCall).not.toHaveBeenCalled();
     expect(result.toolResults[0]?.name).toBe("code_solver");
     expect(result.toolResults[0]?.data).toMatchObject({ count: 2 });
+    expect(result.answer).toContain("A → D → B → C");
+    expect(result.answer).toContain("D → A → C → B");
     expect(result.answer).toContain("Count: 2");
+    expect(result.verified).toBe(true);
   });
 
   it("repairs one invalid planner response before failing the turn", async () => {
