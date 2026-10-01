@@ -27,6 +27,7 @@ import type { Message } from "@gharibo/shared";
 import { z } from "zod";
 import { runAgentTurn } from "@/lib/agent/runtime";
 import type { AgentToolCall } from "@/lib/agent/contracts";
+import { createResearchAdapters } from "@/lib/agent/research/adapters";
 import {
   resolveV1RuntimeConfig,
   resolveRuntimeToken,
@@ -319,9 +320,14 @@ export async function POST(
             const extracted = agentEnabled
               ? await (async () => {
                   send({ status: "agent", modelId: V1_MODEL_ID });
+                  const research = createResearchAdapters(process.env);
+                  const enabledTools: AgentToolCall["name"][] = research.configured
+                    ? ["calculator", "web_search", "web_fetch"]
+                    : ["calculator"];
                   const agent = await runAgentTurn({
                     messages,
-                    enabledTools: ["calculator"],
+                    enabledTools,
+                    adapters: research.adapters,
                     systemPrompt: options.systemPrompt,
                     temperature: options.temperature,
                     maxTokens: options.maxTokens,

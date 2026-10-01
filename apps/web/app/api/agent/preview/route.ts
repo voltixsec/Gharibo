@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { Message } from "@gharibo/shared";
 import { runAgentTurn } from "@/lib/agent/runtime";
+import { createResearchAdapters } from "@/lib/agent/research/adapters";
 import {
   resolveRuntimeToken,
   resolveV1RuntimeConfig,
@@ -39,8 +40,14 @@ export async function POST(request: NextRequest) {
   const token = resolveRuntimeToken(config, process.env);
 
   try {
+    const research = createResearchAdapters(process.env);
+    const enabledTools = research.configured
+      ? (["calculator", "web_search", "web_fetch"] as const)
+      : (["calculator"] as const);
     const result = await runAgentTurn({
       messages: parsed.data.messages as Message[],
+      enabledTools: [...enabledTools],
+      adapters: research.adapters,
       systemPrompt: parsed.data.systemPrompt,
       temperature: parsed.data.temperature ?? 0.2,
       maxTokens: parsed.data.maxTokens ?? 1024,

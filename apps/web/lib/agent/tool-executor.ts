@@ -1,4 +1,4 @@
-import type { AgentToolCall, AgentToolResult } from "./contracts";
+import type { AgentEvidence, AgentToolCall, AgentToolResult } from "./contracts";
 import { runCalculator, type CalculatorRequest } from "./calculator";
 
 export interface AgentToolAdapters {
@@ -6,6 +6,24 @@ export interface AgentToolAdapters {
   webSearch?: (input: unknown) => Promise<unknown>;
   webFetch?: (input: unknown) => Promise<unknown>;
   evidenceVerify?: (input: unknown) => Promise<unknown>;
+}
+
+export interface AgentToolAdapterResult<TData = unknown> {
+  agentToolResult: true;
+  data: TData;
+  evidence?: AgentEvidence[];
+}
+
+export function agentToolAdapterResult<TData>(data: TData, evidence: AgentEvidence[] = []): AgentToolAdapterResult<TData> {
+  return { agentToolResult: true, data, evidence };
+}
+
+function unpackAdapterResult(value: unknown): { data: unknown; evidence?: AgentEvidence[] } {
+  if (value && typeof value === "object" && (value as { agentToolResult?: unknown }).agentToolResult === true) {
+    const envelope = value as AgentToolAdapterResult;
+    return { data: envelope.data, evidence: envelope.evidence };
+  }
+  return { data: value };
 }
 
 export async function executeAgentTool(call: AgentToolCall, adapters: AgentToolAdapters = {}): Promise<AgentToolResult> {
@@ -47,14 +65,27 @@ export async function executeAgentTool(call: AgentToolCall, adapters: AgentToolA
       };
     }
 
-    return { callId: call.id, name: call.name, ok: true, data: await adapter(call.input) };
+    const unpacked = unpackAdapterResult(await adapter(call.input));
+    return {
+      callId: call.id,
+      name: call.name,
+      ok: true,
+      data: unpacked.data,
+      ...(unpacked.evidence?.length ? { evidence: unpacked.evidence } : {}),
+    };
   } catch (error) {
+    const candidateCode = error && typeof error === "object" && typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : null;
+    const messageCode = error instanceof Error && /^[A-Z][A-Z0-9_:.-]+$/.test(error.message)
+      ? error.message.split(":")[0]
+      : null;
     return {
       callId: call.id,
       name: call.name,
       ok: false,
       error: {
-        code: error instanceof Error && /^[A-Z][A-Z0-9_:.-]+$/.test(error.message) ? error.message.split(":")[0] : "AGENT_TOOL_FAILED",
+        code: candidateCode ?? messageCode ?? "AGENT_TOOL_FAILED",
         message: error instanceof Error ? error.message : "Agent tool failed.",
       },
     };

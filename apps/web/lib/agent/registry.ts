@@ -31,7 +31,7 @@ export function routeAgentCapabilities(goal: string, maxVisible = 6): AgentCapab
   if (!text) return [{ ...CAPABILITIES[0] }];
   const wanted = new Set<AgentCapabilityId>(["gharibo_model"]);
 
-  if (/\b(calculate|calculation|sum|total|margin|profit|cost|price|discount|percent|percentage|÷|\+|\-|\*|\/|احسب|حساب|نسبة|تكلفة|هامش|ربح)\b/i.test(text)) {
+  if (/\b(calculate|calculation|sum|total|margin|profit|cost|discount|percent|percentage|÷|\+|\-|\*|\/|احسب|حساب|نسبة|تكلفة|هامش|ربح)\b/i.test(text)) {
     wanted.add("calculator");
   }
   if (/\b(code|typescript|javascript|python|debug|algorithm|constraint|logic|json|solve|كود|برمجة|منطق|حل)\b/i.test(text)) {

@@ -61,6 +61,7 @@ function toolContext(results: readonly AgentToolResult[]): string {
     tool: result.name,
     ok: result.ok,
     data: result.data ?? null,
+    evidence: result.evidence ?? [],
     error: result.error ?? null,
   })).join("\n");
 }
