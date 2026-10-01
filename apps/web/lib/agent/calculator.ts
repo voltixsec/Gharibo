@@ -1,6 +1,8 @@
+export type CalculatorOperand = string | number | { step: number };
+
 export type CalculatorOperation =
-  | { op: "add" | "subtract" | "multiply" | "divide"; a: string | number; b: string | number }
-  | { op: "percent_of"; a: string | number; b: string | number };
+  | { op: "add" | "subtract" | "multiply" | "divide"; a: CalculatorOperand; b: CalculatorOperand }
+  | { op: "percent_of"; a: CalculatorOperand; b: CalculatorOperand };
 
 export interface CalculatorRequest {
   operations: CalculatorOperation[];
@@ -47,18 +49,9 @@ function parseDecimal(value: string | number): Rational {
   return normalize({ n, d });
 }
 
-function add(a: Rational, b: Rational): Rational {
-  return normalize({ n: a.n * b.d + b.n * a.d, d: a.d * b.d });
-}
-
-function subtract(a: Rational, b: Rational): Rational {
-  return normalize({ n: a.n * b.d - b.n * a.d, d: a.d * b.d });
-}
-
-function multiply(a: Rational, b: Rational): Rational {
-  return normalize({ n: a.n * b.n, d: a.d * b.d });
-}
-
+function add(a: Rational, b: Rational): Rational { return normalize({ n: a.n * b.d + b.n * a.d, d: a.d * b.d }); }
+function subtract(a: Rational, b: Rational): Rational { return normalize({ n: a.n * b.d - b.n * a.d, d: a.d * b.d }); }
+function multiply(a: Rational, b: Rational): Rational { return normalize({ n: a.n * b.n, d: a.d * b.d }); }
 function divide(a: Rational, b: Rational): Rational {
   if (b.n === 0n) throw new Error("CALCULATOR_DIVIDE_BY_ZERO");
   return normalize({ n: a.n * b.d, d: a.d * b.n });
@@ -80,17 +73,26 @@ function render(value: Rational, precision: number): string {
   return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`;
 }
 
-export function runCalculator(request: CalculatorRequest): CalculatorResult {
-  if (!request || !Array.isArray(request.operations) || request.operations.length === 0) {
-    throw new Error("CALCULATOR_OPERATIONS_REQUIRED");
+function resolveOperand(operand: CalculatorOperand, exactSteps: Rational[], currentIndex: number): Rational {
+  if (typeof operand === "string" || typeof operand === "number") return parseDecimal(operand);
+  if (!operand || !Number.isInteger(operand.step) || operand.step < 0 || operand.step >= currentIndex) {
+    throw new Error("CALCULATOR_INVALID_STEP_REFERENCE");
   }
+  const value = exactSteps[operand.step];
+  if (!value) throw new Error("CALCULATOR_INVALID_STEP_REFERENCE");
+  return value;
+}
+
+export function runCalculator(request: CalculatorRequest): CalculatorResult {
+  if (!request || !Array.isArray(request.operations) || request.operations.length === 0) throw new Error("CALCULATOR_OPERATIONS_REQUIRED");
   if (request.operations.length > 100) throw new Error("CALCULATOR_OPERATION_LIMIT");
   const precision = request.precision ?? 6;
+  const exactSteps: Rational[] = [];
   const steps: CalculatorStepResult[] = [];
 
   request.operations.forEach((operation, index) => {
-    const a = parseDecimal(operation.a);
-    const b = parseDecimal(operation.b);
+    const a = resolveOperand(operation.a, exactSteps, index);
+    const b = resolveOperand(operation.b, exactSteps, index);
     const value = operation.op === "add"
       ? add(a, b)
       : operation.op === "subtract"
@@ -100,6 +102,7 @@ export function runCalculator(request: CalculatorRequest): CalculatorResult {
           : operation.op === "divide"
             ? divide(a, b)
             : divide(multiply(a, b), parseDecimal(100));
+    exactSteps.push(value);
     steps.push({ index, op: operation.op, value: render(value, precision) });
   });
 
