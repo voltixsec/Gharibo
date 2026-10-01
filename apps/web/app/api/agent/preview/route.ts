@@ -52,7 +52,6 @@ export async function POST(request: NextRequest) {
             systemPrompt: modelRequest.systemPrompt,
             temperature: modelRequest.temperature ?? 0.2,
             maxTokens: modelRequest.maxTokens ?? 1024,
-            toolsEnabled: false,
           },
         });
         if (!extracted.ok || !extracted.answer) {
