@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,7 @@ export function ChatView({
   const [busy, setBusy] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [runtimeStatus, setRuntimeStatus] = useState<string | null>(null);
+  const [agentActivityLabel, setAgentActivityLabel] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [dialogMessage, setDialogMessage] = useState<ConversationMessage | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -105,6 +106,7 @@ export function ChatView({
     setBusy(false);
     setStreamingContent("");
     setRuntimeStatus(null);
+    setAgentActivityLabel(null);
     setNotice(null);
     setInput("");
     setDialogMessage(null);
@@ -136,6 +138,7 @@ export function ChatView({
       setBusy(true);
       setStreamingContent("");
       setRuntimeStatus(null);
+      setAgentActivityLabel(null);
       setNotice(null);
 
       const controller = new AbortController();
@@ -203,6 +206,10 @@ export function ChatView({
               if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
               accumulated += event.delta ?? "";
               setStreamingContent(accumulated);
+            } else if (event.type === STREAM_EVENT.ACTIVITY) {
+              if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
+              setRuntimeStatus("agent");
+              setAgentActivityLabel(event.label ?? null);
             } else if (event.type === STREAM_EVENT.STATUS) {
               if (ttfbMs === null) ttfbMs = Math.round(performance.now() - startedAt);
               setRuntimeStatus(event.status ?? null);
@@ -272,6 +279,7 @@ export function ChatView({
           setBusy(false);
           setStreamingContent("");
           setRuntimeStatus(null);
+          setAgentActivityLabel(null);
           onRefresh();
         }
       }
@@ -444,7 +452,7 @@ export function ChatView({
                     <GhariboOrbit
                       label={
                         runtimeStatus === "agent"
-                          ? "GHARIBO Agent is selecting and using tools…"
+                          ? (agentActivityLabel ?? "GHARIBO Agent is selecting and using tools…")
                           : runtimeStatus === "generating"
                             ? "Generating with GHARIBO-V1…"
                             : "Preparing GHARIBO…"

@@ -42,16 +42,24 @@ describe("runAgentTurn", () => {
       answer: null,
     });
 
+    const seenActivities: Array<{ stage: string; status: string; tool?: string }> = [];
     const result = await runAgentTurn({
       messages: [{ role: "user", content: "Calculate freight per MT: USD 6,200 / 24 MT" }],
       modelCall,
       toolSelector,
+      onActivity: (activity) => { seenActivities.push({ stage: activity.stage, status: activity.status, ...(activity.tool ? { tool: activity.tool } : {}) }); },
     });
 
     expect(result.answer).toBe("USD 258.33/MT");
     expect(result.toolResults[0]?.data).toMatchObject({ final: "258.33" });
     expect(toolSelector).toHaveBeenCalledTimes(1);
     expect(modelCall).toHaveBeenCalledTimes(1);
+    expect(seenActivities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: "PLANNING", status: "RUNNING" }),
+      expect.objectContaining({ stage: "USING_TOOL", status: "RUNNING", tool: "calculator" }),
+      expect.objectContaining({ stage: "CALLING_MODEL", status: "RUNNING" }),
+      expect.objectContaining({ stage: "COMPLETED", status: "DONE" }),
+    ]));
   });
 
   it("repairs one invalid planner response before failing the turn", async () => {

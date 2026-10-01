@@ -17,6 +17,9 @@ interface AnyEvent {
   done?: boolean;
   status?: string;
   modelId?: string;
+  stage?: string;
+  label?: string;
+  tool?: string;
   error?: { code: string; message: string };
 }
 
@@ -36,6 +39,18 @@ describe("complete records", () => {
     const events = parser.push('{"delta":"hello","done":false}\n');
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ type: STREAM_EVENT.DELTA, delta: "hello", done: false });
+  });
+
+  it("parses an agent activity record", () => {
+    const parser = new NdjsonStreamParser();
+    const events = parser.push('{"agentActivity":{"stage":"USING_TOOL","label":"Using calculator","status":"RUNNING","tool":"calculator"}}\n');
+    expect(events[0]).toMatchObject({
+      type: STREAM_EVENT.ACTIVITY,
+      stage: "USING_TOOL",
+      label: "Using calculator",
+      status: "RUNNING",
+      tool: "calculator",
+    });
   });
 
   it("parses several records arriving in one chunk", () => {

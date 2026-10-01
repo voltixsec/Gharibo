@@ -1,4 +1,4 @@
-﻿/**
+/**
  * POST /api/conversations/[id]/messages — send a message, stream the response.
  *
  * Streams newline-delimited JSON events (not SSE `data:` framing, matching the
@@ -345,6 +345,16 @@ export async function POST(
                         toolCall: selected.toolCall as AgentToolCall | null,
                         answer: selected.answer ?? null,
                       };
+                    },
+                    onActivity: async (activity) => {
+                      send({
+                        agentActivity: {
+                          stage: activity.stage,
+                          label: activity.label,
+                          status: activity.status,
+                          tool: activity.tool ?? null,
+                        },
+                      });
                     },
                     modelCall: async (modelRequest) => {
                       const final = await runV1Chat({

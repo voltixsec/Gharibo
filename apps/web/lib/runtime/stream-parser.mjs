@@ -20,6 +20,7 @@
 /** Normalised event kinds the UI understands. */
 export const STREAM_EVENT = Object.freeze({
   STATUS: "status",
+  ACTIVITY: "activity",
   DELTA: "delta",
   ERROR: "error",
   DONE: "done",
@@ -41,7 +42,7 @@ export class NdjsonStreamParser {
    * Feeds a chunk and returns every COMPLETE event it completed.
    *
    * @param {string} chunk
-   * @returns {Array<{type: string, delta?: string, done?: boolean, status?: string, modelId?: string, error?: {code: string, message: string}}>}
+   * @returns {Array<{type: string, delta?: string, done?: boolean, status?: string, modelId?: string, stage?: string, label?: string, tool?: string, error?: {code: string, message: string}}>}
    */
   push(chunk) {
     if (typeof chunk !== "string" || chunk.length === 0) return [];
@@ -139,6 +140,17 @@ export function parseLine(line) {
   // content delta and must not be mistaken for one.
   if (typeof record.title === "string") {
     return { type: STREAM_EVENT.TITLE, title: record.title };
+  }
+
+  if (record.agentActivity && typeof record.agentActivity === "object") {
+    const activity = record.agentActivity;
+    return {
+      type: STREAM_EVENT.ACTIVITY,
+      stage: typeof activity.stage === "string" ? activity.stage : undefined,
+      label: typeof activity.label === "string" ? activity.label : undefined,
+      status: typeof activity.status === "string" ? activity.status : undefined,
+      tool: typeof activity.tool === "string" ? activity.tool : undefined,
+    };
   }
 
   if (typeof record.status === "string") {

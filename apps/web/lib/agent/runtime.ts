@@ -39,6 +39,7 @@ export interface RunAgentTurnInput {
   maxTokens?: number;
   adapters?: AgentToolAdapters;
   now?: () => Date;
+  onActivity?: (activity: AgentActivityEvent) => void | Promise<void>;
 }
 
 function event(now: () => Date, stage: AgentActivityEvent["stage"], label: string, status: AgentActivityEvent["status"], tool?: AgentActivityEvent["tool"]): AgentActivityEvent {
@@ -95,9 +96,13 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
     .filter((name) => !enabledTools || enabledTools.has(name as AgentToolCall["name"]));
   const activity: AgentActivityEvent[] = [];
   const toolResults: AgentToolResult[] = [];
+  const record = async (entry: AgentActivityEvent) => {
+    activity.push(entry);
+    await input.onActivity?.(entry);
+  };
 
   if (allowedTools.length > 0) {
-    activity.push(event(now, "PLANNING", input.toolSelector ? "Selecting the right tool" : "Planning the request", "RUNNING"));
+    await record(event(now, "PLANNING", input.toolSelector ? "Selecting the right tool" : "Planning the request", "RUNNING"));
     let selectedCalls: AgentToolCall[] = [];
 
     try {
@@ -139,30 +144,35 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
       }
     } catch (error) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
+      await input.onActivity?.(activity[activity.length - 1]!);
       throw new Error(`AGENT_PLANNING_FAILED:${error instanceof Error ? error.message : "unknown"}`);
     }
 
     if (allowedTools.includes("calculator") && !selectedCalls.some((call) => call.name === "calculator")) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
+      await input.onActivity?.(activity[activity.length - 1]!);
       throw new Error("AGENT_REQUIRED_TOOL_OMITTED:calculator");
     }
     if (selectedCalls.some((call) => !allowedTools.includes(call.name))) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
+      await input.onActivity?.(activity[activity.length - 1]!);
       throw new Error("AGENT_DISALLOWED_TOOL");
     }
     activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "DONE" };
+    await input.onActivity?.(activity[activity.length - 1]!);
 
     for (const call of selectedCalls) {
       const started = event(now, "USING_TOOL", `Using ${call.name}`, "RUNNING", call.name);
-      activity.push(started);
+      await record(started);
       const result = await executeAgentTool(call, input.adapters);
       toolResults.push(result);
       activity[activity.length - 1] = { ...started, status: result.ok ? "DONE" : "FAILED" };
+      await input.onActivity?.(activity[activity.length - 1]!);
       if (!result.ok) throw new Error(`AGENT_TOOL_FAILED:${call.name}:${result.error?.code ?? "UNKNOWN"}`);
     }
   }
 
-  activity.push(event(now, "CALLING_MODEL", "Preparing the final answer", "RUNNING"));
+  await record(event(now, "CALLING_MODEL", "Preparing the final answer", "RUNNING"));
   const groundedSystem = [
     input.systemPrompt ?? "",
     toolResults.length ? "You are GHARIBO-V1 operating inside GHARIBO Agent." : "",
@@ -178,9 +188,10 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
     maxTokens: input.maxTokens,
   });
   activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "DONE" };
+  await input.onActivity?.(activity[activity.length - 1]!);
 
   const evidence = toolResults.flatMap((result) => result.evidence ?? []);
-  activity.push(event(now, "COMPLETED", "Completed", "DONE"));
+  await record(event(now, "COMPLETED", "Completed", "DONE"));
   return {
     answer,
     toolResults,
