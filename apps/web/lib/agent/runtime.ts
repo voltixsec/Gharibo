@@ -48,6 +48,10 @@ function toolContext(results: readonly AgentToolResult[]): string {
   })).join("\n");
 }
 
+function hasTool(plan: { toolCalls: Array<{ name: string }> }, name: string): boolean {
+  return plan.toolCalls.some((call) => call.name === name);
+}
+
 export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnResult> {
   const now = input.now ?? (() => new Date());
   const goal = lastUserMessage(input.messages);
@@ -56,26 +60,47 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
   const activity: AgentActivityEvent[] = [];
   const toolResults: AgentToolResult[] = [];
 
-  // Ordinary chat must remain one model call. We only wake the planner when the
-  // deterministic router sees a capability that can materially improve accuracy.
+  // Ordinary chat remains one model call. The planner wakes only when the
+  // deterministic router identifies a capability that can materially improve accuracy.
   if (allowedTools.length > 0) {
     activity.push(event(now, "PLANNING", "Planning the request", "RUNNING"));
     let plan;
     try {
+      const plannerContext = compactPlannerContext(input.messages);
       const rawPlan = await input.modelCall({
-        messages: [{ role: "user", content: compactPlannerContext(input.messages) }],
+        messages: [{ role: "user", content: plannerContext }],
         systemPrompt: buildPlannerSystemPrompt(allowedTools),
         temperature: 0,
         maxTokens: 512,
       });
       plan = parseAgentPlan(rawPlan);
+
+      // Deterministic tools that protect correctness are mandatory once the
+      // router has classified the request. If the first planner pass omits one,
+      // repair the plan once with an explicit bounded instruction instead of
+      // silently falling back to mental arithmetic.
+      if (allowedTools.includes("calculator") && !hasTool(plan, "calculator")) {
+        const retryPrompt = [
+          buildPlannerSystemPrompt(allowedTools),
+          "CORRECTION: this request contains arithmetic and the calculator is mandatory.",
+          "Return a revised plan that includes at least one calculator call.",
+          "Break chained formulas into calculator operations and use {\"step\":N} references for prior exact results.",
+          "Do not answer the arithmetic yourself.",
+        ].join("\n");
+        const repairedRawPlan = await input.modelCall({
+          messages: [{ role: "user", content: plannerContext }],
+          systemPrompt: retryPrompt,
+          temperature: 0,
+          maxTokens: 768,
+        });
+        plan = parseAgentPlan(repairedRawPlan);
+      }
     } catch (error) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
       throw new Error(`AGENT_PLANNING_FAILED:${error instanceof Error ? error.message : "unknown"}`);
     }
 
-    const requiredCalculator = allowedTools.includes("calculator");
-    if (requiredCalculator && !plan.toolCalls.some((call) => call.name === "calculator")) {
+    if (allowedTools.includes("calculator") && !hasTool(plan, "calculator")) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
       throw new Error("AGENT_REQUIRED_TOOL_OMITTED:calculator");
     }
