@@ -11,6 +11,7 @@ The adapter is NEVER recreated or merged.
 """
 
 from abc import ABC, abstractmethod
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -278,9 +279,19 @@ class TransformersBackend(ModelBackend):
 
         output_ids = None
         try:
+            # Tool selection uses the untouched base model rather than the LoRA.
+            # The accepted GHARIBO adapter was trained for final-answer behaviour
+            # and can suppress native Harmony tool calls. PEFT lets us disable the
+            # adapter temporarily without unloading or mutating it.
+            adapter_context = (
+                self._model.disable_adapter()
+                if tools and hasattr(self._model, "disable_adapter")
+                else nullcontext()
+            )
+
             # No gradients, no autograd graph, eval mode: the whole generation
             # runs inside inference_mode so no activation memory is retained.
-            with torch.inference_mode():
+            with torch.inference_mode(), adapter_context:
                 output_ids = self._model.generate(
                     **inputs,
                     **generation_kwargs,
