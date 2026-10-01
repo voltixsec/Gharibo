@@ -85,6 +85,35 @@ function renderDeterministicLogicAnswer(result: AgentToolResult): string | null 
   ].filter(Boolean).join("\n");
 }
 
+function renderDeterministicCalculatorAnswer(result: AgentToolResult): string | null {
+  if (result.name !== "calculator" || !result.ok || !result.data || typeof result.data !== "object") return null;
+  const data = result.data as {
+    steps?: Array<{ index?: unknown; op?: unknown; value?: unknown }>;
+    expressions?: Array<{ label?: unknown; expression?: unknown; value?: unknown }>;
+    final?: unknown;
+  };
+  const expressions = Array.isArray(data.expressions) ? data.expressions : [];
+  if (expressions.length > 0) {
+    const lines = expressions.flatMap((item) => {
+      if (typeof item.label !== "string" || typeof item.expression !== "string" || typeof item.value !== "string") return [];
+      const label = item.label.replace(/[_-]+/g, " ").trim();
+      return [`${label}: ${item.expression} = ${item.value}`];
+    });
+    return lines.length ? ["Verified calculation:", ...lines].join("\n") : null;
+  }
+  const steps = Array.isArray(data.steps) ? data.steps : [];
+  if (steps.length === 1 && typeof steps[0]?.value === "string") {
+    return `Verified result: ${steps[0].value}`;
+  }
+  if (steps.length > 1) {
+    const lines = steps.flatMap((step, index) =>
+      typeof step.value === "string" ? [`${index + 1}. ${String(step.op ?? "calculation")}: ${step.value}`] : [],
+    );
+    if (lines.length) return ["Verified calculation:", ...lines, typeof data.final === "string" ? `Final: ${data.final}` : ""].filter(Boolean).join("\n");
+  }
+  return typeof data.final === "string" ? `Verified result: ${data.final}` : null;
+}
+
 function hasTool(plan: AgentPlan, name: string): boolean {
   return plan.toolCalls.some((call) => call.name === name);
 }
@@ -200,7 +229,9 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
   // paraphrase facts the solver already proved. Returning it directly is faster,
   // cheaper and removes an opportunity for the model to corrupt a correct set.
   if (toolResults.length === 1) {
-    const deterministicAnswer = renderDeterministicLogicAnswer(toolResults[0]!);
+    const deterministicAnswer =
+      renderDeterministicLogicAnswer(toolResults[0]!) ??
+      renderDeterministicCalculatorAnswer(toolResults[0]!);
     if (deterministicAnswer) {
       await record(event(now, "COMPLETED", "Completed with deterministic verification", "DONE"));
       return {
