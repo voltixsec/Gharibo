@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { Message } from "@gharibo/shared";
-import type { AgentActivityEvent, AgentPlan, AgentToolResult, AgentTurnResult } from "./contracts";
+import type { AgentActivityEvent, AgentPlan, AgentToolCall, AgentToolResult, AgentTurnResult } from "./contracts";
 import { buildPlannerSystemPrompt, parseAgentPlan } from "./planner";
 import { routeAgentCapabilities } from "./registry";
+import { nativeToolDefinitions, type NativeToolDefinition } from "./native-tools";
 import { executeAgentTool, type AgentToolAdapters } from "./tool-executor";
 
 export interface AgentModelRequest {
@@ -14,9 +15,25 @@ export interface AgentModelRequest {
 
 export type AgentModelCall = (request: AgentModelRequest) => Promise<string>;
 
+export interface AgentToolSelectionRequest {
+  messages: Message[];
+  tools: NativeToolDefinition[];
+  systemPrompt?: string;
+  maxTokens?: number;
+}
+
+export interface AgentToolSelection {
+  toolCall: AgentToolCall | null;
+  answer?: string | null;
+}
+
+export type AgentToolSelectorCall = (request: AgentToolSelectionRequest) => Promise<AgentToolSelection>;
+
 export interface RunAgentTurnInput {
   messages: Message[];
   modelCall: AgentModelCall;
+  toolSelector?: AgentToolSelectorCall;
+  enabledTools?: AgentToolCall["name"][];
   systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
@@ -70,51 +87,71 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
   const now = input.now ?? (() => new Date());
   const goal = lastUserMessage(input.messages);
   const capabilities = routeAgentCapabilities(goal);
-  const allowedTools = capabilities.filter((capability) => capability.id !== "gharibo_model").map((capability) => capability.id);
+  const enabledTools = input.enabledTools ? new Set(input.enabledTools) : null;
+  const allowedTools = capabilities
+    .filter((capability) => capability.id !== "gharibo_model")
+    .map((capability) => capability.id)
+    .filter((name) => !enabledTools || enabledTools.has(name as AgentToolCall["name"]));
   const activity: AgentActivityEvent[] = [];
   const toolResults: AgentToolResult[] = [];
 
   if (allowedTools.length > 0) {
-    activity.push(event(now, "PLANNING", "Planning the request", "RUNNING"));
-    const plannerContext = compactPlannerContext(input.messages);
+    activity.push(event(now, "PLANNING", input.toolSelector ? "Selecting the right tool" : "Planning the request", "RUNNING"));
+    let selectedCalls: AgentToolCall[] = [];
 
-    const callPlanner = async (systemPrompt: string, maxTokens: number): Promise<string> => input.modelCall({
-      messages: [{ role: "user", content: plannerContext }],
-      systemPrompt,
-      temperature: 0,
-      maxTokens,
-    });
-
-    let plan: AgentPlan;
     try {
-      const firstRaw = await callPlanner(buildPlannerSystemPrompt(allowedTools), 1024);
-      try {
-        plan = parseAgentPlan(firstRaw);
-      } catch {
-        const repairedRaw = await callPlanner(plannerRepairPrompt(allowedTools, "INVALID_JSON"), 1536);
-        plan = parseAgentPlan(repairedRaw);
-      }
+      if (input.toolSelector) {
+        const selection = await input.toolSelector({
+          messages: input.messages.slice(-6),
+          tools: nativeToolDefinitions(allowedTools),
+          systemPrompt: [
+            "You are the tool-selection layer for GHARIBO Agent.",
+            "When a listed tool can materially improve correctness, call exactly one tool.",
+            "For arithmetic, always call calculator instead of calculating mentally.",
+            "Do not invent tool results.",
+          ].join("\n"),
+          maxTokens: 256,
+        });
+        if (selection.toolCall) selectedCalls = [selection.toolCall];
+      } else {
+        const plannerContext = compactPlannerContext(input.messages);
+        const callPlanner = async (systemPrompt: string, maxTokens: number): Promise<string> => input.modelCall({
+          messages: [{ role: "user", content: plannerContext }],
+          systemPrompt,
+          temperature: 0,
+          maxTokens,
+        });
 
-      if (allowedTools.includes("calculator") && !hasTool(plan, "calculator")) {
-        const repairedRaw = await callPlanner(plannerRepairPrompt(allowedTools, "MISSING_CALCULATOR"), 1536);
-        plan = parseAgentPlan(repairedRaw);
+        let plan: AgentPlan;
+        const firstRaw = await callPlanner(buildPlannerSystemPrompt(allowedTools), 1024);
+        try {
+          plan = parseAgentPlan(firstRaw);
+        } catch {
+          const repairedRaw = await callPlanner(plannerRepairPrompt(allowedTools, "INVALID_JSON"), 1536);
+          plan = parseAgentPlan(repairedRaw);
+        }
+        if (allowedTools.includes("calculator") && !hasTool(plan, "calculator")) {
+          const repairedRaw = await callPlanner(plannerRepairPrompt(allowedTools, "MISSING_CALCULATOR"), 1536);
+          plan = parseAgentPlan(repairedRaw);
+        }
+        selectedCalls = plan.toolCalls.slice(0, 8);
       }
     } catch (error) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
       throw new Error(`AGENT_PLANNING_FAILED:${error instanceof Error ? error.message : "unknown"}`);
     }
 
-    if (allowedTools.includes("calculator") && !hasTool(plan, "calculator")) {
+    if (allowedTools.includes("calculator") && !selectedCalls.some((call) => call.name === "calculator")) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
       throw new Error("AGENT_REQUIRED_TOOL_OMITTED:calculator");
     }
-    if (plan.toolCalls.some((call) => !allowedTools.includes(call.name))) {
+    if (selectedCalls.some((call) => !allowedTools.includes(call.name))) {
       activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "FAILED" };
       throw new Error("AGENT_DISALLOWED_TOOL");
     }
     activity[activity.length - 1] = { ...activity[activity.length - 1]!, status: "DONE" };
 
-    for (const call of plan.toolCalls.slice(0, 8)) {
+    for (const call of selectedCalls) {
       const started = event(now, "USING_TOOL", `Using ${call.name}`, "RUNNING", call.name);
       activity.push(started);
       const result = await executeAgentTool(call, input.adapters);

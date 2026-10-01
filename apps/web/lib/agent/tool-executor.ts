@@ -11,7 +11,23 @@ export interface AgentToolAdapters {
 export async function executeAgentTool(call: AgentToolCall, adapters: AgentToolAdapters = {}): Promise<AgentToolResult> {
   try {
     if (call.name === "calculator") {
-      return { callId: call.id, name: call.name, ok: true, data: runCalculator(call.input as CalculatorRequest) };
+      const raw = call.input as Partial<CalculatorRequest> & {
+        op?: "add" | "subtract" | "multiply" | "divide" | "percent_of";
+        a?: string | number;
+        b?: string | number;
+        precision?: number;
+      };
+      const request: CalculatorRequest = Array.isArray(raw.operations)
+        ? raw as CalculatorRequest
+        : {
+            operations: [{
+              op: raw.op ?? "add",
+              a: raw.a ?? 0,
+              b: raw.b ?? 0,
+            }],
+            precision: raw.precision,
+          };
+      return { callId: call.id, name: call.name, ok: true, data: runCalculator(request) };
     }
 
     const adapter = call.name === "code_solver"

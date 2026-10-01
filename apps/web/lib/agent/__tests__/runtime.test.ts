@@ -28,6 +28,32 @@ describe("runAgentTurn", () => {
     expect(modelCall).toHaveBeenCalledTimes(2);
   });
 
+  it("uses native tool selection when a selector is connected", async () => {
+    const modelCall = vi.fn<AgentModelCall>().mockImplementation(async (request) => {
+      expect(request.systemPrompt).toContain('"final":"258.33"');
+      return "USD 258.33/MT";
+    });
+    const toolSelector = vi.fn().mockResolvedValue({
+      toolCall: {
+        id: "call-1",
+        name: "calculator",
+        input: { op: "divide", a: 6200, b: 24, precision: 2 },
+      },
+      answer: null,
+    });
+
+    const result = await runAgentTurn({
+      messages: [{ role: "user", content: "Calculate freight per MT: USD 6,200 / 24 MT" }],
+      modelCall,
+      toolSelector,
+    });
+
+    expect(result.answer).toBe("USD 258.33/MT");
+    expect(result.toolResults[0]?.data).toMatchObject({ final: "258.33" });
+    expect(toolSelector).toHaveBeenCalledTimes(1);
+    expect(modelCall).toHaveBeenCalledTimes(1);
+  });
+
   it("repairs one invalid planner response before failing the turn", async () => {
     const repairedPlan = JSON.stringify({
       canAnswerDirectly: false,

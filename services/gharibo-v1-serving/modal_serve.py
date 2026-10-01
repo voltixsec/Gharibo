@@ -52,7 +52,7 @@ app = modal.App(APP_NAME)
 
 @app.function(
     image=runtime_image,
-    gpu="T4",
+    gpu="L4",
     cpu=4.0,
     memory=32768,
     volumes={

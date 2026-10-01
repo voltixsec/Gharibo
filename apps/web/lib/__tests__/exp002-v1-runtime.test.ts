@@ -21,6 +21,7 @@ import {
   checkV1Health,
   describeV1Runtime,
   extractV1Answer,
+  extractV1ToolSelection,
   redactRuntimeConfig,
   resolveRuntimeToken,
   resolveV1RuntimeConfig,
@@ -375,6 +376,29 @@ describe("final-channel-only answers", () => {
   it("tolerates a malformed response body without throwing", () => {
     expect(extractV1Answer(null).ok).toBe(false);
     expect(extractV1Answer("not json").ok).toBe(false);
+  });
+
+  it("extracts one OpenAI-compatible native tool call without surfacing analysis", () => {
+    const result = extractV1ToolSelection({
+      choices: [{
+        message: {
+          content: null,
+          tool_calls: [{
+            id: "call-1",
+            type: "function",
+            function: { name: "calculator", arguments: '{"op":"divide","a":6200,"b":24,"precision":2}' },
+          }],
+        },
+      }],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.toolCall).toEqual({
+      id: "call-1",
+      name: "calculator",
+      input: { op: "divide", a: 6200, b: 24, precision: 2 },
+    });
+    expect(result.answer).toBeNull();
   });
 });
 

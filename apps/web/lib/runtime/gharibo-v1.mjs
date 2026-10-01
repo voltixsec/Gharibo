@@ -520,6 +520,52 @@ export function extractV1Answer(responseBody) {
   };
 }
 
+/**
+ * Extract one OpenAI-compatible function call from a tool-enabled response.
+ * If the model answers directly instead, the validated final answer is returned.
+ * Hidden Harmony analysis is never surfaced on either path.
+ */
+export function extractV1ToolSelection(responseBody) {
+  const choices = responseBody?.choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return { ok: false, toolCall: null, answer: null, reason: V1_ANSWER_REASONS.NO_CHOICES };
+  }
+
+  const message = choices[0]?.message;
+  const calls = message?.tool_calls;
+  if (Array.isArray(calls) && calls.length > 0) {
+    const call = calls[0];
+    const name = call?.function?.name;
+    const rawArguments = call?.function?.arguments;
+    if (typeof name !== "string" || !name || typeof rawArguments !== "string") {
+      return { ok: false, toolCall: null, answer: null, reason: "INVALID_TOOL_CALL" };
+    }
+    let input;
+    try {
+      input = JSON.parse(rawArguments);
+    } catch {
+      return { ok: false, toolCall: null, answer: null, reason: "INVALID_TOOL_ARGUMENTS" };
+    }
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return { ok: false, toolCall: null, answer: null, reason: "INVALID_TOOL_ARGUMENTS" };
+    }
+    return {
+      ok: true,
+      toolCall: { id: typeof call.id === "string" ? call.id : "tool-0", name, input },
+      answer: null,
+      reason: "TOOL_CALL",
+    };
+  }
+
+  const answer = extractV1Answer(responseBody);
+  return {
+    ok: answer.ok,
+    toolCall: null,
+    answer: answer.answer,
+    reason: answer.reason,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // End-to-end chat (the contract the application route drives)
 // ---------------------------------------------------------------------------
@@ -598,6 +644,59 @@ export async function runV1Chat({
 
     const json = await response.json();
     return extractV1Answer(json);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Ask the base model to choose one native function tool. The serving layer
+ * temporarily disables the LoRA whenever `tools` are present, so this call uses
+ * the untouched gpt-oss base strictly as a tool selector.
+ */
+export async function runV1ToolSelection({
+  config,
+  token,
+  messages,
+  tools,
+  systemPrompt,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 180_000,
+  maxTokens = 256,
+}) {
+  if (!config?.configured || !config.baseUrl) throw new Error("GHARIBO V1 runtime is not configured");
+  if (typeof fetchImpl !== "function") throw new Error("No fetch implementation available for the V1 runtime");
+  if (!Array.isArray(tools) || tools.length === 0) throw new Error("Tool selection requires at least one tool");
+
+  const url = `${config.baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
+  const body = {
+    model: config.modelId,
+    ...buildV1Request(messages, {
+      systemPrompt,
+      temperature: 0,
+      maxTokens,
+    }),
+    tools,
+    tool_choice: "auto",
+    stream: false,
+  };
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(`GHARIBO V1 tool-selection error HTTP ${response.status}: ${errText.slice(0, 200)}`);
+    }
+    return extractV1ToolSelection(await response.json());
   } finally {
     clearTimeout(timer);
   }

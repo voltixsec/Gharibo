@@ -25,10 +25,13 @@ import { conversationsRepository, providersRepository } from "@/lib/db/repositor
 import { getProvider } from "@/lib/providers";
 import type { Message } from "@gharibo/shared";
 import { z } from "zod";
+import { runAgentTurn } from "@/lib/agent/runtime";
+import type { AgentToolCall } from "@/lib/agent/contracts";
 import {
   resolveV1RuntimeConfig,
   resolveRuntimeToken,
   runV1Chat,
+  runV1ToolSelection,
   V1_ENV,
   V1_MODEL_ID,
   V1_RUNTIME_PROVIDER_ID,
@@ -240,6 +243,10 @@ export async function POST(
     systemPrompt: conv.systemPrompt ?? undefined,
     toolsEnabled: conv.toolsEnabled,
   };
+  const agentEnabled =
+    route.kind === ROUTE_KIND.V1 &&
+    conv.toolsEnabled === true &&
+    String(process.env.GHARIBO_AGENT_ENABLED ?? "").toLowerCase() === "true";
 
   const routedProviderId = route.kind === ROUTE_KIND.V1 ? null : route.providerId;
   const routedModelId = route.kind === ROUTE_KIND.V1 ? V1_MODEL_ID : route.modelId;
@@ -309,7 +316,48 @@ export async function POST(
             // v1Config is guaranteed configured by the route guard above.
             const config = v1Config!;
             const token = resolveRuntimeToken(config, process.env);
-            const extracted = await runV1Chat({ config, token, messages, options });
+            const extracted = agentEnabled
+              ? await (async () => {
+                  send({ status: "agent", modelId: V1_MODEL_ID });
+                  const agent = await runAgentTurn({
+                    messages,
+                    enabledTools: ["calculator"],
+                    systemPrompt: options.systemPrompt,
+                    temperature: options.temperature,
+                    maxTokens: options.maxTokens,
+                    toolSelector: async (selectionRequest) => {
+                      const selected = await runV1ToolSelection({
+                        config,
+                        token,
+                        messages: selectionRequest.messages,
+                        tools: selectionRequest.tools,
+                        systemPrompt: selectionRequest.systemPrompt,
+                        maxTokens: selectionRequest.maxTokens ?? 256,
+                      });
+                      if (!selected.ok) throw new Error(selected.reason || "TOOL_SELECTION_FAILED");
+                      return {
+                        toolCall: selected.toolCall as AgentToolCall | null,
+                        answer: selected.answer ?? null,
+                      };
+                    },
+                    modelCall: async (modelRequest) => {
+                      const final = await runV1Chat({
+                        config,
+                        token,
+                        messages: modelRequest.messages,
+                        options: {
+                          systemPrompt: modelRequest.systemPrompt,
+                          temperature: modelRequest.temperature,
+                          maxTokens: modelRequest.maxTokens,
+                        },
+                      });
+                      if (!final.ok || !final.answer) throw new Error(final.reason || "NO_FINAL_ANSWER");
+                      return final.answer;
+                    },
+                  });
+                  return { ok: true, answer: agent.answer, reason: "OK", analysisPresent: false };
+                })()
+              : await runV1Chat({ config, token, messages, options });
             if (extracted.ok && extracted.answer) {
               // Mark as recorded so the shared tail below cannot write it twice.
               persistAnswer(extracted.answer);

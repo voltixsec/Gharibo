@@ -6,6 +6,7 @@ import {
   resolveRuntimeToken,
   resolveV1RuntimeConfig,
   runV1Chat,
+  runV1ToolSelection,
 } from "@/lib/runtime/gharibo-v1.mjs";
 
 const requestSchema = z.object({
@@ -43,6 +44,18 @@ export async function POST(request: NextRequest) {
       systemPrompt: parsed.data.systemPrompt,
       temperature: parsed.data.temperature ?? 0.2,
       maxTokens: parsed.data.maxTokens ?? 1024,
+      toolSelector: async (selectionRequest) => {
+        const selected = await runV1ToolSelection({
+          config,
+          token,
+          messages: selectionRequest.messages,
+          tools: selectionRequest.tools,
+          systemPrompt: selectionRequest.systemPrompt,
+          maxTokens: selectionRequest.maxTokens ?? 256,
+        });
+        if (!selected.ok) throw new Error(selected.reason || "TOOL_SELECTION_FAILED");
+        return { toolCall: selected.toolCall as any, answer: selected.answer ?? null };
+      },
       modelCall: async (modelRequest) => {
         const extracted = await runV1Chat({
           config,
