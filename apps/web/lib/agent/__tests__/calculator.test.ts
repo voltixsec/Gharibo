@@ -2,18 +2,17 @@ import { describe, expect, it } from "vitest";
 import { runCalculator } from "../calculator";
 
 describe("runCalculator", () => {
-  it("keeps procurement arithmetic exact", () => {
+  it("keeps procurement arithmetic exact without model-computed intermediates", () => {
     const result = runCalculator({
       precision: 6,
       operations: [
         { op: "multiply", a: 240, b: "42.500" },
-        { op: "multiply", a: 10200, b: "0.93" },
-        { op: "add", a: 9486, b: 385 },
-        { op: "percent_of", a: 9871, b: 5 },
-        { op: "add", a: "9486", b: "385" },
-        { op: "add", a: "9871", b: "493.55" },
-        { op: "add", a: "10364.55", b: "95" },
-        { op: "divide", a: "10459.55", b: 240 },
+        { op: "percent_of", a: { step: 0 }, b: 93 },
+        { op: "add", a: { step: 1 }, b: 385 },
+        { op: "percent_of", a: { step: 2 }, b: 5 },
+        { op: "add", a: { step: 2 }, b: { step: 3 } },
+        { op: "add", a: { step: 4 }, b: 95 },
+        { op: "divide", a: { step: 5 }, b: 240 },
       ],
     });
 
@@ -22,7 +21,6 @@ describe("runCalculator", () => {
       "9486",
       "9871",
       "493.55",
-      "9871",
       "10364.55",
       "10459.55",
       "43.581458",
@@ -32,5 +30,9 @@ describe("runCalculator", () => {
 
   it("rejects division by zero", () => {
     expect(() => runCalculator({ operations: [{ op: "divide", a: 1, b: 0 }] })).toThrow("CALCULATOR_DIVIDE_BY_ZERO");
+  });
+
+  it("rejects forward step references", () => {
+    expect(() => runCalculator({ operations: [{ op: "add", a: { step: 0 }, b: 1 }] })).toThrow("CALCULATOR_INVALID_STEP_REFERENCE");
   });
 });
