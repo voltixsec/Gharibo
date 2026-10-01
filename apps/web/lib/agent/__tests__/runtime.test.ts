@@ -62,6 +62,25 @@ describe("runAgentTurn", () => {
     ]));
   });
 
+  it("bypasses GPU tool selection for a recognised ordering puzzle", async () => {
+    const modelCall = vi.fn<AgentModelCall>().mockImplementation(async (request) => {
+      expect(request.systemPrompt).toContain('"count":2');
+      return "Valid orders: A-D-B-C and D-A-C-B. Count: 2.";
+    });
+    const toolSelector = vi.fn().mockRejectedValue(new Error("selector must not run"));
+
+    const result = await runAgentTurn({
+      messages: [{ role: "user", content: "A warehouse has four shipments: A, B, C and D. Rules: A must arrive before C. B must arrive after D. C cannot be first. D cannot be last. Exactly one shipment is between A and B. B cannot be second." }],
+      modelCall,
+      toolSelector,
+    });
+
+    expect(toolSelector).not.toHaveBeenCalled();
+    expect(result.toolResults[0]?.name).toBe("code_solver");
+    expect(result.toolResults[0]?.data).toMatchObject({ count: 2 });
+    expect(result.answer).toContain("Count: 2");
+  });
+
   it("repairs one invalid planner response before failing the turn", async () => {
     const repairedPlan = JSON.stringify({
       canAnswerDirectly: false,

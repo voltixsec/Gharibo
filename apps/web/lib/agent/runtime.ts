@@ -4,6 +4,7 @@ import type { AgentActivityEvent, AgentPlan, AgentToolCall, AgentToolResult, Age
 import { buildPlannerSystemPrompt, parseAgentPlan } from "./planner";
 import { routeAgentCapabilities } from "./registry";
 import { nativeToolDefinitions, type NativeToolDefinition } from "./native-tools";
+import { parseOrderingPuzzle } from "./logic-solver";
 import { executeAgentTool, type AgentToolAdapters } from "./tool-executor";
 
 export interface AgentModelRequest {
@@ -106,7 +107,13 @@ export async function runAgentTurn(input: RunAgentTurnInput): Promise<AgentTurnR
     let selectedCalls: AgentToolCall[] = [];
 
     try {
-      if (input.toolSelector) {
+      const deterministicLogic = allowedTools.includes("code_solver")
+        ? parseOrderingPuzzle(goal)
+        : null;
+
+      if (deterministicLogic) {
+        selectedCalls = [{ id: randomUUID(), name: "code_solver", input: deterministicLogic }];
+      } else if (input.toolSelector) {
         const selection = await input.toolSelector({
           messages: input.messages.slice(-6),
           tools: nativeToolDefinitions(allowedTools),

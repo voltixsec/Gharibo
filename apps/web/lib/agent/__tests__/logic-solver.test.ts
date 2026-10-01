@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { solveLogic } from "../logic-solver";
+import { parseOrderingPuzzle, solveLogic } from "../logic-solver";
 
 describe("solveLogic", () => {
   it("solves the warehouse benchmark exactly", () => {
@@ -36,5 +36,16 @@ describe("solveLogic", () => {
       items: ["A", "B", "C", "D", "E", "F", "G", "H", "I"],
       rules: [{ type: "before", a: "A", b: "B" }],
     })).toThrow("LOGIC_SOLVER_ITEMS_RANGE");
+  });
+
+  it("parses the warehouse benchmark without a model call", () => {
+    const parsed = parseOrderingPuzzle(
+      "A warehouse has four shipments: A, B, C and D. Rules: A must arrive before C. B must arrive after D. C cannot be first. D cannot be last. Exactly one shipment is between A and B. B cannot be second.",
+    );
+    expect(parsed).not.toBeNull();
+    expect(solveLogic(parsed!).validOrders).toEqual([
+      ["A", "D", "B", "C"],
+      ["D", "A", "C", "B"],
+    ]);
   });
 });

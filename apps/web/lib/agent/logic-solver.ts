@@ -19,6 +19,21 @@ export interface LogicSolverResult {
   truncated: boolean;
 }
 
+const ORDINALS: Record<string, number> = {
+  first: 1, second: 2, third: 3, fourth: 4,
+  fifth: 5, sixth: 6, seventh: 7, eighth: 8,
+};
+
+function itemToken(value: string): string {
+  return value.trim().replace(/[.,;:!?]+$/g, "");
+}
+
+function wordNumber(value: string): number | null {
+  const words: Record<string, number> = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+  if (/^\d+$/.test(value)) return Number(value);
+  return words[value.toLowerCase()] ?? null;
+}
+
 function assertItem(value: unknown, items: Set<string>): string {
   const item = typeof value === "string" ? value.trim() : "";
   if (!item || !items.has(item)) throw new Error("LOGIC_SOLVER_UNKNOWN_ITEM");
@@ -86,6 +101,78 @@ function permutations(items: string[], visit: (order: string[]) => void) {
     }
   };
   walk();
+}
+
+/**
+ * Deterministically recognises a bounded class of ordering puzzles before a GPU
+ * tool-selection call is attempted. It deliberately returns null when a
+ * constraint-looking sentence is not understood, so partial parsing can never
+ * silently produce a wrong solution.
+ */
+export function parseOrderingPuzzle(text: string): LogicSolverRequest | null {
+  const source = String(text ?? "").replace(/\r/g, " ");
+  if (!/\b(before|after|between|adjacent|first|second|third|fourth|last)\b/i.test(source)) return null;
+
+  const rules: LogicRule[] = [];
+  const items: string[] = [];
+  const seen = new Set<string>();
+  const addItem = (raw: string) => {
+    const item = itemToken(raw);
+    if (item && !seen.has(item)) { seen.add(item); items.push(item); }
+    return item;
+  };
+  const constraintSentences = source
+    .split(/[.\n]+/)
+    .map((part) => part.trim())
+    .filter((part) => /\b(must|cannot|between|adjacent)\b/i.test(part));
+
+  for (const sentence of constraintSentences) {
+    let matched = false;
+    let m: RegExpMatchArray | null;
+
+    m = sentence.match(/\b([A-Za-z][A-Za-z0-9_-]*)\b\s+must\s+(?:arrive\s+)?before\s+\b([A-Za-z][A-Za-z0-9_-]*)\b/i);
+    if (m) { rules.push({ type: "before", a: addItem(m[1]!), b: addItem(m[2]!) }); matched = true; }
+
+    m = sentence.match(/\b([A-Za-z][A-Za-z0-9_-]*)\b\s+must\s+(?:arrive\s+)?after\s+\b([A-Za-z][A-Za-z0-9_-]*)\b/i);
+    if (m) { rules.push({ type: "after", a: addItem(m[1]!), b: addItem(m[2]!) }); matched = true; }
+
+    m = sentence.match(/\b([A-Za-z][A-Za-z0-9_-]*)\b\s+cannot\s+be\s+(first|second|third|fourth|fifth|sixth|seventh|eighth)\b/i);
+    if (m) { rules.push({ type: "not_position", item: addItem(m[1]!), position: ORDINALS[m[2]!.toLowerCase()]! }); matched = true; }
+
+    m = sentence.match(/\b([A-Za-z][A-Za-z0-9_-]*)\b\s+must\s+be\s+(first|second|third|fourth|fifth|sixth|seventh|eighth)\b/i);
+    if (m) { rules.push({ type: "position", item: addItem(m[1]!), position: ORDINALS[m[2]!.toLowerCase()]! }); matched = true; }
+
+    m = sentence.match(/exactly\s+(zero|one|two|three|four|five|six|\d+)\s+\w+\s+(?:is|are)\s+between\s+\b([A-Za-z][A-Za-z0-9_-]*)\b\s+and\s+\b([A-Za-z][A-Za-z0-9_-]*)\b/i);
+    if (m) {
+      const count = wordNumber(m[1]!);
+      if (count === null) return null;
+      rules.push({ type: "between_count", a: addItem(m[2]!), b: addItem(m[3]!), count });
+      matched = true;
+    }
+
+    m = sentence.match(/\b([A-Za-z][A-Za-z0-9_-]*)\b\s+and\s+\b([A-Za-z][A-Za-z0-9_-]*)\b\s+(?:must\s+be\s+)?adjacent\b/i);
+    if (m) { rules.push({ type: "adjacent", a: addItem(m[1]!), b: addItem(m[2]!) }); matched = true; }
+
+    // "last" needs the final item count, so defer it until all other items are known.
+    m = sentence.match(/\b([A-Za-z][A-Za-z0-9_-]*)\b\s+cannot\s+be\s+last\b/i);
+    if (m) { addItem(m[1]!); matched = true; }
+
+    if (!matched) return null;
+  }
+
+  // Pull any explicit item list ("shipments: A, B, C and D") into the set.
+  const listMatch = source.match(/\b(?:shipments|items|tasks|entries)\s*:\s*([A-Za-z0-9_,\s-]+?)(?:\.|\bRules\b)/i);
+  if (listMatch) {
+    listMatch[1]!.split(/\s*,\s*|\s+and\s+/i).map(itemToken).filter(Boolean).forEach(addItem);
+  }
+  if (items.length < 2 || items.length > 8 || rules.length === 0) return null;
+
+  for (const sentence of constraintSentences) {
+    const m = sentence.match(/\b([A-Za-z][A-Za-z0-9_-]*)\b\s+cannot\s+be\s+last\b/i);
+    if (m) rules.push({ type: "not_position", item: addItem(m[1]!), position: items.length });
+  }
+
+  return { items, rules, maxSolutions: 1000 };
 }
 export function solveLogic(request: LogicSolverRequest): LogicSolverResult {
   const items = Array.isArray(request?.items) ? request.items.map((item) => String(item).trim()) : [];
