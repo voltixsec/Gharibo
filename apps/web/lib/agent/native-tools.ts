@@ -42,13 +42,35 @@ const DEFINITIONS: Record<AgentToolName, NativeToolDefinition> = {
     type: "function",
     function: {
       name: "code_solver",
-      description: "Solve a bounded code or logic task and return a structured result.",
+      description: "Solve bounded ordering and constraint puzzles deterministically. Convert each stated rule into the structured rule schema; do not solve the puzzle mentally.",
       parameters: {
         type: "object",
         properties: {
-          task: { type: "string", description: "The exact code or logic task to solve." },
+          items: {
+            type: "array",
+            description: "Unique item labels to arrange, in any initial order.",
+            items: { type: "string" },
+          },
+          rules: {
+            type: "array",
+            description: "All constraints from the user request. Supported types: before, after, position, not_position, between_count, adjacent.",
+            items: {
+              type: "object",
+              description: "One normalized logic rule.",
+              properties: {
+                type: { type: "string", enum: ["before", "after", "position", "not_position", "between_count", "adjacent"], description: "Rule type." },
+                a: { type: "string", description: "First item for pair rules." },
+                b: { type: "string", description: "Second item for pair rules." },
+                item: { type: "string", description: "Item for position rules." },
+                position: { type: "integer", description: "1-based position for position/not_position." },
+                count: { type: "integer", description: "Exact number of items between a and b for between_count." },
+              },
+              required: ["type"],
+            },
+          },
+          maxSolutions: { type: "integer", minimum: 1, maximum: 1000, default: 1000, description: "Maximum valid orders to return." },
         },
-        required: ["task"],
+        required: ["items", "rules"],
       },
     },
   },

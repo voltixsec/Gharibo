@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
   try {
     const research = createResearchAdapters(process.env);
     const enabledTools = research.searchConfigured
-      ? (["calculator", "web_search", "web_fetch"] as const)
-      : (["calculator", "web_fetch"] as const);
+      ? (["calculator", "code_solver", "web_search", "web_fetch"] as const)
+      : (["calculator", "code_solver", "web_fetch"] as const);
     const result = await runAgentTurn({
       messages: parsed.data.messages as Message[],
       enabledTools: [...enabledTools],

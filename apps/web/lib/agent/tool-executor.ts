@@ -1,5 +1,6 @@
 import type { AgentEvidence, AgentToolCall, AgentToolResult } from "./contracts";
 import { runCalculator, type CalculatorRequest } from "./calculator";
+import { solveLogic, type LogicSolverRequest } from "./logic-solver";
 
 export interface AgentToolAdapters {
   codeSolver?: (input: unknown) => Promise<unknown>;
@@ -48,11 +49,13 @@ export async function executeAgentTool(call: AgentToolCall, adapters: AgentToolA
       return { callId: call.id, name: call.name, ok: true, data: runCalculator(request) };
     }
 
-    const adapter = call.name === "code_solver"
-      ? adapters.codeSolver
-      : call.name === "web_search"
-        ? adapters.webSearch
-        : call.name === "web_fetch"
+    if (call.name === "code_solver") {
+      return { callId: call.id, name: call.name, ok: true, data: solveLogic(call.input as LogicSolverRequest) };
+    }
+
+    const adapter = call.name === "web_search"
+      ? adapters.webSearch
+      : call.name === "web_fetch"
           ? adapters.webFetch
           : adapters.evidenceVerify;
 
